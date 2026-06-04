@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ── helpers ── */
+    function signedIn()      { return request.auth != null; }
+    function isUser(uid)     { return signedIn() && request.auth.uid == uid; }
+    // keys present in the incoming write but changed vs existing doc
+    function changed(keys)   { return request.resource.data.diff(resource.data).affectedKeys().hasAny(keys); }
+
+    /* default deny */
+    match /{document=**} { allow read, write: if false; }
+
+    /* ── Gap A/B/C — USERS ──
+       Read: owner only. Create: owner, but server-only fields must be absent/zeroed.
+       Update: owner may touch ONLY profile fields. economy/tasteVector/streak/
+       isPremium/premiumSince are server-authored (Admin SDK bypasses rules). */
+    match /users/{uid} {
+      allow read:   if isUser(uid);
+      allow create: if isUser(uid)
+                    && request.resource.data.uid == uid
+                    && request.resource.data.isPremium == false;
+      allow update: if isUser(uid)
+                    && !changed(['economy','tasteVector','streak',
+                                 'isPremium','premiumSince','uid','createdAt']);
+      allow delete: if false;
+
+      /* ── Gap C — LEDGER (append-only, server-written) ── */
+      match /ledger/{eventId} {
+        allow read:  if isUser(uid);
+        allow write: if false;            // Admin SDK only
+      }
+    }
+
+    /* ── Feature 1 — SHARE CARDS (public read for unfurls; server writes) ── */
+    match /cards/{cardId} {
+      allow read:  if true;               // shareable by link
+      allow write: if false;              // server renders + writes (locks roast fields)
+    }
+
+    /* ── Feature 3 — DUELS (realtime) ──
+       Read: a participant. Create: challenger sets self, no winner/comparison yet.
+       Update: a participant, but winner/comparison are server-authored. */
+    match /duels/{duelId} {
+      allow read:   if signedIn()
+                    && request.auth.uid in resource.data.participantUids;
+      allow create: if signedIn()
+                    && request.resource.data.challenger.uid == request.auth.uid
+                    && request.resource.data.winnerUid == null
+                    && request.resource.data.comparison == null;
+      allow update: if signedIn()
+                    && request.auth.uid in request.resource.data.participantUids
+                    && !changed(['winnerUid','comparison','challenger','inviteCode',
+                                 'questionSet','createdAt']);
+      allow delete: if false;
+    }
+
+    /* ── Feature 5 — LIVE EVENTS (realtime FOMO ticker) ──
+       Public read for the countdown + claimedCount. Capacity/winner ranking are
+       enforced in a server transaction → all writes (event + claims) are server-only. */
+    match /liveEvents/{eventId} {
+      allow read:  if true;
+      allow write: if false;              // Admin SDK / callable only
+
+      match /claims/{uid} {
+        allow read:  if true;             // leaderboard of winners
+        allow write: if false;            // server transaction assigns rank/isWinner
+      }
+    }
+
+    /* ── Pre-existing quiz sessions (unchanged) ── */
+    match /sessions/{sessionId} {
+      allow read:  if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
