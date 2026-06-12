@@ -15,7 +15,7 @@ const WAVE2_PERSONAS = [
     loves: ['parody', 'spoof', 'פארודיה'], hates: ['serious', 'רציני'],
     tier: 'elite', behavior: { trailerFocus: true } },
   { name: 'W2 Supernatural-Only Believer (44, f)', expected: 'The Cinematic Edge-Lord',
-    bucketVotes: { horror: 5, mystery: 4, horror2: 2, comedy: 1 },
+    bucketVotes: { horror: 5, mystery: 4, horror2: 3, comedy: 1 },
     loves: ['haunted', 'possession', 'exorcism', 'רוח'], hates: ['slasher', 'gore'],
     tier: 'elite', behavior: {} },
   { name: 'W2 Found-Footage Hunter (21, m)', expected: 'The Cinematic Edge-Lord',

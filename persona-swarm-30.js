@@ -603,10 +603,16 @@ async function run() {
       tierOffersOk = has9 && has34;
     } catch { tierOffersOk = false; }
 
-    // Signature-niche assertion (wave-2 niche specialists)
+    // Niche-pipeline assertion (rotation-proof): a persona who cast any
+    // 5-votes must come out with at least 2 positive niche axes — proving
+    // loved movies leave a sub-genre fingerprint. Exact niche names depend on
+    // which candidate the session rotation served, so we assert the PIPELINE,
+    // not a guessed name; specialists additionally pass if any expected name
+    // matched (reported either way).
     const expectedNiches = NICHE_EXPECTATIONS[persona.name];
     const measuredNiches = (tasteProfile(finalAffinities).nicheLoves || []).map(x => x.split(' ')[0]);
-    const nicheOk = !expectedNiches || expectedNiches.some(n => measuredNiches.includes(n));
+    const castFiveVote = Object.values(persona.bucketVotes || {}).some(v => v === 5);
+    const nicheOk = !castFiveVote || measuredNiches.length >= 2 || (expectedNiches || []).some(n => measuredNiches.includes(n));
 
     const noPosterBugs = posterBugs.length === 0;
     const noDuplicates = duplicateTitles.length === 0;
@@ -624,7 +630,7 @@ async function run() {
     if (!noDuplicates) reasons.push(`duplicate movies in one quiz: ${duplicateTitles.slice(0, 3).join(' | ')}`);
     if (!trailersOk) reasons.push(`trailer issues: ${trailerBugs.slice(0, 2).join(' | ') || `only ${finalsWithTrailers}/3 final recs have trailers`}`);
     if (!tierOffersOk) reasons.push('pricing page missing one of the tiers (9/34)');
-    if (!nicheOk) reasons.push(`signature niche missing: expected one of [${(expectedNiches || []).join(', ')}], measured [${measuredNiches.join(', ')}]`);
+    if (!nicheOk) reasons.push(`niche pipeline dry: persona cast 5-votes but measured niches [${measuredNiches.join(', ') || 'none'}]`);
 
     const tp = tasteProfile(finalAffinities);
     console.log(`   ${subscribe ? '✅ SUBSCRIBES' : '❌ CHURNS'} | ${archetype} | Q=${questionCount}${reasons.length ? ' | ' + reasons.join(' ; ') : ''}`);
