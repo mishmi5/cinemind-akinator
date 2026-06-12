@@ -136,12 +136,10 @@ export default function LoginPage() {
 
         </div>
 
-        <p className="mt-8 text-xs text-zinc-600 font-medium">
-          <div className="flex flex-col gap-1 items-center">
-            <span>בכניסה אתה מסכים ל<Link href="#" className="text-indigo-400 hover:underline">תנאי השימוש</Link> ול<Link href="#" className="text-indigo-400 hover:underline">מדיניות הפרטיות</Link>.</span>
-            <span className="text-xs text-zinc-600 mt-2">(דברים שהעורך דין שלנו הכריח אותנו לכתוב. חסר לכם שאתם לא קוראים עד הסוף, זה עלה לנו ים כסף 💼💸)</span>
-          </div>
-        </p>
+        <div className="mt-8 text-xs text-zinc-600 font-medium flex flex-col gap-1 items-center">
+          <span>בכניסה אתה מסכים ל<Link href="#" className="text-indigo-400 hover:underline">תנאי השימוש</Link> ול<Link href="#" className="text-indigo-400 hover:underline">מדיניות הפרטיות</Link>.</span>
+          <span className="text-xs text-zinc-600 mt-2">(דברים שהעורך דין שלנו הכריח אותנו לכתוב. חסר לכם שאתם לא קוראים עד הסוף, זה עלה לנו ים כסף 💼💸)</span>
+        </div>
       </div>
     </main>
   );

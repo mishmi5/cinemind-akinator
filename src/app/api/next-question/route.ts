@@ -61,55 +61,33 @@ Must follow:
   }
 }
 
-// Genre metadata corrected to true TMDB taxonomy — Se7en/Scream were missing Mystery (9648),
-// which starved the Mystery affinity signal and misclassified detective-taste users.
-const FALLBACK_POOL: MovieContext[] = [
-  { id: "155", title: "האביר האפל", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/qJ2tW6WMUDux911r6m7haRef0WH.jpg", overview: "באטמן מתמודד מול הג'וקר...", trailerId: "EXeTwQWrcwY", easterEgg: { type: 'oscar' }, _genreIds: [28, 80, 53] },
-  { id: "27205", title: "התחלה", originalDetails: "Inception · 2010", rating: 8.8, posterUrl: "/api/poster?path=/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg", overview: "גנב חלומות...", trailerId: "YoHD9XEInc0", easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
-  { id: "807", title: "שבעה חטאים", originalDetails: "Se7en · 1995", rating: 8.6, posterUrl: "/api/poster?path=/wgQ7APnFpf1TuviKHXeEe3KnsTV.jpg", overview: "רוצח סדרתי מתוחכם...", trailerId: "znmZoVkCjpI", easterEgg: { type: 'blood' }, _genreIds: [80, 9648, 53] },
-  { id: "603", title: "מטריקס", originalDetails: "The Matrix · 1999", rating: 8.7, posterUrl: "/api/poster?path=/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg", overview: "העולם הוא אשליה...", trailerId: "vKQi3bBA1y8", easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
-  { id: "680", title: "ספרות זולה", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/d5iIlFn5s0ImszYzBPbOYKQruzY.jpg", overview: "פושעים בלוס אנג'לס...", trailerId: "s7EdQ4FqbhY", easterEgg: { type: 'wazzap' }, _genreIds: [80, 53] },
-  { id: "238", title: "הסנדק", originalDetails: "The Godfather · 1972", rating: 9.2, posterUrl: "/api/poster?path=/3bhkrj58Vtu7enYsRolD1fZdja1.jpg", overview: "ראש משפחת פשע בניו יורק...", trailerId: "UaVTIH8mujA", easterEgg: { type: 'oscar' }, _genreIds: [18, 80] },
-  { id: "98", title: "גלדיאטור", originalDetails: "Gladiator · 2000", rating: 8.2, posterUrl: "/api/poster?path=/ty8TGRuvJLPUmAR1H1nRIsgwvqV.jpg", overview: "גנרל רומי נבגד...", trailerId: "owK1qxDselE", easterEgg: { type: 'oscar' }, _genreIds: [28, 12] },
-  { id: "157336", title: "בין כוכבים", originalDetails: "Interstellar · 2014", rating: 8.6, posterUrl: "/api/poster?path=/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg", overview: "מסע בחלל להצלת האנושות...", trailerId: "zSWdZVtXT7E", easterEgg: { type: 'oscar' }, _genreIds: [878, 12] },
-  { id: "4232", title: "צעקה", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/xQZkMWe02OaVdK3xXyZ0B61rAEd.jpg", overview: "רוצח במסכה...", trailerId: "AWm_mkbdpCA", easterEgg: { type: 'wazzap' }, _genreIds: [27, 80, 9648] },
-  { id: "22970", title: "בקתה ביער", originalDetails: "The Cabin in the Woods · 2011", rating: 8.0, posterUrl: "/api/poster?path=/aC1242vB3k1KhyS7s5R7a303gZJ.jpg", overview: "חברים בבקתה...", trailerId: "NsIilFNNmkY", easterEgg: { type: 'blood' }, _genreIds: [27, 35] },
-  { id: "11036", title: "היומן", originalDetails: "The Notebook · 2004", rating: 8.0, posterUrl: "/api/poster?path=/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg", overview: "סיפור אהבה חוצה עשורים...", trailerId: "FC6biTjEyZw", easterEgg: { type: 'oscar' }, _genreIds: [10749, 18] },
-  { id: "862", title: "צעצוע של סיפור", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg", overview: "צעצועים קמים לתחייה...", trailerId: "v-PjgYDrg70", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
-];
+// Exploration pool lives in src/lib/engine/baselinePool.ts — 12 taste buckets ×
+// 2-3 TMDB-verified candidates. Per-session rotation gives every quiz full
+// genre coverage (accuracy) with a different movie mix and order (variety).
+// Old hardcoded pool had stale poster paths that rendered WRONG artwork
+// (Se7en displayed Detective Pikachu's poster).
+import { pickBaselineMovie, fullBaselinePool } from '@/lib/engine/baselinePool';
 
-// Exploration phase: deterministic genre-coverage order instead of random sampling.
-// The first 10 questions (init + 9) must span every taste bucket exactly once —
-// random selection left a ~33% chance a user's signature genre (e.g. Romance, which
-// has a single representative) never appeared, making their taste vector unrecoverable.
-const BASELINE_ORDER: string[] = [
-  "155",    // The Dark Knight — Action/Crime/Thriller
-  "603",    // The Matrix — Sci-Fi/Action
-  "11036",  // The Notebook — Romance/Drama (sole Romance signal!)
-  "862",    // Toy Story — Animation/Family/Comedy (sole Animation signal!)
-  "4232",   // Scream — Horror/Crime/Mystery
-  "807",    // Se7en — Crime/Mystery/Thriller
-  "238",    // The Godfather — Drama/Crime
-  "98",     // Gladiator — Action/Adventure
-  "680",    // Pulp Fiction — Crime/Thriller
-  "157336", // Interstellar — Sci-Fi/Adventure
-  "27205",  // Inception — reserve
-  "22970"   // Cabin in the Woods — reserve
-];
-
-const EN_TITLES: Record<string, string> = {
-  "155": "The Dark Knight", "27205": "Inception", "807": "Se7en", "603": "The Matrix",
-  "680": "Pulp Fiction", "238": "The Godfather", "98": "Gladiator", "157336": "Interstellar",
-  "4232": "Scream", "22970": "The Cabin in the Woods", "11036": "The Notebook", "862": "Toy Story"
+// Genre informativeness (IDF): Action/Drama/Thriller tag nearly every blockbuster,
+// so each occurrence carries little information about personal taste; Mystery,
+// Animation, Romance or Fantasy on a movie is a much stronger taste statement.
+// Without this, a fantasy lover who 5-stars fantasy-action blockbusters drifts
+// into "Action" purely because Action is the most over-represented genre.
+const GENRE_IDF: Record<string, number> = {
+  '28': 0.85,   // Action — on almost everything
+  '18': 0.9,    // Drama — ubiquitous
+  '53': 0.9,    // Thriller — ubiquitous
+  '80': 0.95,   // Crime
+  '35': 0.95,   // Comedy
+  '12': 1.05,   // Adventure
+  '878': 1.05,  // Sci-Fi
+  '27': 1.05,   // Horror
+  '10751': 1.05,// Family
+  '9648': 1.15, // Mystery — rare, highly informative
+  '16': 1.1,    // Animation
+  '10749': 1.1, // Romance
+  '14': 1.1,    // Fantasy
 };
-
-function pickBaselineMovie(askedMovieIds: string[], locale: string): MovieContext | null {
-  const nextId = BASELINE_ORDER.find(id => !askedMovieIds.includes(id));
-  if (!nextId) return null;
-  const movie = FALLBACK_POOL.find(m => m.id === nextId)!;
-  // English users were shown Hebrew titles for baseline movies — localize.
-  return locale === 'en' ? { ...movie, title: EN_TITLES[movie.id] || movie.title } : { ...movie };
-}
 
 // Latent-taste inference (the "serendipity" layer): a user who strongly likes BOTH
 // Crime and Thriller — more than raw Action — is statistically a whodunit lover even
@@ -138,7 +116,8 @@ async function getTrailerForMovieId(tmdbId: string): Promise<string> {
 }
 
 async function fetchMoviesFromTMDB(page: number, affinities: Record<string, number>, locale: string = 'he', disableRandomYear: boolean = false): Promise<MovieContext[]> {
-  if (!TMDB_API_KEY) return FALLBACK_POOL; 
+  const POOL = fullBaselinePool(locale);
+  if (!TMDB_API_KEY) return POOL;
   
   // 1. Analyze Affinities to dynamically build API query
   let likedGenres: string[] = [];
@@ -172,7 +151,7 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
 
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
-    if (!res.ok) return FALLBACK_POOL;
+    if (!res.ok) return POOL;
     let data = await res.json();
 
     // A year+genre+vote_count-filtered discover query often has far fewer pages
@@ -182,7 +161,7 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
       const retry = await fetch(url.replace(`page=${page}`, 'page=1'), { next: { revalidate: 0 } });
       if (retry.ok) data = await retry.json();
     }
-    if (!data.results || data.results.length === 0) return FALLBACK_POOL;
+    if (!data.results || data.results.length === 0) return POOL;
 
     return data.results.filter((m: any) => m.poster_path && m.overview).map((m: any) => {
       const mainGenreId = m.genre_ids && m.genre_ids.length > 0 ? m.genre_ids[0] : 28;
@@ -193,17 +172,23 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
         trailerId: '', easterEgg: { type: eggType }, _genreIds: m.genre_ids
       };
     });
-  } catch (e) { return FALLBACK_POOL; }
+  } catch (e) { return POOL; }
 }
 
 export async function POST(req: Request) {
   try {
     const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-    if (!checkRateLimit(ip, 50, 60000)) { // Max 50 requests per minute
+    const payload: AnswerPayload = await req.json();
+
+    // Rate-limit per ip+session, not per ip: a 40-question quiz plus retries
+    // legitimately needs ~60 requests, and shared IPs (households, offices,
+    // campus NAT) would silently 429 each other's votes — eroding taste
+    // signal with no visible error. 120/min per session is generous for one
+    // human and still a hard wall for abuse.
+    const rateKey = `${ip}:${payload.sessionId || 'anon'}`;
+    if (!checkRateLimit(rateKey, 120, 60000)) {
       return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
     }
-
-    const payload: AnswerPayload = await req.json();
     const currentConfidence = parseFloat(req.headers.get('x-current-confidence') || '0.01');
     const currentCount = parseInt(req.headers.get('x-history-count') || '0', 10);
     const locale = req.headers.get('x-locale') || 'he';
@@ -213,10 +198,11 @@ export async function POST(req: Request) {
     if (payload.isInit) {
       // Start with iconic baseline movies to hook the user and establish initial strong signals.
       // Deterministic coverage order — see BASELINE_ORDER rationale.
-      let selected = pickBaselineMovie(askedMovieIds, locale);
+      const sessionId = payload.sessionId || `session_${Date.now()}`;
+      let selected = pickBaselineMovie(sessionId, askedMovieIds, locale);
       if (!selected) {
-        const availableStarts = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
-        selected = availableStarts.length > 0 ? availableStarts[0] : FALLBACK_POOL[0];
+        const pool = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
+        selected = pool.length > 0 ? pool[0] : fullBaselinePool(locale)[0];
       }
       if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
       askedMovieIds.push(selected.id);
@@ -259,7 +245,15 @@ export async function POST(req: Request) {
           if (payload.genreIds && payload.genreIds.length > 0) {
             const polarity = base > 0 ? 2 : 3;
             payload.genreIds.forEach((g, idx) => {
-              const w = base * polarity * (idx === 0 ? 1 : 0.5);
+              const idf = GENRE_IDF[g.toString()] ?? 1;
+              // Loving a movie endorses all its flavors (secondaries at half
+              // weight). Hating a movie rejects what it primarily IS — its
+              // secondary tags say nothing about the user's taste. A drama
+              // lover who hates a comedy-drama hates the comedy, not drama;
+              // punishing secondaries cratered exactly that drama signal.
+              const positionWeight = idx === 0 ? 1 : (base > 0 ? 0.5 : 0);
+              if (positionWeight === 0) return;
+              const w = base * polarity * positionWeight * idf;
               userAffinities[g.toString()] = (userAffinities[g.toString()] || 0) + w;
             });
             inferLatentAffinities(userAffinities);
@@ -270,26 +264,27 @@ export async function POST(req: Request) {
 
     const answeredCount = currentCount + 1;
     let newConfidence = Math.min(0.99, currentConfidence + confidenceBoost);
-    // Completion gates: never before 12 answers (need full baseline coverage + signal),
-    // early exit at 20 if confident, hard cap at 30 — a 60-question quiz IS churn.
+    // Completion gates — precision over speed: a few more questions for an exact
+    // taste read beats a fast almost-right one. Floor of 15 guarantees the full
+    // 12-movie baseline plus live-pool refinement; cap of 40 still kills churn.
     let isComplete = false;
-    if (answeredCount >= 12) {
-      if (newConfidence >= CONFIDENCE_THRESHOLD) isComplete = true;
-      else if (answeredCount >= 20 && newConfidence >= 0.85) isComplete = true;
-      else if (answeredCount >= 30) isComplete = true; // Hard cap
+    if (answeredCount >= 15) {
+      if (answeredCount >= 18 && newConfidence >= CONFIDENCE_THRESHOLD) isComplete = true;
+      else if (answeredCount >= 26 && newConfidence >= 0.85) isComplete = true;
+      else if (answeredCount >= 40) isComplete = true; // Hard cap
     }
 
     let nextMovie = null;
     let finalMoviesResult = undefined;
 
     if (!isComplete) {
-      if (currentCount < 9) {
-        // Exploration phase: init + 9 = 10 deterministic baseline questions covering
-        // every genre bucket exactly once (see BASELINE_ORDER).
-        let selected = pickBaselineMovie(askedMovieIds, locale);
+      if (currentCount < 11) {
+        // Exploration phase: init + 11 = full 12-movie deterministic baseline —
+        // every genre bucket measured at least once, key buckets twice (see BASELINE_ORDER).
+        let selected = pickBaselineMovie(payload.sessionId || '', askedMovieIds, locale);
         if (!selected) {
-          const remaining = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
-          selected = remaining.length > 0 ? remaining[0] : FALLBACK_POOL[0];
+          const remaining = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
+          selected = remaining.length > 0 ? remaining[0] : fullBaselinePool(locale)[0];
         }
         if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
         nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
@@ -299,16 +294,22 @@ export async function POST(req: Request) {
         // pages, and requesting past total_pages returns an empty set.
         const maxPage = Math.min(10, Math.max(1, Math.floor(500 * (1 - newConfidence))));
         const randomPage = Math.floor(Math.random() * maxPage) + 1;
+        // Same-title repeats (remakes, re-releases, sequels sharing a name) read
+        // as duplicates to the user even when the TMDB ids differ — block both.
+        const askedTitleSet = new Set((payload.askedTitles || []).map(t => t.trim().toLowerCase()));
+        const notSeenBefore = (m: MovieContext) =>
+          !askedMovieIds.includes(m.id) && !askedTitleSet.has(m.title.trim().toLowerCase());
+
         let availableMovies = await fetchMoviesFromTMDB(randomPage, userAffinities, locale);
-        let filtered = availableMovies.filter(m => !askedMovieIds.includes(m.id));
-        
+        let filtered = availableMovies.filter(notSeenBefore);
+
         if (filtered.length === 0) {
           // Fallback to random page without strict filters if too narrow
           availableMovies = await fetchMoviesFromTMDB(Math.floor(Math.random() * 50) + 1, {}, locale);
-          filtered = availableMovies.filter(m => !askedMovieIds.includes(m.id));
+          filtered = availableMovies.filter(notSeenBefore);
         }
         
-        if (filtered.length === 0) filtered = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
+        if (filtered.length === 0) filtered = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
         if (filtered.length === 0) { 
           isComplete = true; 
         }
@@ -325,7 +326,7 @@ export async function POST(req: Request) {
       // 👑 Fetch the absolute best matches based on highly liked genres (without year constraints)
       let bestMovies = await fetchMoviesFromTMDB(1, userAffinities, locale, true);
       let availableResults = bestMovies.filter(m => !askedMovieIds.includes(m.id));
-      if (availableResults.length === 0) availableResults = FALLBACK_POOL; 
+      if (availableResults.length === 0) availableResults = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id)).slice(0, 8); 
       
       // Select Top 3 matches: two safest picks + one "hidden gem" from deeper in the
       // ranking (serendipity boost) — a niche title the user didn't know they wanted,

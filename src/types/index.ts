@@ -59,4 +59,6 @@ export interface AnswerPayload {
   answer?: number | 'SKIP';
   isInit?: boolean;
   genreIds?: number[];
+  /** Titles already shown this session — blocks same-title repeats (remakes, re-releases) */
+  askedTitles?: string[];
 }
