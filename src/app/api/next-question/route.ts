@@ -205,7 +205,11 @@ export async function POST(req: Request) {
         selected = pool.length > 0 ? pool[0] : fullBaselinePool(locale)[0];
       }
       if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
-      askedMovieIds.push(selected.id);
+      // Do NOT pre-push the served movie into askedMovieIds: the answer handler
+      // guards affinity updates with `!askedMovieIds.includes(movieId)` to block
+      // double-counting, so a pre-pushed id made the user's FIRST vote — usually
+      // their most enthusiastic — silently vanish from their taste profile.
+      // The id is recorded when the answer arrives, which also keeps dedup intact.
 
       return NextResponse.json({
         sessionId: payload.sessionId || `session_${Date.now()}`,

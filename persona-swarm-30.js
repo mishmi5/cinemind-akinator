@@ -312,9 +312,11 @@ async function humanStarClick(page, vote) {
   } catch { return false; }
 }
 
-function resolveVote(persona, titleText) {
-  // 1. Taste-bucket vote (robust to per-session candidate rotation)
-  const bucket = bucketOf(titleText);
+function resolveVote(persona, titleText, questionNumber) {
+  // 1. Taste-bucket vote — baseline phase only (first 13 questions). Sequels in
+  //    the live-TMDB phase share substrings with baseline titles ("The Matrix
+  //    Reloaded" ⊃ "The Matrix") and must fall through to keywords/default.
+  const bucket = questionNumber <= 13 ? bucketOf(titleText) : null;
   if (bucket && persona.bucketVotes && persona.bucketVotes[bucket] !== undefined) {
     return persona.bucketVotes[bucket];
   }
@@ -431,7 +433,7 @@ async function run() {
         if (!probe.posterLoaded) {
           // Image may simply still be loading — give it up to 4s before flagging.
           let landed = false;
-          for (let w = 0; w < 8; w++) {
+          for (let w = 0; w < 16; w++) {
             await sleep(500);
             landed = await page.evaluate(() => {
               const img = document.querySelector('main img');
@@ -458,7 +460,7 @@ async function run() {
           continue;
         }
 
-        const vote = resolveVote(persona, titleText);
+        const vote = resolveVote(persona, titleText, questionCount + 1);
         questionCount++;
         if (Math.random() < 0.25) await humanScroll(page); // sometimes read the overview first
         const clicked = await humanStarClick(page, vote);
