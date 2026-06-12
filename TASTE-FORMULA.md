@@ -107,3 +107,13 @@ The 31-persona swarm (visible, human-like Chrome) validates every change:
 archetype accuracy, sub-genre accuracy (planned: parody-vs-comedy persona),
 posters load, trailers load and match, no duplicates, every page healthy —
 churn target 0%, then and only then ship.
+
+## 7. Planned: Niche-Direct Candidate Injection (post-v9)
+
+When a niche axis is strong (aff[k:niche] ≥ 4), the recommendation pool gains a
+second discover pass: `with_keywords=<id1>|<id2>` using a reverse map
+niche → representative TMDB keyword IDs. **OR semantics (`|`), never AND (`,`)** —
+multiple strong niches must WIDEN the candidate stream, not intersect it to
+nothing (the same starvation failure mode as the over-eager `without_genres`).
+Injected candidates carry the niche tag by construction, so the vector score
+can finally reward esoteric tastes with esoteric movies.
