@@ -1,0 +1,1865 @@
+[
+  {
+    "persona": "Slasher Teen (16, m)",
+    "locale": "he",
+    "viewport": "mobile",
+    "pages": [
+      "/",
+      "/pricing"
+    ],
+    "questionCount": 38,
+    "archetype": "The Cinematic Edge-Lord",
+    "expected": "The Cinematic Edge-Lord",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "באקרומס",
+      "28 שנה אחרי: מקדש העצמות",
+      "מלחמת העולם Z"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Horror (+8.4)",
+        "Mystery (+2.3)",
+        "Sci-Fi (+2.1)"
+      ],
+      "hates": [
+        "Animation (-6.6)",
+        "Romance (-6.6)"
+      ]
+    },
+    "finalAffinities": {
+      "16": -6.6000000000000005,
+      "18": 1.8,
+      "27": 8.4,
+      "35": 1.9,
+      "878": 2.1,
+      "9648": 2.3,
+      "10749": -6.6000000000000005,
+      "General": 0
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 759,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/pricing",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 803,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Gore Granny (72, f)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/arena",
+      "/arena/leaderboard"
+    ],
+    "questionCount": 38,
+    "archetype": "The Cinematic Edge-Lord",
+    "expected": "The Cinematic Edge-Lord",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Obsession",
+      "Send Help",
+      "28 Years Later: The Bone Temple"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Horror (+8.4)",
+        "Thriller (+3.6)",
+        "Mystery (+2.3)"
+      ],
+      "hates": [
+        "Animation (-6.6)",
+        "Romance (-3.3)"
+      ]
+    },
+    "finalAffinities": {
+      "16": -6.6000000000000005,
+      "27": 8.4,
+      "53": 3.6,
+      "9648": 2.3,
+      "10749": -3.3000000000000003,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/arena",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 366,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/arena/leaderboard",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 563,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Metalhead Midnighter (28, m)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/pulse",
+      "/duel"
+    ],
+    "questionCount": 37,
+    "archetype": "The Cinematic Edge-Lord",
+    "expected": "The Cinematic Edge-Lord",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "אובססיה",
+      "מומיה",
+      "דרקולה: סיפור אהבה"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Horror (+6.3)"
+      ],
+      "hates": [
+        "Animation (-6.6)",
+        "Adventure (-6.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": -6.300000000000001,
+      "16": -6.6000000000000005,
+      "27": 6.300000000000001,
+      "35": 0.95,
+      "53": 1.8,
+      "9648": 1.15,
+      "General": -1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/pulse",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 122,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/duel",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 155,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Horror Purist Hates Everything (24, f)",
+    "locale": "en",
+    "viewport": "mobile",
+    "pages": [
+      "/quiz",
+      "/login"
+    ],
+    "questionCount": 29,
+    "archetype": "The Cinematic Edge-Lord",
+    "expected": "The Cinematic Edge-Lord",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Obsession",
+      "The Conjuring: Last Rites",
+      "Five Nights at Freddy's 2"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Horror (+8.4)"
+      ],
+      "hates": [
+        "Sci-Fi (-12.6)",
+        "Animation (-6.6)",
+        "Romance (-6.6)",
+        "Adventure (-6.3)",
+        "Comedy (-5.7)",
+        "Drama (-5.4)",
+        "Action (-5.1)",
+        "Crime (-3.8)",
+        "Mystery (-2.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": -6.300000000000001,
+      "16": -6.6000000000000005,
+      "18": -5.4,
+      "27": 8.4,
+      "28": -5.1,
+      "35": -5.699999999999999,
+      "53": 1.8,
+      "80": -3.7999999999999994,
+      "878": -12.600000000000001,
+      "9648": -2.3,
+      "10749": -6.6000000000000005,
+      "General": -16
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/quiz",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 908,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/login",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 483,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Dreamy Student (19, f)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/privacy",
+      "/terms"
+    ],
+    "questionCount": 39,
+    "archetype": "The Hopeless Romantic",
+    "expected": "The Hopeless Romantic",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "השם שלך",
+      "Chainsaw Man – The Movie: Reze Arc",
+      "צורתו של קול"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Romance (+4.4)",
+        "Animation (+2.2)"
+      ],
+      "hates": [
+        "Mystery (-6.9)",
+        "Horror (-6.3)"
+      ]
+    },
+    "finalAffinities": {
+      "14": 1.1,
+      "16": 2.2,
+      "18": 1.8,
+      "27": -6.300000000000001,
+      "9648": -6.8999999999999995,
+      "10749": 4.4,
+      "10751": 1.05,
+      "General": -1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/privacy",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1076,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/terms",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1440,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Divorced Romantic (45, m)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/profile",
+      "/"
+    ],
+    "questionCount": 40,
+    "archetype": "The Hopeless Romantic",
+    "expected": "The Hopeless Romantic",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Damage",
+      "After We Fell",
+      "Room in Rome"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Romance (+4.4)",
+        "Drama (+3.6)"
+      ],
+      "hates": [
+        "Horror (-12.6)"
+      ]
+    },
+    "finalAffinities": {
+      "18": 3.6,
+      "27": -12.600000000000001,
+      "80": 0.95,
+      "10749": 4.4,
+      "General": -1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/profile",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 891,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 944,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "K-Drama Addict (27, f)",
+    "locale": "he",
+    "viewport": "mobile",
+    "pages": [
+      "/pricing",
+      "/arena"
+    ],
+    "questionCount": 40,
+    "archetype": "The Hopeless Romantic",
+    "expected": "The Hopeless Romantic",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "משיכה גורלית",
+      "אחרי ש... נפלנו",
+      "חדר ברומא"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Drama (+9)",
+        "Romance (+8.8)"
+      ],
+      "hates": [
+        "Horror (-6.3)",
+        "Crime (-5.7)",
+        "Sci-Fi (-3.2)"
+      ]
+    },
+    "finalAffinities": {
+      "18": 9,
+      "27": -6.300000000000001,
+      "35": 1.9,
+      "80": -5.699999999999999,
+      "878": -3.1500000000000004,
+      "10749": 8.8,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/pricing",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 803,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/arena",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 347,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Wedding Planner (33, f)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/arena/leaderboard",
+      "/pulse"
+    ],
+    "questionCount": 38,
+    "archetype": "The Hopeless Romantic",
+    "expected": "The Hopeless Romantic",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "The Devil Wears Prada",
+      "The Drama",
+      "Forrest Gump"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Romance (+11)",
+        "Comedy (+7.6)",
+        "Drama (+5.4)"
+      ],
+      "hates": [
+        "Horror (-6.3)",
+        "Mystery (-3.4)"
+      ]
+    },
+    "finalAffinities": {
+      "18": 5.4,
+      "27": -6.300000000000001,
+      "35": 7.6,
+      "9648": -3.4499999999999997,
+      "10749": 11,
+      "General": 3
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/arena/leaderboard",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 563,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/pulse",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 130,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Pixar Dad (38, m)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/duel",
+      "/quiz"
+    ],
+    "questionCount": 39,
+    "archetype": "The Family & Animation Enthusiast",
+    "expected": "The Family & Animation Enthusiast",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "סופר מריו גלקסי: הסרט",
+      "מי אני עכשיו?",
+      "קורליין ודלת הקסמים"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Animation (+4.4)",
+        "Fantasy (+2.2)",
+        "Family (+2.1)"
+      ],
+      "hates": [
+        "Mystery (-6.9)",
+        "Horror (-6.3)",
+        "Crime (-2.8)"
+      ]
+    },
+    "finalAffinities": {
+      "14": 2.2,
+      "16": 4.4,
+      "27": -6.300000000000001,
+      "80": -2.8499999999999996,
+      "9648": -6.8999999999999995,
+      "10751": 2.1,
+      "General": -3
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/duel",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 155,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/quiz",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 757,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Kindergarten Teacher (26, f)",
+    "locale": "en",
+    "viewport": "mobile",
+    "pages": [
+      "/login",
+      "/privacy"
+    ],
+    "questionCount": 40,
+    "archetype": "The Family & Animation Enthusiast",
+    "expected": "The Family & Animation Enthusiast",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "The Super Mario Galaxy Movie",
+      "Swapped",
+      "Toy Story"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Animation (+4.4)",
+        "Adventure (+2.1)",
+        "Family (+2.1)"
+      ],
+      "hates": [
+        "Horror (-12.6)",
+        "Action (-2.5)"
+      ]
+    },
+    "finalAffinities": {
+      "12": 2.1,
+      "16": 4.4,
+      "27": -12.600000000000001,
+      "28": -2.55,
+      "35": 1.9,
+      "10751": 2.1,
+      "General": -3
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/login",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 483,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/privacy",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1084,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Animation Student (22, m)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/terms",
+      "/profile"
+    ],
+    "questionCount": 39,
+    "archetype": "The Family & Animation Enthusiast",
+    "expected": "The Family & Animation Enthusiast",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "סופר מריו גלקסי: הסרט",
+      "מי אני עכשיו?",
+      "קורליין ודלת הקסמים"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Animation (+4.4)",
+        "Fantasy (+2.2)",
+        "Sci-Fi (+2.1)",
+        "Family (+2.1)"
+      ],
+      "hates": [
+        "Horror (-6.3)"
+      ]
+    },
+    "finalAffinities": {
+      "14": 2.2,
+      "16": 4.4,
+      "27": -6.300000000000001,
+      "28": 0.85,
+      "878": 2.1,
+      "10751": 2.1,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/terms",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1440,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/profile",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 872,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Grandpa of Five (68, m)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/",
+      "/pricing"
+    ],
+    "questionCount": 39,
+    "archetype": "The Family & Animation Enthusiast",
+    "expected": "The Family & Animation Enthusiast",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "The Super Mario Galaxy Movie",
+      "Swapped",
+      "Toy Story"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Animation (+4.4)",
+        "Family (+2.1)"
+      ],
+      "hates": [
+        "Mystery (-6.9)",
+        "Horror (-6.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": -1.0500000000000003,
+      "16": 4.4,
+      "27": -6.300000000000001,
+      "35": 1.9,
+      "9648": -6.8999999999999995,
+      "10751": 2.1,
+      "General": -3
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 964,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/pricing",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 822,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Cyberpunk Hacker (24, m)",
+    "locale": "he",
+    "viewport": "mobile",
+    "pages": [
+      "/arena",
+      "/arena/leaderboard"
+    ],
+    "questionCount": 39,
+    "archetype": "The Escapist",
+    "expected": "The Escapist",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "המנדלוריאן וגרוגו",
+      "פרויקט הייל מרי",
+      "גרינלנד: בתנועה"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Sci-Fi (+8.4)",
+        "Adventure (+2.1)"
+      ],
+      "hates": [
+        "Romance (-6.6)"
+      ]
+    },
+    "finalAffinities": {
+      "12": 2.1,
+      "18": 0.8999999999999999,
+      "878": 8.4,
+      "10749": -6.6000000000000005,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/arena",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 347,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/arena/leaderboard",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 544,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Space Nerd (31, f)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/pulse",
+      "/duel"
+    ],
+    "questionCount": 40,
+    "archetype": "The Escapist",
+    "expected": "The Escapist",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Mortal Kombat II",
+      "The Mandalorian and Grogu",
+      "The Avengers"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Sci-Fi (+14.7)",
+        "Action (+6.8)",
+        "Adventure (+6.3)"
+      ],
+      "hates": [
+        "Romance (-3.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": 6.300000000000001,
+      "18": 1.8,
+      "28": 6.8,
+      "878": 14.700000000000001,
+      "10749": -3.3000000000000003,
+      "General": 7
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/pulse",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 130,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/duel",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 166,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Whodunit Bookworm (52, f)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/quiz",
+      "/login"
+    ],
+    "questionCount": 40,
+    "archetype": "The Escapist",
+    "expected": "The Escapist",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "מומיה",
+      "באקרומס",
+      "צעקה 7"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Mystery (+4.6)"
+      ],
+      "hates": []
+    },
+    "finalAffinities": {
+      "53": 1.8,
+      "80": 1.9,
+      "9648": 4.6,
+      "General": 2
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/quiz",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 757,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/login",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 464,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Fantasy LARPer (29, m)",
+    "locale": "en",
+    "viewport": "mobile",
+    "pages": [
+      "/privacy",
+      "/terms"
+    ],
+    "questionCount": 40,
+    "archetype": "The Escapist",
+    "expected": "The Escapist",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Mortal Kombat II",
+      "The Mandalorian and Grogu",
+      "The Avengers"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Adventure (+10.5)",
+        "Action (+5.1)",
+        "Sci-Fi (+4.2)",
+        "Romance (+2.2)"
+      ],
+      "hates": []
+    },
+    "finalAffinities": {
+      "12": 10.5,
+      "18": 0.8999999999999999,
+      "28": 5.1,
+      "878": 4.2,
+      "10749": 2.2,
+      "General": 5
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/privacy",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1084,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/terms",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1448,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Sci-Fi Skeptic Convert (60, m)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/profile",
+      "/"
+    ],
+    "questionCount": 39,
+    "archetype": "The Escapist",
+    "expected": "The Escapist",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "המנדלוריאן וגרוגו",
+      "פרויקט הייל מרי",
+      "הטורף: שטח פראי"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Sci-Fi (+8.4)",
+        "Adventure (+2.1)"
+      ],
+      "hates": [
+        "Horror (-6.3)",
+        "Animation (-3.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": 2.1,
+      "16": -3.3000000000000003,
+      "18": 1.8,
+      "27": -6.300000000000001,
+      "28": 1.7,
+      "878": 8.4,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/profile",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 872,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 779,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Crime Podcast Host (41, f)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/pricing",
+      "/arena"
+    ],
+    "questionCount": 38,
+    "archetype": "The Action Junkie",
+    "expected": "The Action Junkie",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "The Punisher: One Last Kill",
+      "The Shadow's Edge",
+      "The Wrecking Crew"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Crime (+5.7)",
+        "Action (+3.4)"
+      ],
+      "hates": [
+        "Romance (-3.3)"
+      ]
+    },
+    "finalAffinities": {
+      "18": 1.8,
+      "28": 3.4,
+      "53": 1.8,
+      "80": 5.699999999999999,
+      "10749": -3.3000000000000003,
+      "General": 3
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/pricing",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 822,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/arena",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 366,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Gym Bro (23, m)",
+    "locale": "he",
+    "viewport": "mobile",
+    "pages": [
+      "/arena/leaderboard",
+      "/pulse"
+    ],
+    "questionCount": 39,
+    "archetype": "The Action Junkie",
+    "expected": "The Action Junkie",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "מורטל קומבט II",
+      "המנדלוריאן וגרוגו",
+      "הנוקמים"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Crime (+3.8)",
+        "Action (+3.4)",
+        "Adventure (+2.1)",
+        "Sci-Fi (+2.1)"
+      ],
+      "hates": [
+        "Romance (-6.6)"
+      ]
+    },
+    "finalAffinities": {
+      "12": 2.1,
+      "18": 1.8,
+      "28": 3.4,
+      "80": 3.8,
+      "878": 2.1,
+      "10749": -6.6000000000000005,
+      "General": 2
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/arena/leaderboard",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 544,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/pulse",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 122,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Army Vet (50, m)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/duel",
+      "/quiz"
+    ],
+    "questionCount": 38,
+    "archetype": "The Action Junkie",
+    "expected": "The Action Junkie",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Mortal Kombat II",
+      "Avatar: Fire and Ash",
+      "Harry Potter and the Philosopher's Stone"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Comedy (+5.7)",
+        "Action (+5.1)",
+        "Adventure (+4.2)",
+        "Sci-Fi (+4.2)",
+        "Crime (+3.8)",
+        "Fantasy (+2.2)"
+      ],
+      "hates": [
+        "Romance (-6.6)",
+        "Animation (-3.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": 4.2,
+      "14": 2.2,
+      "16": -3.3000000000000003,
+      "28": 5.1,
+      "35": 5.699999999999999,
+      "80": 3.8,
+      "878": 4.2,
+      "10749": -6.6000000000000005,
+      "General": 3
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/duel",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 166,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/quiz",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 908,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Tarantino Disciple (35, m)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/login",
+      "/privacy"
+    ],
+    "questionCount": 40,
+    "archetype": "The Action Junkie",
+    "expected": "The Action Junkie",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "ג'ק ריאן מלחמת הרוחות",
+      "קצה הצל",
+      "מכונת מלחמה"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Crime (+3.8)",
+        "Thriller (+3.6)",
+        "Action (+3.4)"
+      ],
+      "hates": [
+        "Animation (-6.6)"
+      ]
+    },
+    "finalAffinities": {
+      "16": -6.6000000000000005,
+      "28": 3.4,
+      "35": 1.9,
+      "53": 3.6,
+      "80": 3.8,
+      "General": 2
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/login",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 464,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/privacy",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1076,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Film Professor (58, m)",
+    "locale": "en",
+    "viewport": "mobile",
+    "pages": [
+      "/terms",
+      "/profile"
+    ],
+    "questionCount": 40,
+    "archetype": "The Pretentious Cinephile",
+    "expected": "The Pretentious Cinephile",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Michael",
+      "The Punisher: One Last Kill",
+      "Damage"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Drama (+3.6)"
+      ],
+      "hates": [
+        "Animation (-6.6)",
+        "Sci-Fi (-6.3)",
+        "Comedy (-5.7)"
+      ]
+    },
+    "finalAffinities": {
+      "16": -6.6000000000000005,
+      "18": 3.6,
+      "35": -5.699999999999999,
+      "80": 1.9,
+      "878": -6.300000000000001,
+      "General": -4
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/terms",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1448,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/profile",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 891,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Festival Critic (29, f)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/",
+      "/pricing"
+    ],
+    "questionCount": 37,
+    "archetype": "The Pretentious Cinephile",
+    "expected": "The Pretentious Cinephile",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "מייקל",
+      "פינק פלויד - החומה",
+      "השטן לובשת פראדה"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Drama (+3.6)"
+      ],
+      "hates": [
+        "Horror (-6.3)",
+        "Sci-Fi (-3.2)",
+        "Action (-2.5)"
+      ]
+    },
+    "finalAffinities": {
+      "18": 3.6,
+      "27": -6.300000000000001,
+      "28": -2.55,
+      "35": 1.9,
+      "53": 1.8,
+      "878": -3.1500000000000004,
+      "General": -2
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 756,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/pricing",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 803,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Theater Snob (47, f)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/arena",
+      "/arena/leaderboard"
+    ],
+    "questionCount": 39,
+    "archetype": "The Pretentious Cinephile",
+    "expected": "The Pretentious Cinephile",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Damage",
+      "After We Fell",
+      "Room in Rome"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Drama (+4.5)",
+        "Romance (+2.2)"
+      ],
+      "hates": [
+        "Horror (-6.3)",
+        "Sci-Fi (-6.3)"
+      ]
+    },
+    "finalAffinities": {
+      "18": 4.5,
+      "27": -6.300000000000001,
+      "80": 1.9,
+      "878": -6.300000000000001,
+      "10749": 2.2,
+      "General": -1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/arena",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 366,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/arena/leaderboard",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 563,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Documentary Purist (63, m)",
+    "locale": "he",
+    "viewport": "mobile",
+    "pages": [
+      "/pulse",
+      "/duel"
+    ],
+    "questionCount": 39,
+    "archetype": "The Pretentious Cinephile",
+    "expected": "The Pretentious Cinephile",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "מייקל",
+      "המעניש: חיסול אחרון",
+      "משיכה גורלית"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Drama (+3.6)"
+      ],
+      "hates": [
+        "Animation (-6.6)",
+        "Adventure (-6.3)",
+        "Horror (-6.3)",
+        "Sci-Fi (-6.3)"
+      ]
+    },
+    "finalAffinities": {
+      "12": -6.300000000000001,
+      "16": -6.6000000000000005,
+      "18": 3.6,
+      "27": -6.300000000000001,
+      "80": 1.9,
+      "878": -6.300000000000001,
+      "General": -6
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/pulse",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 122,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/duel",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 155,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Channel-Flipping Uncle (55, m)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/quiz",
+      "/login"
+    ],
+    "questionCount": 40,
+    "archetype": "The Basic Binge-Watcher",
+    "expected": "The Basic Binge-Watcher",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Obsession",
+      "Mortal Kombat II",
+      "The Super Mario Galaxy Movie"
+    ],
+    "tasteProfile": {
+      "loves": [],
+      "hates": []
+    },
+    "finalAffinities": {
+      "28": 1.7,
+      "53": 0.9,
+      "80": 0.95,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/quiz",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 908,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/login",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 483,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "TikTok Attention Span (16, f)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/privacy",
+      "/terms"
+    ],
+    "questionCount": 39,
+    "archetype": "The Basic Binge-Watcher",
+    "expected": "The Basic Binge-Watcher",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "אובססיה",
+      "מורטל קומבט II",
+      "סופר מריו גלקסי: הסרט"
+    ],
+    "tasteProfile": {
+      "loves": [],
+      "hates": []
+    },
+    "finalAffinities": {},
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/privacy",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1076,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/terms",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 1440,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Whatever-Is-On Mom (42, f)",
+    "locale": "en",
+    "viewport": "mobile",
+    "pages": [
+      "/profile",
+      "/"
+    ],
+    "questionCount": 40,
+    "archetype": "The Basic Binge-Watcher",
+    "expected": "The Basic Binge-Watcher",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Obsession",
+      "Mortal Kombat II",
+      "The Super Mario Galaxy Movie"
+    ],
+    "tasteProfile": {
+      "loves": [],
+      "hates": []
+    },
+    "finalAffinities": {},
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/profile",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 891,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 951,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Polite But Unmoved Tourist (30, m)",
+    "locale": "he",
+    "viewport": "desktop",
+    "pages": [
+      "/pricing",
+      "/arena"
+    ],
+    "questionCount": 40,
+    "archetype": "The Basic Binge-Watcher",
+    "expected": "The Basic Binge-Watcher",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "משיכה גורלית",
+      "אחרי ש... נפלנו",
+      "דרקולה: סיפור אהבה"
+    ],
+    "tasteProfile": {
+      "loves": [
+        "Romance (+2.2)"
+      ],
+      "hates": []
+    },
+    "finalAffinities": {
+      "18": 0.9,
+      "10749": 2.2,
+      "General": 1
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/pricing",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 803,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/arena",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 347,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Sleep-Deprived New Dad (36, m)",
+    "locale": "en",
+    "viewport": "desktop",
+    "pages": [
+      "/arena/leaderboard",
+      "/pulse"
+    ],
+    "questionCount": 40,
+    "archetype": "The Basic Binge-Watcher",
+    "expected": "The Basic Binge-Watcher",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "Mortal Kombat II",
+      "Michael",
+      "Project Hail Mary"
+    ],
+    "tasteProfile": {
+      "loves": [],
+      "hates": [
+        "Horror (-3.2)",
+        "Crime (-2.8)"
+      ]
+    },
+    "finalAffinities": {
+      "27": -3.1500000000000004,
+      "80": -2.8499999999999996,
+      "General": -2
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/arena/leaderboard",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 563,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/pulse",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 130,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  },
+  {
+    "persona": "Contrarian Troll (20, m)",
+    "locale": "he",
+    "viewport": "mobile",
+    "pages": [
+      "/duel",
+      "/quiz"
+    ],
+    "questionCount": 19,
+    "archetype": "The Basic Binge-Watcher",
+    "expected": "The Basic Binge-Watcher",
+    "archetypeMatch": true,
+    "personalized": true,
+    "recs": [
+      "אויב בשער",
+      "מסכת המראה",
+      "ג'ארהד 4: חוק השבות"
+    ],
+    "tasteProfile": {
+      "loves": [],
+      "hates": [
+        "Sci-Fi (-18.9)",
+        "Horror (-12.6)",
+        "Comedy (-11.4)",
+        "Mystery (-6.9)",
+        "Animation (-6.6)",
+        "Romance (-6.6)",
+        "Adventure (-6.3)",
+        "Family (-6.3)",
+        "Western (-6)",
+        "Documentary (-6)",
+        "Music (-6)",
+        "Crime (-5.7)",
+        "Drama (-5.4)",
+        "Thriller (-5.4)",
+        "Action (-5.1)"
+      ]
+    },
+    "finalAffinities": {
+      "12": -6.300000000000001,
+      "16": -6.6000000000000005,
+      "18": -5.4,
+      "27": -12.600000000000001,
+      "28": -5.1,
+      "35": -11.399999999999999,
+      "37": -6,
+      "53": -5.4,
+      "80": -5.699999999999999,
+      "99": -6,
+      "878": -18.900000000000002,
+      "9648": -6.8999999999999995,
+      "10402": -6,
+      "10749": -6.6000000000000005,
+      "10751": -6.300000000000001,
+      "General": -38
+    },
+    "quizConsoleErrors": [],
+    "posterBugs": [],
+    "duplicateTitles": [],
+    "pageAudits": [
+      {
+        "path": "/duel",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 155,
+        "brokenImages": 0,
+        "ok": true
+      },
+      {
+        "path": "/quiz",
+        "status": 200,
+        "consoleErrors": [],
+        "textLength": 757,
+        "brokenImages": 0,
+        "ok": true
+      }
+    ],
+    "subscribe": true,
+    "reasons": []
+  }
+]

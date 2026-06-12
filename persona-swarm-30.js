@@ -389,6 +389,8 @@ async function run() {
     const posterBugs = [];
     let lastTitle = '';
     let stuckCycles = 0;
+    const trailerBugs = [];
+    let trailersChecked = 0;
 
     try {
       await page.goto(`http://localhost:3000/${locale}/scan`, { waitUntil: 'networkidle2', timeout: 45000 });
@@ -460,6 +462,34 @@ async function run() {
           continue;
         }
 
+        // Trailer spot-check: a real user clicks the trailer sometimes. Verify
+        // the player opens with a non-empty YouTube embed and closes cleanly.
+        if (trailersChecked < 3 && Math.random() < 0.18) {
+          const opened = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const b = btns.find(x => x.innerText.includes('טריילר') || x.innerText.toLowerCase().includes('trailer'));
+            if (b) { b.click(); return true; }
+            return false;
+          });
+          if (opened) {
+            trailersChecked++;
+            await sleep(2500);
+            const embed = await page.evaluate(() => {
+              const f = document.querySelector('iframe[src*="youtube"]');
+              return f ? f.getAttribute('src') : null;
+            });
+            if (!embed || !/embed\/[A-Za-z0-9_-]{6,}/.test(embed)) {
+              trailerBugs.push(`${titleKey}: trailer opened but embed invalid (${(embed || 'no iframe').slice(0, 60)})`);
+            }
+            await page.evaluate(() => {
+              const btns = Array.from(document.querySelectorAll('button'));
+              const close = btns.find(x => x.innerText.trim() === '✕');
+              if (close) close.click();
+            });
+            await sleep(600);
+          }
+        }
+
         const vote = resolveVote(persona, titleText, questionCount + 1);
         questionCount++;
         if (Math.random() < 0.25) await humanScroll(page); // sometimes read the overview first
@@ -477,7 +507,7 @@ async function run() {
       await sleep(2500);
       const finals = await page.evaluate(() => ({
         aff: window.__cinemind_final_affinities || null,
-        movies: window.__cinemind_final_movies ? window.__cinemind_final_movies.map(m => ({ id: m.id, title: m.title })) : [],
+        movies: window.__cinemind_final_movies ? window.__cinemind_final_movies.map(m => ({ id: m.id, title: m.title, trailerId: m.trailerId || '' })) : [],
       }));
       finalAffinities = finals.aff;
       finalMovies = finals.movies;
@@ -490,6 +520,13 @@ async function run() {
     // archetype check
     const archetype = finalAffinities ? deriveTaste(finalAffinities).archetype : 'N/A';
     const archetypeMatch = archetype === persona.expected;
+
+    // Final recs trailer coverage
+    const recsMissingTrailers = await (async () => {
+      try {
+        return finalMovies.filter(m => !(m && m.id)).length; // placeholder, refined below
+      } catch { return 0; }
+    })();
 
     // personalized recs: 3 movies, not all from the static fallback pool
     const recIds = finalMovies.map(m => String(m.id).replace('res_', ''));
@@ -507,7 +544,9 @@ async function run() {
 
     const noPosterBugs = posterBugs.length === 0;
     const noDuplicates = duplicateTitles.length === 0;
-    const subscribe = archetypeMatch && quizComplete && personalized && noQuizErrors && pagesHealthy && questionsSane && noPosterBugs && noDuplicates;
+    const finalsWithTrailers = finalMovies.filter(m => m.trailerId && m.trailerId.length > 5).length;
+    const trailersOk = trailerBugs.length === 0 && (finalMovies.length === 0 || finalsWithTrailers >= 2);
+    const subscribe = archetypeMatch && quizComplete && personalized && noQuizErrors && pagesHealthy && questionsSane && noPosterBugs && noDuplicates && trailersOk;
     const reasons = [];
     if (!archetypeMatch) reasons.push(`archetype: got "${archetype}", wanted "${persona.expected}"`);
     if (!quizComplete) reasons.push('quiz never completed');
@@ -517,6 +556,7 @@ async function run() {
     if (!questionsSane) reasons.push(`question count ${questionCount} outside 15-45`);
     if (!noPosterBugs) reasons.push(`broken/placeholder posters: ${posterBugs.slice(0, 3).join(' | ')}`);
     if (!noDuplicates) reasons.push(`duplicate movies in one quiz: ${duplicateTitles.slice(0, 3).join(' | ')}`);
+    if (!trailersOk) reasons.push(`trailer issues: ${trailerBugs.slice(0, 2).join(' | ') || `only ${finalsWithTrailers}/3 final recs have trailers`}`);
 
     const tp = tasteProfile(finalAffinities);
     console.log(`   ${subscribe ? '✅ SUBSCRIBES' : '❌ CHURNS'} | ${archetype} | Q=${questionCount}${reasons.length ? ' | ' + reasons.join(' ; ') : ''}`);
@@ -527,6 +567,7 @@ async function run() {
       persona: persona.name, locale, viewport: mobile ? 'mobile' : 'desktop',
       pages: assignedPages, questionCount, archetype, expected: persona.expected,
       archetypeMatch, personalized, recs: finalMovies.map(m => m.title),
+      trailerBugs, finalsWithTrailers,
       tasteProfile: tasteProfile(finalAffinities),
       finalAffinities,
       quizConsoleErrors, posterBugs, duplicateTitles, pageAudits, subscribe, reasons,
@@ -538,7 +579,7 @@ async function run() {
   await browser.close();
 
   const subs = results.filter(r => r.subscribe).length;
-  const bugs = results.reduce((n, r) => n + r.quizConsoleErrors.length + r.posterBugs.length + r.duplicateTitles.length + r.pageAudits.reduce((m, a) => m + a.consoleErrors.length + a.brokenImages + (a.status >= 400 ? 1 : 0), 0), 0);
+  const bugs = results.reduce((n, r) => n + r.quizConsoleErrors.length + r.posterBugs.length + r.duplicateTitles.length + r.trailerBugs.length + r.pageAudits.reduce((m, a) => m + a.consoleErrors.length + a.brokenImages + (a.status >= 400 ? 1 : 0), 0), 0);
   const churn = Math.round(((30 - subs) / 30) * 100);
 
 
