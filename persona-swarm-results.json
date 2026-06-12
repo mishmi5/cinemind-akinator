@@ -7,23 +7,22 @@
       "/",
       "/pricing"
     ],
-    "questionCount": 34,
+    "questionCount": 39,
     "archetype": "The Cinematic Edge-Lord",
     "expected": "The Cinematic Edge-Lord",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "רכבת לבוסאן",
-      "בלייד",
-      "קרב בראשית"
+      "פסיכו",
+      "אובססיה",
+      "חמישה לילות אצל פרדי 2"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Horror (+10.5)",
-        "Thriller (+5.4)",
-        "Action (+3.4)",
+        "Horror (+8.4)",
+        "Thriller (+3.6)",
         "Mystery (+2.3)"
       ],
       "hates": [
@@ -31,36 +30,38 @@
         "Romance (-6.6)"
       ],
       "nicheLoves": [
-        "dark-comedy (+6)",
-        "satire (+6)",
-        "psychological-thriller (+3)",
-        "revenge (+3)",
         "supernatural-horror (+3)",
-        "true-story (+3)",
         "whodunit (+3)",
-        "survival (+3)"
+        "psychological-thriller (+3)",
+        "dark-comedy (+3)",
+        "satire (+3)",
+        "revenge (+3)"
       ],
       "nicheHates": [
-        "epic-romance (-4.5)"
+        "friendship (-4.5)",
+        "epic-romance (-4.5)",
+        "disaster (-4.5)",
+        "period-drama (-4.5)"
       ]
     },
     "finalAffinities": {
       "16": -6.6000000000000005,
-      "27": 10.5,
-      "28": 3.4,
-      "53": 5.4,
+      "27": 8.4,
+      "53": 3.6,
       "9648": 2.3,
       "10749": -6.6000000000000005,
-      "General": 2,
+      "General": 0,
+      "k:friendship": -4.5,
       "k:epic-romance": -4.5,
-      "k:psychological-thriller": 3,
-      "k:dark-comedy": 6,
-      "k:satire": 6,
-      "k:revenge": 3,
+      "k:disaster": -4.5,
+      "k:true-story": -1.5,
+      "k:period-drama": -4.5,
       "k:supernatural-horror": 3,
-      "k:true-story": 3,
       "k:whodunit": 3,
-      "k:survival": 3
+      "k:psychological-thriller": 3,
+      "k:dark-comedy": 3,
+      "k:satire": 3,
+      "k:revenge": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -70,7 +71,7 @@
         "path": "/",
         "status": 200,
         "consoleErrors": [],
-        "textLength": 761,
+        "textLength": 759,
         "brokenImages": 0,
         "ok": true
       },
@@ -94,57 +95,66 @@
       "/arena",
       "/arena/leaderboard"
     ],
-    "questionCount": 38,
+    "questionCount": 40,
     "archetype": "The Cinematic Edge-Lord",
     "expected": "The Cinematic Edge-Lord",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "Scream 7",
       "Psycho",
+      "Scream 7",
       "Scream"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Horror (+12.6)",
-        "Mystery (+6.9)"
+        "Horror (+8.4)",
+        "Mystery (+4.6)"
       ],
       "hates": [
         "Animation (-6.6)",
         "Romance (-3.3)"
       ],
       "nicheLoves": [
+        "psychological-thriller (+3)",
+        "dark-comedy (+3)",
+        "satire (+3)",
+        "revenge (+3)",
         "party-comedy (+3)",
         "serial-killer (+3)",
         "slasher (+3)",
-        "whodunit (+3)",
-        "monster (+3)",
-        "post-apocalyptic (+3)",
-        "zombie (+3)"
+        "whodunit (+3)"
       ],
       "nicheHates": [
-        "friendship (-4.5)"
+        "occult (-4.5)",
+        "magic-fantasy (-4.5)",
+        "mythology (-4.5)"
       ]
     },
     "finalAffinities": {
       "16": -6.6000000000000005,
-      "27": 12.600000000000001,
-      "35": 1.9,
+      "27": 8.4,
+      "53": 1.8,
       "80": 1.9,
-      "9648": 6.8999999999999995,
+      "9648": 4.6,
       "10749": -3.3000000000000003,
-      "General": 3,
-      "k:friendship": -4.5,
+      "General": 1,
+      "k:music-film": -2.25,
+      "k:melancholic": -2.25,
+      "k:musical": -2.25,
+      "k:rom-com": -2.25,
+      "k:occult": -4.5,
+      "k:magic-fantasy": -4.5,
+      "k:mythology": -4.5,
+      "k:psychological-thriller": 3,
+      "k:dark-comedy": 3,
+      "k:satire": 3,
+      "k:revenge": 3,
       "k:party-comedy": 3,
       "k:serial-killer": 3,
       "k:slasher": 3,
-      "k:whodunit": 3,
-      "k:monster": 3,
-      "k:post-apocalyptic": 3,
-      "k:zombie": 3,
-      "k:epic-romance": -2.25
+      "k:whodunit": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -178,22 +188,21 @@
       "/pulse",
       "/duel"
     ],
-    "questionCount": 39,
+    "questionCount": 38,
     "archetype": "The Cinematic Edge-Lord",
     "expected": "The Cinematic Edge-Lord",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "הניצוץ",
-      "פסיכו",
-      "יופי מסוכן"
+      "מומיה",
+      "לזמן את הרוע 4: הפרק האחרון",
+      "28 שנה אחרי: מקדש העצמות"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Horror (+6.3)",
-        "Thriller (+2.7)"
+        "Horror (+6.3)"
       ],
       "hates": [
         "Animation (-6.6)",
@@ -205,27 +214,30 @@
         "whodunit (+3)"
       ],
       "nicheHates": [
+        "friendship (-4.5)",
         "sword-and-sandal (-4.5)",
-        "period-drama (-4.5)",
-        "revenge (-3)"
+        "revenge (-4.5)",
+        "period-drama (-4.5)"
       ]
     },
     "finalAffinities": {
       "12": -6.300000000000001,
       "16": -6.6000000000000005,
       "27": 6.300000000000001,
-      "53": 2.7,
+      "35": 0.95,
+      "53": 1.8,
       "9648": 1.15,
       "General": -1,
+      "k:monster": 1.5,
+      "k:post-apocalyptic": 1.5,
+      "k:zombie": 1.5,
       "k:supernatural-horror": 3,
       "k:true-story": 3,
       "k:whodunit": 3,
+      "k:friendship": -4.5,
       "k:sword-and-sandal": -4.5,
-      "k:revenge": -3,
-      "k:period-drama": -4.5,
-      "k:psychological-thriller": 1.5,
-      "k:dark-comedy": 1.5,
-      "k:satire": 1.5
+      "k:revenge": -4.5,
+      "k:period-drama": -4.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -259,21 +271,22 @@
       "/quiz",
       "/login"
     ],
-    "questionCount": 30,
+    "questionCount": 28,
     "archetype": "The Cinematic Edge-Lord",
     "expected": "The Cinematic Edge-Lord",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "Scream 7",
       "Obsession",
-      "The Human Centipede (First Sequence)"
+      "The Shining",
+      "Black Phone 2"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Horror (+8.4)"
+        "Horror (+8.4)",
+        "Thriller (+3.6)"
       ],
       "hates": [
         "Sci-Fi (-12.6)",
@@ -281,37 +294,38 @@
         "Romance (-6.6)",
         "Adventure (-6.3)",
         "Comedy (-5.7)",
+        "Crime (-5.7)",
         "Drama (-5.4)",
         "Action (-5.1)",
-        "Crime (-3.8)",
-        "Mystery (-2.3)"
+        "Mystery (-4.6)"
       ],
       "nicheLoves": [
+        "supernatural-horror (+3)",
+        "psychological-thriller (+3)",
         "dark-comedy (+3)",
-        "satire (+3)",
-        "party-comedy (+3)",
-        "serial-killer (+3)",
-        "slasher (+3)"
+        "satire (+3)"
       ],
       "nicheHates": [
         "gangster (-9)",
-        "family-drama (-9)",
         "period-drama (-9)",
-        "survival (-9)",
         "revenge (-6)",
+        "family-drama (-4.5)",
         "epic-romance (-4.5)",
-        "spy (-4.5)",
+        "disaster (-4.5)",
+        "space (-4.5)",
         "heist (-4.5)",
-        "war-drama (-4.5)",
-        "post-apocalyptic (-4.5)",
-        "dystopia (-4.5)",
-        "sword-and-sandal (-4.5)",
-        "friendship (-4.5)",
+        "sports (-4.5)",
+        "superhero (-4.5)",
         "noir (-4.5)",
-        "prison (-4.5)",
-        "biopic (-4.5)",
-        "true-story (-4.5)",
-        "space (-4.5)"
+        "coming-of-age (-4.5)",
+        "sword-and-sandal (-4.5)",
+        "ai-scifi (-4.5)",
+        "dystopia (-4.5)",
+        "cyberpunk (-4.5)",
+        "serial-killer (-4.5)",
+        "occult (-4.5)",
+        "magic-fantasy (-4.5)",
+        "mythology (-4.5)"
       ]
     },
     "finalAffinities": {
@@ -321,37 +335,38 @@
       "27": 8.4,
       "28": -5.1,
       "35": -5.699999999999999,
-      "53": 1.8,
-      "80": -3.7999999999999994,
+      "53": 3.6,
+      "80": -5.699999999999999,
       "878": -12.600000000000001,
-      "9648": -2.3,
+      "9648": -4.6,
       "10749": -6.6000000000000005,
       "General": -16,
       "k:gangster": -9,
       "k:revenge": -6,
-      "k:family-drama": -9,
+      "k:family-drama": -4.5,
       "k:epic-romance": -4.5,
-      "k:spy": -4.5,
-      "k:psychological-thriller": -1.5,
-      "k:heist": -4.5,
-      "k:war-drama": -4.5,
+      "k:disaster": -4.5,
+      "k:true-story": -1.5,
       "k:period-drama": -9,
-      "k:post-apocalyptic": -4.5,
-      "k:survival": -9,
-      "k:dystopia": -4.5,
-      "k:sword-and-sandal": -4.5,
-      "k:friendship": -4.5,
+      "k:supernatural-horror": 3,
       "k:whodunit": -1.5,
-      "k:noir": -4.5,
-      "k:prison": -4.5,
-      "k:biopic": -4.5,
-      "k:true-story": -4.5,
+      "k:psychological-thriller": 3,
       "k:dark-comedy": 3,
       "k:satire": 3,
-      "k:party-comedy": 3,
-      "k:serial-killer": 3,
-      "k:slasher": 3,
-      "k:space": -4.5
+      "k:space": -4.5,
+      "k:heist": -4.5,
+      "k:sports": -4.5,
+      "k:superhero": -4.5,
+      "k:noir": -4.5,
+      "k:coming-of-age": -4.5,
+      "k:sword-and-sandal": -4.5,
+      "k:ai-scifi": -4.5,
+      "k:dystopia": -4.5,
+      "k:cyberpunk": -4.5,
+      "k:serial-killer": -4.5,
+      "k:occult": -4.5,
+      "k:magic-fantasy": -4.5,
+      "k:mythology": -4.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -385,15 +400,15 @@
       "/privacy",
       "/terms"
     ],
-    "questionCount": 38,
+    "questionCount": 40,
     "archetype": "The Hopeless Romantic",
     "expected": "The Hopeless Romantic",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "השם שלך",
-      "היפהפייה הנרדמת",
-      "הנסיכה והצפרדע"
+      "הרקולס",
+      "חתונת הרפאים",
+      "המופלאה: הרפתקאות ליידי באג וחתול שחור"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
@@ -407,18 +422,16 @@
         "Horror (-6.3)"
       ],
       "nicheLoves": [
-        "epic-romance (+3)",
-        "disaster (+3)",
-        "true-story (+3)",
-        "period-drama (+3)"
+        "music-film (+3)",
+        "melancholic (+3)",
+        "musical (+3)",
+        "rom-com (+3)"
       ],
       "nicheHates": [
-        "whodunit (-4.5)",
-        "serial-killer (-4.5)",
-        "post-apocalyptic (-4.5)",
-        "alien (-4.5)",
-        "monster (-4.5)",
-        "survival (-4.5)"
+        "whodunit (-9)",
+        "supernatural-horror (-4.5)",
+        "true-story (-4.5)",
+        "serial-killer (-4.5)"
       ]
     },
     "finalAffinities": {
@@ -426,23 +439,22 @@
       "16": 2.2,
       "18": 1.8,
       "27": -6.300000000000001,
+      "35": 1.9,
       "9648": -6.8999999999999995,
       "10749": 4.4,
       "10751": 1.05,
       "General": -1,
-      "k:whodunit": -4.5,
-      "k:serial-killer": -4.5,
-      "k:epic-romance": 3,
-      "k:disaster": 3,
-      "k:true-story": 3,
-      "k:period-drama": 3,
+      "k:supernatural-horror": -4.5,
+      "k:true-story": -4.5,
+      "k:whodunit": -9,
       "k:occult": 1.5,
       "k:magic-fantasy": 1.5,
       "k:mythology": 1.5,
-      "k:post-apocalyptic": -4.5,
-      "k:alien": -4.5,
-      "k:monster": -4.5,
-      "k:survival": -4.5
+      "k:serial-killer": -4.5,
+      "k:music-film": 3,
+      "k:melancholic": 3,
+      "k:musical": 3,
+      "k:rom-com": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -476,22 +488,23 @@
       "/profile",
       "/"
     ],
-    "questionCount": 39,
+    "questionCount": 38,
     "archetype": "The Hopeless Romantic",
     "expected": "The Hopeless Romantic",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "My Fault",
-      "Your Name.",
-      "Our Fault"
+      "Dilwale Dulhania Le Jayenge",
+      "Forrest Gump",
+      "The Intouchables"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Romance (+4.4)",
-        "Drama (+3.6)"
+        "Romance (+6.6)",
+        "Drama (+5.4)",
+        "Comedy (+3.8)"
       ],
       "hates": [
         "Horror (-12.6)"
@@ -500,39 +513,42 @@
         "epic-romance (+3)",
         "disaster (+3)",
         "true-story (+3)",
-        "period-drama (+3)"
+        "period-drama (+3)",
+        "coming-of-age (+3)"
       ],
       "nicheHates": [
+        "psychological-thriller (-4.5)",
+        "dark-comedy (-4.5)",
+        "satire (-4.5)",
         "post-apocalyptic (-4.5)",
         "alien (-4.5)",
         "monster (-4.5)",
         "survival (-4.5)",
-        "revenge (-4.5)",
-        "dark-comedy (-3)",
-        "satire (-3)",
-        "psychological-thriller (-3)"
+        "revenge (-3)"
       ]
     },
     "finalAffinities": {
-      "18": 3.6,
+      "18": 5.4,
       "27": -12.600000000000001,
-      "35": 0.95,
-      "53": 0.9,
-      "10749": 4.4,
-      "General": -1,
-      "k:epic-romance": 3,
-      "k:disaster": 3,
-      "k:true-story": 3,
-      "k:period-drama": 3,
+      "35": 3.8,
+      "80": 0.95,
+      "10749": 6.6000000000000005,
+      "General": 1,
+      "k:gangster": 1.5,
+      "k:revenge": -3,
+      "k:family-drama": 1.5,
+      "k:psychological-thriller": -4.5,
+      "k:dark-comedy": -4.5,
+      "k:satire": -4.5,
       "k:post-apocalyptic": -4.5,
       "k:alien": -4.5,
       "k:monster": -4.5,
       "k:survival": -4.5,
-      "k:dark-comedy": -3,
-      "k:satire": -3,
-      "k:class-drama": 1.5,
-      "k:psychological-thriller": -3,
-      "k:revenge": -4.5
+      "k:epic-romance": 3,
+      "k:disaster": 3,
+      "k:true-story": 3,
+      "k:period-drama": 3,
+      "k:coming-of-age": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -550,7 +566,7 @@
         "path": "/",
         "status": 200,
         "consoleErrors": [],
-        "textLength": 968,
+        "textLength": 967,
         "brokenImages": 0,
         "ok": true
       }
@@ -566,22 +582,24 @@
       "/pricing",
       "/arena"
     ],
-    "questionCount": 38,
+    "questionCount": 35,
     "archetype": "The Hopeless Romantic",
     "expected": "The Hopeless Romantic",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "הדרמה",
-      "אשמתנו",
-      "טיטניק"
+      "לשבור את הקרח 2",
+      "טד",
+      "רטטוי"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
         "Romance (+6.6)",
-        "Drama (+5.4)"
+        "Fantasy (+4.4)",
+        "Comedy (+3.8)",
+        "Family (+2.1)"
       ],
       "hates": [
         "Horror (-6.3)",
@@ -592,38 +610,43 @@
         "music-film (+3)",
         "melancholic (+3)",
         "musical (+3)",
-        "rom-com (+3)"
+        "rom-com (+3)",
+        "friendship (+3)"
       ],
       "nicheHates": [
-        "survival (-6.7)",
-        "post-apocalyptic (-4.5)",
-        "alien (-4.5)",
-        "monster (-4.5)",
+        "supernatural-horror (-4.5)",
+        "true-story (-4.5)",
+        "whodunit (-4.5)",
+        "gangster (-4.5)",
+        "dark-comedy (-4.5)",
         "heist (-4.5)",
-        "sports (-4.5)",
-        "gangster (-4.5)"
+        "noir (-4.5)"
       ]
     },
     "finalAffinities": {
-      "18": 5.4,
+      "14": 4.4,
+      "18": 1.8,
       "27": -6.300000000000001,
-      "35": 1.9,
+      "35": 3.8,
       "80": -5.699999999999999,
       "878": -3.1500000000000004,
       "10749": 6.6000000000000005,
+      "10751": 2.1,
       "General": -1,
-      "k:post-apocalyptic": -4.5,
-      "k:alien": -4.5,
-      "k:monster": -4.5,
-      "k:survival": -6.75,
-      "k:space": -2.25,
+      "k:supernatural-horror": -4.5,
+      "k:true-story": -4.5,
+      "k:whodunit": -4.5,
+      "k:gangster": -4.5,
+      "k:dark-comedy": -4.5,
+      "k:heist": -4.5,
+      "k:noir": -4.5,
       "k:music-film": 3,
       "k:melancholic": 3,
       "k:musical": 3,
       "k:rom-com": 3,
-      "k:heist": -4.5,
-      "k:sports": -4.5,
-      "k:gangster": -4.5
+      "k:space": -2.25,
+      "k:survival": -2.25,
+      "k:friendship": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -657,22 +680,23 @@
       "/arena/leaderboard",
       "/pulse"
     ],
-    "questionCount": 36,
+    "questionCount": 37,
     "archetype": "The Hopeless Romantic",
     "expected": "The Hopeless Romantic",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "10 Things I Hate About You",
-      "The Proposal",
-      "American Pie"
+      "365 Days",
+      "Léon: The Professional",
+      "The Wolf of Wall Street"
     ],
     "trailerBugs": [],
-    "finalsWithTrailers": 3,
+    "finalsWithTrailers": 2,
     "tasteProfile": {
       "loves": [
         "Romance (+6.6)",
-        "Comedy (+5.7)"
+        "Crime (+3.8)",
+        "Drama (+3.6)"
       ],
       "hates": [
         "Horror (-6.3)",
@@ -682,32 +706,34 @@
         "music-film (+3)",
         "melancholic (+3)",
         "musical (+3)",
-        "rom-com (+3)",
-        "coming-of-age (+3)"
+        "rom-com (+3)"
       ],
       "nicheHates": [
-        "serial-killer (-6.7)",
-        "whodunit (-6.7)",
-        "party-comedy (-4.5)",
-        "slasher (-4.5)"
+        "post-apocalyptic (-4.5)",
+        "alien (-4.5)",
+        "monster (-4.5)",
+        "survival (-4.5)"
       ]
     },
     "finalAffinities": {
-      "18": 1.8,
+      "18": 3.6,
       "27": -6.300000000000001,
-      "35": 5.699999999999999,
+      "35": 1.9,
+      "80": 3.8,
       "9648": -3.4499999999999997,
       "10749": 6.6000000000000005,
       "General": 1,
-      "k:party-comedy": -4.5,
-      "k:serial-killer": -6.75,
-      "k:slasher": -4.5,
-      "k:whodunit": -6.75,
       "k:music-film": 3,
       "k:melancholic": 3,
       "k:musical": 3,
       "k:rom-com": 3,
-      "k:coming-of-age": 3
+      "k:serial-killer": 0.75,
+      "k:whodunit": 0.75,
+      "k:noir": 0.75,
+      "k:post-apocalyptic": -4.5,
+      "k:alien": -4.5,
+      "k:monster": -4.5,
+      "k:survival": -4.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -741,7 +767,7 @@
       "/duel",
       "/quiz"
     ],
-    "questionCount": 39,
+    "questionCount": 40,
     "archetype": "The Family & Animation Enthusiast",
     "expected": "The Family & Animation Enthusiast",
     "archetypeMatch": true,
@@ -768,11 +794,10 @@
         "friendship (+3)"
       ],
       "nicheHates": [
-        "serial-killer (-9)",
         "whodunit (-9)",
-        "noir (-4.5)",
-        "party-comedy (-4.5)",
-        "slasher (-4.5)"
+        "supernatural-horror (-4.5)",
+        "true-story (-4.5)",
+        "serial-killer (-4.5)"
       ]
     },
     "finalAffinities": {
@@ -784,15 +809,15 @@
       "9648": -6.8999999999999995,
       "10751": 2.1,
       "General": -3,
-      "k:heist": -2.25,
-      "k:sports": -2.25,
-      "k:gangster": -2.25,
-      "k:serial-killer": -9,
+      "k:friendship": 3,
+      "k:supernatural-horror": -4.5,
+      "k:true-story": -4.5,
       "k:whodunit": -9,
-      "k:noir": -4.5,
-      "k:party-comedy": -4.5,
-      "k:slasher": -4.5,
-      "k:friendship": 3
+      "k:gangster": -2.25,
+      "k:dark-comedy": -2.25,
+      "k:heist": -2.25,
+      "k:noir": -2.25,
+      "k:serial-killer": -4.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -826,15 +851,15 @@
       "/login",
       "/privacy"
     ],
-    "questionCount": 37,
+    "questionCount": 40,
     "archetype": "The Family & Animation Enthusiast",
     "expected": "The Family & Animation Enthusiast",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "The Super Mario Galaxy Movie",
-      "Toy Story 4",
-      "Inside Out"
+      "Shrek",
+      "Zootopia 2",
+      "Inside Out 2"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
@@ -848,18 +873,13 @@
         "Horror (-12.6)",
         "Action (-2.5)"
       ],
-      "nicheLoves": [
-        "friendship (+3)"
-      ],
+      "nicheLoves": [],
       "nicheHates": [
-        "revenge (-6.7)",
-        "psychological-thriller (-4.5)",
-        "dark-comedy (-4.5)",
-        "satire (-4.5)",
-        "party-comedy (-4.5)",
-        "serial-killer (-4.5)",
-        "slasher (-4.5)",
-        "whodunit (-4.5)"
+        "monster (-9)",
+        "post-apocalyptic (-9)",
+        "zombie (-4.5)",
+        "alien (-4.5)",
+        "survival (-4.5)"
       ]
     },
     "finalAffinities": {
@@ -870,18 +890,13 @@
       "35": 1.9,
       "10751": 2.1,
       "General": -3,
-      "k:friendship": 3,
-      "k:assassin": -2.25,
-      "k:gangster": -2.25,
-      "k:spy": -2.25,
-      "k:revenge": -6.75,
-      "k:psychological-thriller": -4.5,
-      "k:dark-comedy": -4.5,
-      "k:satire": -4.5,
-      "k:party-comedy": -4.5,
-      "k:serial-killer": -4.5,
-      "k:slasher": -4.5,
-      "k:whodunit": -4.5
+      "k:monster": -9,
+      "k:post-apocalyptic": -9,
+      "k:zombie": -4.5,
+      "k:alien": -4.5,
+      "k:survival": -4.5,
+      "k:superhero": -2.25,
+      "k:noir": -2.25
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -921,53 +936,44 @@
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "הטירה הנעה של האוול",
+      "קופצים בראש",
       "שרק",
-      "לשבור את הקרח"
+      "הקול בראש 2"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
         "Animation (+4.4)",
-        "Fantasy (+2.2)",
+        "Adventure (+3.2)",
         "Sci-Fi (+2.1)",
         "Family (+2.1)"
       ],
       "hates": [
         "Horror (-6.3)"
       ],
-      "nicheLoves": [
-        "occult (+3)",
-        "magic-fantasy (+3)",
-        "mythology (+3)"
-      ],
+      "nicheLoves": [],
       "nicheHates": [
-        "post-apocalyptic (-4.5)",
-        "alien (-4.5)",
-        "monster (-4.5)",
-        "survival (-4.5)"
+        "supernatural-horror (-4.5)",
+        "true-story (-4.5)",
+        "whodunit (-4.5)"
       ]
     },
     "finalAffinities": {
-      "14": 2.2,
+      "12": 3.1500000000000004,
       "16": 4.4,
       "27": -6.300000000000001,
       "28": 0.85,
+      "35": 1.9,
       "878": 2.1,
       "10751": 2.1,
       "General": 1,
-      "k:post-apocalyptic": -4.5,
-      "k:alien": -4.5,
-      "k:monster": -4.5,
-      "k:survival": -4.5,
-      "k:ai-scifi": 1.5,
-      "k:martial-arts": 1.5,
-      "k:dystopia": 1.5,
-      "k:cyberpunk": 1.5,
-      "k:occult": 3,
-      "k:magic-fantasy": 3,
-      "k:mythology": 3
+      "k:supernatural-horror": -4.5,
+      "k:true-story": -4.5,
+      "k:whodunit": -4.5,
+      "k:spy": 1.5,
+      "k:psychological-thriller": 1.5,
+      "k:heist": 1.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1001,52 +1007,61 @@
       "/",
       "/pricing"
     ],
-    "questionCount": 38,
+    "questionCount": 37,
     "archetype": "The Family & Animation Enthusiast",
     "expected": "The Family & Animation Enthusiast",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "GOAT",
-      "Toy Story 3",
-      "Toy Story 2"
+      "Ne Zha 2",
+      "Howl's Moving Castle",
+      "Shrek"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
         "Animation (+4.4)",
+        "Fantasy (+2.2)",
         "Family (+2.1)"
       ],
       "hates": [
         "Mystery (-6.9)",
-        "Horror (-6.3)"
+        "Horror (-6.3)",
+        "Adventure (-3.2)"
       ],
-      "nicheLoves": [],
+      "nicheLoves": [
+        "occult (+3)",
+        "magic-fantasy (+3)",
+        "mythology (+3)"
+      ],
       "nicheHates": [
+        "serial-killer (-9)",
         "whodunit (-9)",
+        "noir (-4.5)",
         "party-comedy (-4.5)",
-        "serial-killer (-4.5)",
-        "slasher (-4.5)",
-        "family-drama (-4.5)",
-        "noir (-4.5)"
+        "slasher (-4.5)"
       ]
     },
     "finalAffinities": {
-      "12": -1.0500000000000003,
+      "12": -3.1500000000000004,
+      "14": 2.2,
       "16": 4.4,
       "27": -6.300000000000001,
-      "35": 1.9,
       "9648": -6.8999999999999995,
       "10751": 2.1,
       "General": -3,
-      "k:treasure-adventure": -2.25,
-      "k:party-comedy": -4.5,
-      "k:serial-killer": -4.5,
-      "k:slasher": -4.5,
+      "k:serial-killer": -9,
       "k:whodunit": -9,
-      "k:family-drama": -4.5,
-      "k:noir": -4.5
+      "k:noir": -4.5,
+      "k:party-comedy": -4.5,
+      "k:slasher": -4.5,
+      "k:occult": 3,
+      "k:magic-fantasy": 3,
+      "k:mythology": 3,
+      "k:sword-and-sandal": -2.25,
+      "k:revenge": -2.25,
+      "k:period-drama": -2.25
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1056,7 +1071,7 @@
         "path": "/",
         "status": 200,
         "consoleErrors": [],
-        "textLength": 951,
+        "textLength": 953,
         "brokenImages": 0,
         "ok": true
       },
@@ -1080,33 +1095,33 @@
       "/arena",
       "/arena/leaderboard"
     ],
-    "questionCount": 38,
+    "questionCount": 40,
     "archetype": "The Escapist",
     "expected": "The Escapist",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "בין כוכבים",
-      "אווטאר: אש ואפר",
-      "אווטאר"
+      "בלייד ראנר 2049",
+      "שליחות קטלנית 2: יום הדין",
+      "הנוסע השמיני"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Sci-Fi (+12.6)",
-        "Adventure (+4.2)"
+        "Sci-Fi (+8.4)",
+        "Adventure (+2.1)"
       ],
       "hates": [
         "Romance (-6.6)"
       ],
       "nicheLoves": [
         "ai-scifi (+6)",
-        "space (+6)",
-        "dystopia (+3)",
+        "dystopia (+6)",
+        "martial-arts (+3)",
         "cyberpunk (+3)",
-        "survival (+3)",
-        "assassin (+3)"
+        "space (+3)",
+        "time-travel (+3)"
       ],
       "nicheHates": [
         "music-film (-4.5)",
@@ -1116,25 +1131,25 @@
       ]
     },
     "finalAffinities": {
-      "12": 4.2,
-      "18": 0.8999999999999999,
+      "12": 2.1,
+      "18": -0.9000000000000001,
       "28": 1.7,
-      "53": 1.8,
-      "878": 12.600000000000001,
+      "878": 8.4,
       "10749": -6.6000000000000005,
-      "General": 3,
-      "k:ai-scifi": 6,
-      "k:dystopia": 3,
-      "k:cyberpunk": 3,
+      "General": 1,
       "k:music-film": -4.5,
       "k:melancholic": -4.5,
       "k:musical": -4.5,
       "k:rom-com": -4.5,
-      "k:space": 6,
-      "k:survival": 3,
-      "k:prison": -2.25,
-      "k:friendship": -2.25,
-      "k:assassin": 3
+      "k:gangster": -2.25,
+      "k:revenge": -2.25,
+      "k:family-drama": -2.25,
+      "k:ai-scifi": 6,
+      "k:martial-arts": 3,
+      "k:dystopia": 6,
+      "k:cyberpunk": 3,
+      "k:space": 3,
+      "k:time-travel": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1168,51 +1183,54 @@
       "/pulse",
       "/duel"
     ],
-    "questionCount": 37,
+    "questionCount": 39,
     "archetype": "The Escapist",
     "expected": "The Escapist",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "The Martian",
-      "E.T. the Extra-Terrestrial",
-      "Bridge to Terabithia"
+      "Avengers: Endgame",
+      "Interstellar",
+      "Guardians of the Galaxy Vol. 2"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Sci-Fi (+8.4)",
-        "Drama (+3.6)",
-        "Adventure (+2.1)"
+        "Sci-Fi (+12.6)",
+        "Adventure (+4.2)",
+        "Thriller (+3.6)",
+        "Action (+3.4)"
       ],
       "hates": [
         "Romance (-3.3)"
       ],
       "nicheLoves": [
-        "ai-scifi (+6)",
-        "dystopia (+6)",
-        "space (+3)",
-        "time-travel (+3)",
-        "cyberpunk (+3)"
+        "space (+6)",
+        "spy (+3)",
+        "psychological-thriller (+3)",
+        "heist (+3)",
+        "time-travel (+3)"
       ],
       "nicheHates": []
     },
     "finalAffinities": {
-      "12": 2.1,
-      "18": 3.6,
-      "878": 8.4,
+      "12": 4.2,
+      "18": 1.8,
+      "28": 3.4,
+      "53": 3.6,
+      "878": 12.600000000000001,
       "10749": -3.3000000000000003,
-      "General": 3,
-      "k:space": 3,
-      "k:ai-scifi": 6,
-      "k:time-travel": 3,
-      "k:dystopia": 6,
-      "k:cyberpunk": 3,
+      "General": 5,
+      "k:space": 6,
       "k:epic-romance": -2.25,
       "k:disaster": -2.25,
       "k:true-story": -2.25,
-      "k:period-drama": -2.25
+      "k:period-drama": -2.25,
+      "k:spy": 3,
+      "k:psychological-thriller": 3,
+      "k:heist": 3,
+      "k:time-travel": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1246,44 +1264,36 @@
       "/quiz",
       "/login"
     ],
-    "questionCount": 34,
+    "questionCount": 39,
     "archetype": "The Escapist",
     "expected": "The Escapist",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "רצח כתוב היטב: התעורר, איש מת",
-      "ספרות זולה",
-      "היו זמנים בהוליווד"
+      "באטמן",
+      "צעקה",
+      "אינסטינקט בסיסי"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Mystery (+6.9)",
-        "Comedy (+5.7)",
-        "Crime (+5.7)",
-        "Thriller (+5.4)"
+        "Mystery (+4.6)"
       ],
       "hates": [],
       "nicheLoves": [
-        "serial-killer (+3)",
         "whodunit (+3)",
-        "noir (+3)",
-        "true-story (+3)"
+        "serial-killer (+3)"
       ],
       "nicheHates": []
     },
     "finalAffinities": {
-      "35": 5.699999999999999,
-      "53": 5.4,
-      "80": 5.699999999999999,
-      "9648": 6.8999999999999995,
-      "General": 6,
-      "k:serial-killer": 3,
+      "53": 1.8,
+      "80": 1.9,
+      "9648": 4.6,
+      "General": 2,
       "k:whodunit": 3,
-      "k:noir": 3,
-      "k:true-story": 3
+      "k:serial-killer": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1317,54 +1327,59 @@
       "/privacy",
       "/terms"
     ],
-    "questionCount": 39,
+    "questionCount": 38,
     "archetype": "The Escapist",
     "expected": "The Escapist",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "Mortal Kombat II",
-      "Mortal Kombat",
-      "The Lord of the Rings: The Return of the King"
+      "The Lord of the Rings: The Return of the King",
+      "The Lord of the Rings: The Fellowship of the Ring",
+      "The Lord of the Rings: The Two Towers"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Action (+6.8)",
-        "Adventure (+6.3)",
-        "Sci-Fi (+6.3)",
-        "Fantasy (+2.2)"
+        "Fantasy (+11)",
+        "Adventure (+10.5)",
+        "Action (+5.1)",
+        "Animation (+4.4)",
+        "Sci-Fi (+4.2)"
       ],
-      "hates": [
-        "Drama (-2.7)"
-      ],
+      "hates": [],
       "nicheLoves": [
+        "ai-scifi (+6)",
         "martial-arts (+6)",
-        "ai-scifi (+3)",
+        "magic-fantasy (+6)",
+        "high-fantasy (+6)",
+        "treasure-adventure (+3)",
         "dystopia (+3)",
         "cyberpunk (+3)",
-        "treasure-adventure (+3)",
-        "post-apocalyptic (+3)"
+        "monster (+3)",
+        "revenge (+3)"
       ],
       "nicheHates": []
     },
     "finalAffinities": {
-      "12": 6.300000000000001,
-      "14": 2.2,
-      "18": -2.7,
-      "28": 6.8,
-      "35": 1.9,
-      "878": 6.300000000000001,
-      "General": 5,
-      "k:ai-scifi": 3,
-      "k:martial-arts": 6,
-      "k:dystopia": 3,
-      "k:cyberpunk": 3,
+      "12": 10.5,
+      "14": 11,
+      "16": 4.4,
+      "18": -0.9000000000000001,
+      "28": 5.1,
+      "878": 4.2,
+      "General": 9,
       "k:prison": -2.25,
       "k:friendship": -2.25,
       "k:treasure-adventure": 3,
-      "k:post-apocalyptic": 3
+      "k:ai-scifi": 6,
+      "k:martial-arts": 6,
+      "k:dystopia": 3,
+      "k:cyberpunk": 3,
+      "k:magic-fantasy": 6,
+      "k:monster": 3,
+      "k:revenge": 3,
+      "k:high-fantasy": 6
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1398,60 +1413,61 @@
       "/profile",
       "/"
     ],
-    "questionCount": 37,
+    "questionCount": 38,
     "archetype": "The Escapist",
     "expected": "The Escapist",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "בין כוכבים",
+      "הנוקמים: סוף המשחק",
       "קופצים בראש",
-      "רוז הרובוטית"
+      "אווטאר"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Sci-Fi (+8.4)"
+        "Sci-Fi (+8.4)",
+        "Adventure (+4.2)"
       ],
       "hates": [
         "Horror (-6.3)",
         "Animation (-3.3)"
       ],
       "nicheLoves": [
+        "spy (+3)",
+        "psychological-thriller (+3)",
+        "heist (+3)",
         "space (+3)",
         "ai-scifi (+3)",
-        "martial-arts (+3)",
-        "dystopia (+3)",
-        "cyberpunk (+3)"
+        "time-travel (+3)",
+        "dystopia (+3)"
       ],
       "nicheHates": [
-        "post-apocalyptic (-4.5)",
-        "alien (-4.5)",
-        "monster (-4.5)",
-        "survival (-4.5)"
+        "supernatural-horror (-4.5)",
+        "true-story (-4.5)",
+        "whodunit (-4.5)"
       ]
     },
     "finalAffinities": {
+      "12": 4.2,
       "16": -3.3000000000000003,
       "18": 1.8,
       "27": -6.300000000000001,
       "28": 1.7,
-      "53": 1.8,
       "878": 8.4,
       "General": 1,
-      "k:occult": -2.25,
-      "k:magic-fantasy": -2.25,
-      "k:mythology": -2.25,
+      "k:spy": 3,
+      "k:psychological-thriller": 3,
+      "k:heist": 3,
+      "k:supernatural-horror": -4.5,
+      "k:true-story": -4.5,
+      "k:whodunit": -4.5,
       "k:space": 3,
       "k:ai-scifi": 3,
-      "k:martial-arts": 3,
+      "k:time-travel": 3,
       "k:dystopia": 3,
-      "k:cyberpunk": 3,
-      "k:post-apocalyptic": -4.5,
-      "k:alien": -4.5,
-      "k:monster": -4.5,
-      "k:survival": -4.5
+      "k:friendship": -2.25
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1469,7 +1485,7 @@
         "path": "/",
         "status": 200,
         "consoleErrors": [],
-        "textLength": 770,
+        "textLength": 767,
         "brokenImages": 0,
         "ok": true
       }
@@ -1485,56 +1501,52 @@
       "/pricing",
       "/arena"
     ],
-    "questionCount": 39,
+    "questionCount": 38,
     "archetype": "The Action Junkie",
     "expected": "The Action Junkie",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "Inception",
-      "Predator: Badlands",
-      "Spider-Man: No Way Home"
+      "Léon: The Professional",
+      "The Equalizer",
+      "John Wick: Chapter 4"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
         "Crime (+3.8)",
-        "Action (+3.4)",
-        "Adventure (+2.1)",
-        "Sci-Fi (+2.1)"
+        "Action (+3.4)"
       ],
       "hates": [
         "Romance (-3.3)"
       ],
       "nicheLoves": [
-        "post-apocalyptic (+3)",
-        "survival (+3)",
-        "dystopia (+3)",
-        "heist (+3)",
-        "sports (+3)",
-        "gangster (+3)"
+        "gangster (+6)",
+        "prison (+3)",
+        "biopic (+3)",
+        "true-story (+3)",
+        "assassin (+3)",
+        "spy (+3)",
+        "revenge (+3)"
       ],
       "nicheHates": []
     },
     "finalAffinities": {
-      "12": 2.1,
+      "18": 1.8,
       "28": 3.4,
-      "35": 1.9,
+      "53": 1.8,
       "80": 3.8,
-      "878": 2.1,
       "10749": -3.3000000000000003,
       "General": 3,
-      "k:post-apocalyptic": 3,
-      "k:survival": 3,
-      "k:dystopia": 3,
+      "k:prison": 3,
+      "k:gangster": 6,
+      "k:biopic": 3,
+      "k:true-story": 3,
       "k:epic-romance": -2.25,
-      "k:disaster": -2.25,
-      "k:true-story": -2.25,
-      "k:period-drama": -2.25,
-      "k:heist": 3,
-      "k:sports": 3,
-      "k:gangster": 3
+      "k:assassin": 3,
+      "k:spy": 3,
+      "k:revenge": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1568,61 +1580,50 @@
       "/arena/leaderboard",
       "/pulse"
     ],
-    "questionCount": 37,
+    "questionCount": 40,
     "archetype": "The Action Junkie",
     "expected": "The Action Junkie",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "האביר האפל",
-      "בלרינה",
-      "משימה בלתי אפשרית: חשבון סופי"
+      "לאון",
+      "ג'ון וויק 4",
+      "טריפל אקס"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Crime (+3.8)",
-        "Thriller (+3.6)",
+        "Crime (+5.7)",
         "Action (+3.4)"
       ],
       "hates": [
         "Romance (-6.6)"
       ],
       "nicheLoves": [
-        "gangster (+6)",
-        "dark-comedy (+3)",
         "heist (+3)",
-        "noir (+3)",
-        "assassin (+3)",
-        "spy (+3)",
-        "revenge (+3)"
+        "sports (+3)",
+        "gangster (+3)",
+        "superhero (+3)",
+        "noir (+3)"
       ],
       "nicheHates": [
-        "music-film (-4.5)",
-        "melancholic (-4.5)",
-        "musical (-4.5)",
-        "rom-com (-4.5)"
+        "epic-romance (-4.5)"
       ]
     },
     "finalAffinities": {
       "28": 3.4,
       "35": 1.9,
-      "53": 3.6,
-      "80": 3.8,
+      "53": 1.8,
+      "80": 5.699999999999999,
       "10749": -6.6000000000000005,
       "General": 2,
-      "k:music-film": -4.5,
-      "k:melancholic": -4.5,
-      "k:musical": -4.5,
-      "k:rom-com": -4.5,
-      "k:gangster": 6,
-      "k:dark-comedy": 3,
+      "k:epic-romance": -4.5,
       "k:heist": 3,
-      "k:noir": 3,
-      "k:assassin": 3,
-      "k:spy": 3,
-      "k:revenge": 3
+      "k:sports": 3,
+      "k:gangster": 3,
+      "k:superhero": 3,
+      "k:noir": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1656,21 +1657,21 @@
       "/duel",
       "/quiz"
     ],
-    "questionCount": 39,
+    "questionCount": 37,
     "archetype": "The Action Junkie",
     "expected": "The Action Junkie",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "The Equalizer",
+      "Léon: The Professional",
       "John Wick: Chapter 4",
-      "xXx: Return of Xander Cage"
+      "xXx"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
-        "Crime (+3.8)",
+        "Crime (+5.7)",
         "Action (+3.4)"
       ],
       "hates": [
@@ -1678,18 +1679,14 @@
         "Animation (-3.3)"
       ],
       "nicheLoves": [
-        "gangster (+6)",
+        "superhero (+3)",
+        "noir (+3)",
         "heist (+3)",
         "sports (+3)",
-        "assassin (+3)",
-        "spy (+3)",
-        "revenge (+3)"
+        "gangster (+3)"
       ],
       "nicheHates": [
-        "epic-romance (-4.5)",
-        "disaster (-4.5)",
-        "true-story (-4.5)",
-        "period-drama (-4.5)"
+        "epic-romance (-4.5)"
       ]
     },
     "finalAffinities": {
@@ -1697,22 +1694,18 @@
       "28": 3.4,
       "35": 1.9,
       "53": 1.8,
-      "80": 3.8,
+      "80": 5.699999999999999,
       "10749": -6.6000000000000005,
       "General": 1,
+      "k:superhero": 3,
+      "k:noir": 3,
+      "k:heist": 3,
+      "k:sports": 3,
+      "k:gangster": 3,
       "k:occult": -2.25,
       "k:magic-fantasy": -2.25,
       "k:mythology": -2.25,
-      "k:heist": 3,
-      "k:sports": 3,
-      "k:gangster": 6,
-      "k:assassin": 3,
-      "k:spy": 3,
-      "k:revenge": 3,
-      "k:epic-romance": -4.5,
-      "k:disaster": -4.5,
-      "k:true-story": -4.5,
-      "k:period-drama": -4.5
+      "k:epic-romance": -4.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1746,58 +1739,51 @@
       "/login",
       "/privacy"
     ],
-    "questionCount": 38,
+    "questionCount": 37,
     "archetype": "The Action Junkie",
     "expected": "The Action Junkie",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "הטורף: שטח פראי",
-      "ספיידרמן: אין דרך הביתה",
-      "הנוקמים: מלחמת האינסוף"
+      "נקודת שוויון",
+      "הסנדק",
+      "מייק & ניק & ניק & אליס"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
         "Crime (+3.8)",
-        "Action (+3.4)",
-        "Adventure (+2.1)",
-        "Sci-Fi (+2.1)"
+        "Action (+3.4)"
       ],
       "hates": [
         "Animation (-6.6)"
       ],
       "nicheLoves": [
-        "post-apocalyptic (+3)",
-        "survival (+3)",
-        "dystopia (+3)",
-        "gangster (+3)",
-        "dark-comedy (+3)",
-        "heist (+3)",
-        "noir (+3)"
+        "gangster (+6)",
+        "prison (+3)",
+        "biopic (+3)",
+        "true-story (+3)",
+        "assassin (+3)",
+        "spy (+3)",
+        "revenge (+3)"
       ],
-      "nicheHates": [
-        "friendship (-4.5)"
-      ]
+      "nicheHates": []
     },
     "finalAffinities": {
-      "12": 2.1,
       "16": -6.6000000000000005,
+      "18": 1.8,
       "28": 3.4,
-      "35": 1.9,
       "53": 1.8,
       "80": 3.8,
-      "878": 2.1,
       "General": 2,
-      "k:post-apocalyptic": 3,
-      "k:survival": 3,
-      "k:dystopia": 3,
-      "k:gangster": 3,
-      "k:dark-comedy": 3,
-      "k:heist": 3,
-      "k:noir": 3,
-      "k:friendship": -4.5
+      "k:prison": 3,
+      "k:gangster": 6,
+      "k:biopic": 3,
+      "k:true-story": 3,
+      "k:assassin": 3,
+      "k:spy": 3,
+      "k:revenge": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1831,14 +1817,14 @@
       "/terms",
       "/profile"
     ],
-    "questionCount": 38,
+    "questionCount": 40,
     "archetype": "The Pretentious Cinephile",
     "expected": "The Pretentious Cinephile",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "The Punisher: One Last Kill",
-      "After We Fell",
+      "The Drama",
+      "My Fault",
       "The Shawshank Redemption"
     ],
     "trailerBugs": [],
@@ -1850,16 +1836,16 @@
       "hates": [
         "Animation (-6.6)",
         "Sci-Fi (-6.3)",
-        "Comedy (-5.7)"
+        "Comedy (-3.8)"
       ],
       "nicheLoves": [
-        "gangster (+3)",
-        "revenge (+3)",
-        "family-drama (+3)"
+        "dark-comedy (+3)",
+        "satire (+3)",
+        "class-drama (+3)",
+        "psychological-thriller (+3)"
       ],
       "nicheHates": [
         "ai-scifi (-4.5)",
-        "martial-arts (-4.5)",
         "dystopia (-4.5)",
         "cyberpunk (-4.5)",
         "war-drama (-4.5)",
@@ -1869,17 +1855,17 @@
     "finalAffinities": {
       "16": -6.6000000000000005,
       "18": 3.6,
-      "35": -5.699999999999999,
-      "80": 1.9,
+      "35": -3.7999999999999994,
+      "53": 1.8,
       "878": -6.300000000000001,
       "General": -4,
+      "k:dark-comedy": 3,
+      "k:satire": 3,
+      "k:class-drama": 3,
+      "k:psychological-thriller": 3,
       "k:ai-scifi": -4.5,
-      "k:martial-arts": -4.5,
       "k:dystopia": -4.5,
       "k:cyberpunk": -4.5,
-      "k:gangster": 3,
-      "k:revenge": 3,
-      "k:family-drama": 3,
       "k:war-drama": -4.5,
       "k:period-drama": -4.5
     },
@@ -1915,14 +1901,14 @@
       "/",
       "/pricing"
     ],
-    "questionCount": 40,
+    "questionCount": 38,
     "archetype": "The Pretentious Cinephile",
     "expected": "The Pretentious Cinephile",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "אשמתי",
-      "השטן לובשת פראדה",
+      "המעניש: חיסול אחרון",
+      "אחרי ש... נפלנו",
       "חומות של תקווה"
     ],
     "trailerBugs": [],
@@ -1937,30 +1923,34 @@
         "Action (-2.5)"
       ],
       "nicheLoves": [
-        "class-drama (+3)"
+        "gangster (+3)",
+        "revenge (+3)",
+        "family-drama (+3)"
       ],
       "nicheHates": [
-        "revenge (-4.5)",
-        "psychological-thriller (-3.7)"
+        "post-apocalyptic (-6.7)",
+        "monster (-4.5)",
+        "zombie (-4.5)"
       ]
     },
     "finalAffinities": {
       "18": 3.6,
       "27": -6.300000000000001,
       "28": -2.55,
-      "35": 1.9,
-      "53": 1.8,
+      "80": 1.9,
       "878": -3.1500000000000004,
       "General": -2,
-      "k:psychological-thriller": -3.75,
-      "k:dark-comedy": -1.5,
-      "k:satire": -1.5,
-      "k:revenge": -4.5,
-      "k:superhero": -2.25,
-      "k:noir": -2.25,
+      "k:gangster": 3,
+      "k:revenge": 3,
+      "k:family-drama": 3,
+      "k:post-apocalyptic": -6.75,
+      "k:survival": -2.25,
+      "k:dystopia": -2.25,
+      "k:monster": -4.5,
+      "k:zombie": -4.5,
       "k:spy": -2.25,
-      "k:heist": -2.25,
-      "k:class-drama": 3
+      "k:psychological-thriller": -2.25,
+      "k:heist": -2.25
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -1970,7 +1960,7 @@
         "path": "/",
         "status": 200,
         "consoleErrors": [],
-        "textLength": 760,
+        "textLength": 769,
         "brokenImages": 0,
         "ok": true
       },
@@ -1994,22 +1984,21 @@
       "/arena",
       "/arena/leaderboard"
     ],
-    "questionCount": 36,
+    "questionCount": 39,
     "archetype": "The Pretentious Cinephile",
     "expected": "The Pretentious Cinephile",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "The Drama",
-      "The Proposal",
-      "Dilwale Dulhania Le Jayenge"
+      "After We Fell",
+      "365 Days: This Day",
+      "Forrest Gump"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [
         "Drama (+4.5)",
-        "Comedy (+2.8)",
         "Romance (+2.2)"
       ],
       "hates": [
@@ -2017,46 +2006,41 @@
         "Sci-Fi (-6.3)"
       ],
       "nicheLoves": [
-        "dark-comedy (+3)",
-        "satire (+3)",
-        "class-drama (+3)",
-        "psychological-thriller (+3)"
+        "gangster (+3)",
+        "revenge (+3)",
+        "family-drama (+3)"
       ],
       "nicheHates": [
+        "ai-scifi (-4.5)",
+        "dystopia (-4.5)",
+        "cyberpunk (-4.5)",
         "post-apocalyptic (-4.5)",
         "alien (-4.5)",
         "monster (-4.5)",
-        "survival (-4.5)",
-        "ai-scifi (-4.5)",
-        "martial-arts (-4.5)",
-        "dystopia (-4.5)",
-        "cyberpunk (-4.5)"
+        "survival (-4.5)"
       ]
     },
     "finalAffinities": {
       "18": 4.5,
       "27": -6.300000000000001,
-      "35": 2.8499999999999996,
-      "53": 1.8,
+      "80": 1.9,
       "878": -6.300000000000001,
       "10749": 2.2,
       "General": -1,
+      "k:gangster": 3,
+      "k:revenge": 3,
+      "k:family-drama": 3,
+      "k:ai-scifi": -4.5,
+      "k:dystopia": -4.5,
+      "k:cyberpunk": -4.5,
       "k:post-apocalyptic": -4.5,
       "k:alien": -4.5,
       "k:monster": -4.5,
       "k:survival": -4.5,
-      "k:ai-scifi": -4.5,
-      "k:martial-arts": -4.5,
-      "k:dystopia": -4.5,
-      "k:cyberpunk": -4.5,
-      "k:dark-comedy": 3,
-      "k:satire": 3,
-      "k:class-drama": 3,
-      "k:psychological-thriller": 3,
-      "k:music-film": 1.5,
-      "k:melancholic": 1.5,
-      "k:musical": 1.5,
-      "k:rom-com": 1.5
+      "k:epic-romance": 1.5,
+      "k:disaster": 1.5,
+      "k:true-story": 1.5,
+      "k:period-drama": 1.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -2090,15 +2074,15 @@
       "/pulse",
       "/duel"
     ],
-    "questionCount": 39,
+    "questionCount": 38,
     "archetype": "The Pretentious Cinephile",
     "expected": "The Pretentious Cinephile",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "חדר ברומא",
       "אשמתי",
-      "השטן לובשת פראדה"
+      "השטן לובשת פראדה",
+      "אחרי ש... נפלנו"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
@@ -2113,17 +2097,13 @@
         "Sci-Fi (-6.3)"
       ],
       "nicheLoves": [
-        "prison (+3)",
-        "friendship (+3)"
+        "prison (+3)"
       ],
       "nicheHates": [
-        "party-comedy (-4.5)",
-        "serial-killer (-4.5)",
-        "slasher (-4.5)",
-        "whodunit (-4.5)",
-        "occult (-4.5)",
-        "magic-fantasy (-4.5)",
-        "mythology (-4.5)",
+        "post-apocalyptic (-4.5)",
+        "alien (-4.5)",
+        "monster (-4.5)",
+        "survival (-4.5)",
         "sword-and-sandal (-4.5)",
         "revenge (-4.5)",
         "period-drama (-4.5)",
@@ -2140,21 +2120,18 @@
       "80": 1.9,
       "878": -6.300000000000001,
       "General": -6,
-      "k:party-comedy": -4.5,
-      "k:serial-killer": -4.5,
-      "k:slasher": -4.5,
-      "k:whodunit": -4.5,
-      "k:occult": -4.5,
-      "k:magic-fantasy": -4.5,
-      "k:mythology": -4.5,
+      "k:friendship": -1.5,
+      "k:post-apocalyptic": -4.5,
+      "k:alien": -4.5,
+      "k:monster": -4.5,
+      "k:survival": -4.5,
       "k:sword-and-sandal": -4.5,
       "k:revenge": -4.5,
       "k:period-drama": -4.5,
       "k:spy": -4.5,
       "k:psychological-thriller": -4.5,
       "k:heist": -4.5,
-      "k:prison": 3,
-      "k:friendship": 3
+      "k:prison": 3
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -2188,15 +2165,15 @@
       "/quiz",
       "/login"
     ],
-    "questionCount": 38,
+    "questionCount": 40,
     "archetype": "The Basic Binge-Watcher",
     "expected": "The Basic Binge-Watcher",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "The Punisher: One Last Kill",
-      "The Shadow's Edge",
-      "Tom Clancy's Jack Ryan: Ghost War"
+      "The Mandalorian and Grogu",
+      "Mortal Kombat II",
+      "Project Hail Mary"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
@@ -2207,13 +2184,13 @@
       "nicheHates": []
     },
     "finalAffinities": {
+      "12": 1.05,
       "28": 1.7,
-      "53": 0.9,
+      "878": 1.05,
       "General": 1,
-      "k:assassin": 1.5,
-      "k:gangster": 1.5,
-      "k:spy": 1.5,
-      "k:revenge": 1.5
+      "k:post-apocalyptic": 1.5,
+      "k:survival": 1.5,
+      "k:dystopia": 1.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -2247,25 +2224,35 @@
       "/privacy",
       "/terms"
     ],
-    "questionCount": 40,
+    "questionCount": 38,
     "archetype": "The Basic Binge-Watcher",
     "expected": "The Basic Binge-Watcher",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "מי אני עכשיו?",
-      "פרויקט הייל מרי",
-      "המעניש: חיסול אחרון"
+      "קופצים בראש",
+      "הנוקמים",
+      "אווטאר"
     ],
     "trailerBugs": [],
     "finalsWithTrailers": 3,
     "tasteProfile": {
-      "loves": [],
+      "loves": [
+        "Sci-Fi (+2.1)"
+      ],
       "hates": [],
       "nicheLoves": [],
       "nicheHates": []
     },
-    "finalAffinities": {},
+    "finalAffinities": {
+      "12": 1.05,
+      "28": 0.85,
+      "878": 2.1,
+      "General": 1,
+      "k:spy": 1.5,
+      "k:psychological-thriller": 1.5,
+      "k:heist": 1.5
+    },
     "quizConsoleErrors": [],
     "posterBugs": [],
     "duplicateTitles": [],
@@ -2333,7 +2320,7 @@
         "path": "/",
         "status": 200,
         "consoleErrors": [],
-        "textLength": 941,
+        "textLength": 965,
         "brokenImages": 0,
         "ok": true
       }
@@ -2355,8 +2342,8 @@
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
-      "טיטניק",
-      "אשמתי",
+      "הדרמה",
+      "פורסט גאמפ",
       "אשמתנו"
     ],
     "trailerBugs": [],
@@ -2371,9 +2358,13 @@
     },
     "finalAffinities": {
       "18": 0.9,
+      "35": 0.95,
       "10749": 2.2,
       "General": 1,
-      "k:epic-romance": 1.5
+      "k:music-film": 1.5,
+      "k:melancholic": 1.5,
+      "k:musical": 1.5,
+      "k:rom-com": 1.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -2407,14 +2398,14 @@
       "/arena/leaderboard",
       "/pulse"
     ],
-    "questionCount": 40,
+    "questionCount": 39,
     "archetype": "The Basic Binge-Watcher",
     "expected": "The Basic Binge-Watcher",
     "archetypeMatch": true,
     "personalized": true,
     "recs": [
       "Swapped",
-      "Michael",
+      "The Super Mario Galaxy Movie",
       "Pink Floyd: The Wall"
     ],
     "trailerBugs": [],
@@ -2432,14 +2423,14 @@
       "27": -3.1500000000000004,
       "80": -2.8499999999999996,
       "General": -2,
-      "k:gangster": -2.25,
-      "k:dark-comedy": -2.25,
-      "k:heist": -2.25,
-      "k:noir": -2.25,
       "k:post-apocalyptic": -2.25,
       "k:alien": -2.25,
       "k:monster": -2.25,
-      "k:survival": -2.25
+      "k:survival": -2.25,
+      "k:prison": -2.25,
+      "k:gangster": -2.25,
+      "k:biopic": -2.25,
+      "k:true-story": -2.25
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -2473,102 +2464,104 @@
       "/duel",
       "/quiz"
     ],
-    "questionCount": 19,
+    "questionCount": 18,
     "archetype": "The Basic Binge-Watcher",
     "expected": "The Basic Binge-Watcher",
     "archetypeMatch": true,
-    "personalized": false,
-    "recs": [],
+    "personalized": true,
+    "recs": [
+      "מייקל",
+      "פינק פלויד - החומה",
+      "מכורה"
+    ],
     "trailerBugs": [],
-    "finalsWithTrailers": 0,
+    "finalsWithTrailers": 3,
     "tasteProfile": {
       "loves": [],
       "hates": [
+        "Sci-Fi (-18.9)",
         "Comedy (-17.1)",
-        "Drama (-16.2)",
+        "Action (-15.3)",
+        "Romance (-13.2)",
         "Horror (-12.6)",
-        "Sci-Fi (-12.6)",
-        "Crime (-11.4)",
-        "Action (-10.2)",
         "Mystery (-6.9)",
         "Animation (-6.6)",
-        "Romance (-6.6)",
         "Adventure (-6.3)",
-        "War (-6)"
+        "Family (-6.3)",
+        "Crime (-5.7)",
+        "Drama (-5.4)"
       ],
       "nicheLoves": [],
       "nicheHates": [
-        "dystopia (-13.5)",
-        "true-story (-13.5)",
-        "ai-scifi (-9)",
-        "post-apocalyptic (-9)",
-        "whodunit (-9)",
+        "dark-comedy (-13.5)",
+        "assassin (-13.5)",
+        "satire (-9)",
+        "psychological-thriller (-9)",
+        "revenge (-9)",
         "gangster (-9)",
-        "epic-romance (-9)",
-        "period-drama (-9)",
-        "war-drama (-9)",
-        "space (-4.5)",
-        "time-travel (-4.5)",
-        "monster (-4.5)",
-        "zombie (-4.5)",
-        "cyberpunk (-4.5)",
-        "dark-comedy (-4.5)",
-        "satire (-4.5)",
+        "noir (-9)",
+        "true-story (-9)",
+        "whodunit (-9)",
+        "space (-9)",
+        "epic-romance (-4.5)",
+        "occult (-4.5)",
+        "magic-fantasy (-4.5)",
+        "mythology (-4.5)",
         "class-drama (-4.5)",
-        "psychological-thriller (-4.5)",
-        "treasure-adventure (-4.5)",
-        "serial-killer (-4.5)",
         "heist (-4.5)",
-        "sports (-4.5)",
-        "supernatural-horror (-4.5)",
-        "disaster (-4.5)",
-        "survival (-4.5)",
+        "treasure-adventure (-4.5)",
+        "spy (-4.5)",
+        "ai-scifi (-4.5)",
         "martial-arts (-4.5)",
-        "prison (-4.5)",
-        "party-comedy (-4.5)"
+        "dystopia (-4.5)",
+        "cyberpunk (-4.5)",
+        "supernatural-horror (-4.5)",
+        "serial-killer (-4.5)",
+        "party-comedy (-4.5)",
+        "music-film (-4.5)",
+        "time-travel (-4.5)"
       ]
     },
     "finalAffinities": {
       "12": -6.300000000000001,
       "16": -6.6000000000000005,
-      "18": -16.200000000000003,
+      "18": -5.4,
       "27": -12.600000000000001,
-      "28": -10.2,
+      "28": -15.299999999999999,
       "35": -17.099999999999998,
-      "80": -11.399999999999999,
-      "878": -12.600000000000001,
+      "80": -5.699999999999999,
+      "878": -18.900000000000002,
       "9648": -6.8999999999999995,
-      "10749": -6.6000000000000005,
-      "10752": -6,
+      "10749": -13.200000000000001,
+      "10751": -6.300000000000001,
       "General": -38,
-      "k:space": -4.5,
-      "k:ai-scifi": -9,
-      "k:time-travel": -4.5,
-      "k:dystopia": -13.5,
-      "k:monster": -4.5,
-      "k:post-apocalyptic": -9,
-      "k:zombie": -4.5,
-      "k:cyberpunk": -4.5,
-      "k:dark-comedy": -4.5,
-      "k:satire": -4.5,
+      "k:epic-romance": -4.5,
+      "k:occult": -4.5,
+      "k:magic-fantasy": -4.5,
+      "k:mythology": -4.5,
+      "k:dark-comedy": -13.5,
+      "k:satire": -9,
       "k:class-drama": -4.5,
-      "k:psychological-thriller": -4.5,
-      "k:treasure-adventure": -4.5,
-      "k:whodunit": -9,
-      "k:serial-killer": -4.5,
-      "k:heist": -4.5,
-      "k:sports": -4.5,
+      "k:psychological-thriller": -9,
+      "k:revenge": -9,
       "k:gangster": -9,
-      "k:supernatural-horror": -4.5,
-      "k:true-story": -13.5,
-      "k:epic-romance": -9,
-      "k:disaster": -4.5,
-      "k:period-drama": -9,
-      "k:survival": -4.5,
-      "k:war-drama": -9,
+      "k:heist": -4.5,
+      "k:noir": -9,
+      "k:treasure-adventure": -4.5,
+      "k:assassin": -13.5,
+      "k:spy": -4.5,
+      "k:ai-scifi": -4.5,
       "k:martial-arts": -4.5,
-      "k:prison": -4.5,
-      "k:party-comedy": -4.5
+      "k:dystopia": -4.5,
+      "k:cyberpunk": -4.5,
+      "k:supernatural-horror": -4.5,
+      "k:true-story": -9,
+      "k:whodunit": -9,
+      "k:space": -9,
+      "k:serial-killer": -4.5,
+      "k:party-comedy": -4.5,
+      "k:music-film": -4.5,
+      "k:time-travel": -4.5
     },
     "quizConsoleErrors": [],
     "posterBugs": [],
@@ -2591,9 +2584,7 @@
         "ok": true
       }
     ],
-    "subscribe": false,
-    "reasons": [
-      "recs not personalized (0 movies, ids: )"
-    ]
+    "subscribe": true,
+    "reasons": []
   }
 ]
