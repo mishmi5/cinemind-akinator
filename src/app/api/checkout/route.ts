@@ -1,16 +1,28 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// אתחול Stripe עם המפתח הסודי
 const VALID_PLAN_TYPES = ['credits', 'elite'] as const;
 type PlanType = typeof VALID_PLAN_TYPES[number];
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-05-27.dahlia',
-});
+// Lazy init: constructing Stripe at module scope throws when STRIPE_SECRET_KEY
+// is unset, which crashes `next build` during page-data collection.
+let stripeClient: Stripe | null = null;
+function getStripe(): Stripe | null {
+  if (!process.env.STRIPE_SECRET_KEY) return null;
+  if (!stripeClient) {
+    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2026-05-27.dahlia',
+    });
+  }
+  return stripeClient;
+}
 
 export async function POST(req: Request) {
   try {
+    const stripe = getStripe();
+    if (!stripe) {
+      return NextResponse.json({ error: 'Payments are not configured' }, { status: 503 });
+    }
     const body = await req.json();
     const planType = body.planType as string;
 
