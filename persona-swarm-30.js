@@ -321,10 +321,10 @@ async function humanStarClick(page, vote) {
 }
 
 function resolveVote(persona, titleText, questionNumber) {
-  // 1. Taste-bucket vote — baseline phase only (first 13 questions). Sequels in
+  // 1. Taste-bucket vote — baseline phase only (12 questions: init + 11). Sequels in
   //    the live-TMDB phase share substrings with baseline titles ("The Matrix
   //    Reloaded" ⊃ "The Matrix") and must fall through to keywords/default.
-  const bucket = questionNumber <= 13 ? bucketOf(titleText) : null;
+  const bucket = questionNumber <= 12 ? bucketOf(titleText) : null;
   if (bucket && persona.bucketVotes && persona.bucketVotes[bucket] !== undefined) {
     return persona.bucketVotes[bucket];
   }
