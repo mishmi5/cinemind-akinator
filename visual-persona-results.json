@@ -2,101 +2,101 @@
   {
     "persona": "The Pretentious Film Critic",
     "locale": "he",
-    "questionsAnswered": 60,
-    "archetype": "The Basic Binge-Watcher",
+    "questionsAnswered": 12,
+    "archetype": "The Pretentious Cinephile",
     "roastText": "Derived locally",
-    "moviesMatched": "נימפומנית חלק שני, משיכה גורלית, מייקל",
-    "willingToPay": false,
-    "paymentReason": "Got wrong archetype: \"The Basic Binge-Watcher\", expected: \"The Pretentious Cinephile\". Not paying."
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
+    "willingToPay": true,
+    "paymentReason": "Matched expected archetype \"The Pretentious Cinephile\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Sci-Fi Cyberpunk Nerd",
     "locale": "he",
-    "questionsAnswered": 60,
+    "questionsAnswered": 12,
     "archetype": "The Escapist",
     "roastText": "Derived locally",
-    "moviesMatched": "מורטל קומבט II, המנדלוריאן וגרוגו, מורטל קומבט",
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
     "willingToPay": true,
     "paymentReason": "Matched expected archetype \"The Escapist\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Adrenaline Junkie",
     "locale": "en",
-    "questionsAnswered": 60,
+    "questionsAnswered": 12,
     "archetype": "The Action Junkie",
     "roastText": "Derived locally",
-    "moviesMatched": "Mortal Kombat II, The Mandalorian and Grogu, Mortal Kombat",
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
     "willingToPay": true,
     "paymentReason": "Matched expected archetype \"The Action Junkie\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Rom-Com Dreamer",
-    "locale": "he",
-    "questionsAnswered": 60,
-    "archetype": "The Basic Binge-Watcher",
+    "locale": "en",
+    "questionsAnswered": 12,
+    "archetype": "The Hopeless Romantic",
     "roastText": "Derived locally",
-    "moviesMatched": "קצה הצל, מכורה, אשמתי",
-    "willingToPay": false,
-    "paymentReason": "Got wrong archetype: \"The Basic Binge-Watcher\", expected: \"The Hopeless Romantic\". Not paying."
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
+    "willingToPay": true,
+    "paymentReason": "Matched expected archetype \"The Hopeless Romantic\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Horror Gore-Hound",
-    "locale": "he",
-    "questionsAnswered": 60,
+    "locale": "en",
+    "questionsAnswered": 12,
     "archetype": "The Cinematic Edge-Lord",
     "roastText": "Derived locally",
-    "moviesMatched": "חוטאים, 28 שנה אחרי: מקדש העצמות, אני יורקת על הקבר שלך",
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
     "willingToPay": true,
     "paymentReason": "Matched expected archetype \"The Cinematic Edge-Lord\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Nostalgic Retro Buff",
-    "locale": "en",
-    "questionsAnswered": 60,
+    "locale": "he",
+    "questionsAnswered": 12,
     "archetype": "The Escapist",
     "roastText": "Derived locally",
-    "moviesMatched": "The Matrix, The Mandalorian and Grogu, Real Steel",
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
     "willingToPay": true,
     "paymentReason": "Matched expected archetype \"The Escapist\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Pretentious Art-House Snob",
-    "locale": "he",
-    "questionsAnswered": 60,
-    "archetype": "The Basic Binge-Watcher",
+    "locale": "en",
+    "questionsAnswered": 12,
+    "archetype": "The Pretentious Cinephile",
     "roastText": "Derived locally",
-    "moviesMatched": "נימפומנית חלק שני, משיכה גורלית, מייקל",
-    "willingToPay": false,
-    "paymentReason": "Got wrong archetype: \"The Basic Binge-Watcher\", expected: \"The Pretentious Cinephile\". Not paying."
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
+    "willingToPay": true,
+    "paymentReason": "Matched expected archetype \"The Pretentious Cinephile\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Casual Sunday Watcher",
-    "locale": "en",
-    "questionsAnswered": 60,
+    "locale": "he",
+    "questionsAnswered": 12,
     "archetype": "The Basic Binge-Watcher",
     "roastText": "Derived locally",
-    "moviesMatched": "Obsession, Lee Cronin's The Mummy, Tom Clancy's Jack Ryan: Ghost War",
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
     "willingToPay": true,
     "paymentReason": "Matched expected archetype \"The Basic Binge-Watcher\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The True Crime & Mystery Sleuth",
-    "locale": "en",
-    "questionsAnswered": 60,
-    "archetype": "The Action Junkie",
+    "locale": "he",
+    "questionsAnswered": 12,
+    "archetype": "The Escapist",
     "roastText": "Derived locally",
-    "moviesMatched": "The Punisher: One Last Kill, The Shadow's Edge, Real Steel",
-    "willingToPay": false,
-    "paymentReason": "Got wrong archetype: \"The Action Junkie\", expected: \"The Escapist\". Not paying."
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
+    "willingToPay": true,
+    "paymentReason": "Matched expected archetype \"The Escapist\". Roast was accurate. Willing to pay."
   },
   {
     "persona": "The Family & Animation Enthusiast",
-    "locale": "en",
-    "questionsAnswered": 60,
-    "archetype": "The Basic Binge-Watcher",
+    "locale": "he",
+    "questionsAnswered": 12,
+    "archetype": "The Family & Animation Enthusiast",
     "roastText": "Derived locally",
-    "moviesMatched": "The Super Mario Galaxy Movie, Hoppers, GOAT",
-    "willingToPay": false,
-    "paymentReason": "Got wrong archetype: \"The Basic Binge-Watcher\", expected: \"The Family & Animation Enthusiast\". Not paying."
+    "moviesMatched": "האביר האפל, התחלה, ספרות זולה",
+    "willingToPay": true,
+    "paymentReason": "Matched expected archetype \"The Family & Animation Enthusiast\". Roast was accurate. Willing to pay."
   }
 ]

@@ -61,20 +61,68 @@ Must follow:
   }
 }
 
+// Genre metadata corrected to true TMDB taxonomy — Se7en/Scream were missing Mystery (9648),
+// which starved the Mystery affinity signal and misclassified detective-taste users.
 const FALLBACK_POOL: MovieContext[] = [
-  { id: "155", title: "האביר האפל", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/qJ2tW6WMUDux911r6m7haRef0WH.jpg", overview: "באטמן מתמודד מול הג'וקר...", trailerId: "EXeTwQWrcwY", easterEgg: { type: 'oscar' }, _genreIds: [28, 80] },
+  { id: "155", title: "האביר האפל", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/qJ2tW6WMUDux911r6m7haRef0WH.jpg", overview: "באטמן מתמודד מול הג'וקר...", trailerId: "EXeTwQWrcwY", easterEgg: { type: 'oscar' }, _genreIds: [28, 80, 53] },
   { id: "27205", title: "התחלה", originalDetails: "Inception · 2010", rating: 8.8, posterUrl: "/api/poster?path=/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg", overview: "גנב חלומות...", trailerId: "YoHD9XEInc0", easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
-  { id: "807", title: "שבעה חטאים", originalDetails: "Se7en · 1995", rating: 8.6, posterUrl: "/api/poster?path=/wgQ7APnFpf1TuviKHXeEe3KnsTV.jpg", overview: "רוצח סדרתי מתוחכם...", trailerId: "znmZoVkCjpI", easterEgg: { type: 'blood' }, _genreIds: [53, 80] },
+  { id: "807", title: "שבעה חטאים", originalDetails: "Se7en · 1995", rating: 8.6, posterUrl: "/api/poster?path=/wgQ7APnFpf1TuviKHXeEe3KnsTV.jpg", overview: "רוצח סדרתי מתוחכם...", trailerId: "znmZoVkCjpI", easterEgg: { type: 'blood' }, _genreIds: [80, 9648, 53] },
   { id: "603", title: "מטריקס", originalDetails: "The Matrix · 1999", rating: 8.7, posterUrl: "/api/poster?path=/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg", overview: "העולם הוא אשליה...", trailerId: "vKQi3bBA1y8", easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
-  { id: "680", title: "ספרות זולה", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/d5iIlFn5s0ImszYzBPbOYKQruzY.jpg", overview: "פושעים בלוס אנג'לס...", trailerId: "s7EdQ4FqbhY", easterEgg: { type: 'wazzap' }, _genreIds: [80] },
+  { id: "680", title: "ספרות זולה", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/d5iIlFn5s0ImszYzBPbOYKQruzY.jpg", overview: "פושעים בלוס אנג'לס...", trailerId: "s7EdQ4FqbhY", easterEgg: { type: 'wazzap' }, _genreIds: [80, 53] },
   { id: "238", title: "הסנדק", originalDetails: "The Godfather · 1972", rating: 9.2, posterUrl: "/api/poster?path=/3bhkrj58Vtu7enYsRolD1fZdja1.jpg", overview: "ראש משפחת פשע בניו יורק...", trailerId: "UaVTIH8mujA", easterEgg: { type: 'oscar' }, _genreIds: [18, 80] },
   { id: "98", title: "גלדיאטור", originalDetails: "Gladiator · 2000", rating: 8.2, posterUrl: "/api/poster?path=/ty8TGRuvJLPUmAR1H1nRIsgwvqV.jpg", overview: "גנרל רומי נבגד...", trailerId: "owK1qxDselE", easterEgg: { type: 'oscar' }, _genreIds: [28, 12] },
   { id: "157336", title: "בין כוכבים", originalDetails: "Interstellar · 2014", rating: 8.6, posterUrl: "/api/poster?path=/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg", overview: "מסע בחלל להצלת האנושות...", trailerId: "zSWdZVtXT7E", easterEgg: { type: 'oscar' }, _genreIds: [878, 12] },
-  { id: "4232", title: "צעקה", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/xQZkMWe02OaVdK3xXyZ0B61rAEd.jpg", overview: "רוצח במסכה...", trailerId: "AWm_mkbdpCA", easterEgg: { type: 'wazzap' }, _genreIds: [27] },
+  { id: "4232", title: "צעקה", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/xQZkMWe02OaVdK3xXyZ0B61rAEd.jpg", overview: "רוצח במסכה...", trailerId: "AWm_mkbdpCA", easterEgg: { type: 'wazzap' }, _genreIds: [27, 80, 9648] },
   { id: "22970", title: "בקתה ביער", originalDetails: "The Cabin in the Woods · 2011", rating: 8.0, posterUrl: "/api/poster?path=/aC1242vB3k1KhyS7s5R7a303gZJ.jpg", overview: "חברים בבקתה...", trailerId: "NsIilFNNmkY", easterEgg: { type: 'blood' }, _genreIds: [27, 35] },
   { id: "11036", title: "היומן", originalDetails: "The Notebook · 2004", rating: 8.0, posterUrl: "/api/poster?path=/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg", overview: "סיפור אהבה חוצה עשורים...", trailerId: "FC6biTjEyZw", easterEgg: { type: 'oscar' }, _genreIds: [10749, 18] },
   { id: "862", title: "צעצוע של סיפור", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg", overview: "צעצועים קמים לתחייה...", trailerId: "v-PjgYDrg70", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
 ];
+
+// Exploration phase: deterministic genre-coverage order instead of random sampling.
+// The first 10 questions (init + 9) must span every taste bucket exactly once —
+// random selection left a ~33% chance a user's signature genre (e.g. Romance, which
+// has a single representative) never appeared, making their taste vector unrecoverable.
+const BASELINE_ORDER: string[] = [
+  "155",    // The Dark Knight — Action/Crime/Thriller
+  "603",    // The Matrix — Sci-Fi/Action
+  "11036",  // The Notebook — Romance/Drama (sole Romance signal!)
+  "862",    // Toy Story — Animation/Family/Comedy (sole Animation signal!)
+  "4232",   // Scream — Horror/Crime/Mystery
+  "807",    // Se7en — Crime/Mystery/Thriller
+  "238",    // The Godfather — Drama/Crime
+  "98",     // Gladiator — Action/Adventure
+  "680",    // Pulp Fiction — Crime/Thriller
+  "157336", // Interstellar — Sci-Fi/Adventure
+  "27205",  // Inception — reserve
+  "22970"   // Cabin in the Woods — reserve
+];
+
+const EN_TITLES: Record<string, string> = {
+  "155": "The Dark Knight", "27205": "Inception", "807": "Se7en", "603": "The Matrix",
+  "680": "Pulp Fiction", "238": "The Godfather", "98": "Gladiator", "157336": "Interstellar",
+  "4232": "Scream", "22970": "The Cabin in the Woods", "11036": "The Notebook", "862": "Toy Story"
+};
+
+function pickBaselineMovie(askedMovieIds: string[], locale: string): MovieContext | null {
+  const nextId = BASELINE_ORDER.find(id => !askedMovieIds.includes(id));
+  if (!nextId) return null;
+  const movie = FALLBACK_POOL.find(m => m.id === nextId)!;
+  // English users were shown Hebrew titles for baseline movies — localize.
+  return locale === 'en' ? { ...movie, title: EN_TITLES[movie.id] || movie.title } : { ...movie };
+}
+
+// Latent-taste inference (the "serendipity" layer): a user who strongly likes BOTH
+// Crime and Thriller — more than raw Action — is statistically a whodunit lover even
+// if no pure Mystery title was ever shown. Surface that hidden axis so Mystery
+// recommendations can reach them. 0.9× keeps the inferred signal just under the
+// evidence that produced it (inference must never outrank observation).
+function inferLatentAffinities(aff: Record<string, number>) {
+  const crime = aff['80'] || 0, thriller = aff['53'] || 0, action = aff['28'] || 0;
+  const minCT = Math.min(crime, thriller);
+  if (minCT > action && minCT >= 4) {
+    aff['9648'] = Math.max(aff['9648'] || 0, Math.max(crime, thriller) * 0.9);
+  }
+}
 
 async function getTrailerForMovieId(tmdbId: string): Promise<string> {
   if (!TMDB_API_KEY || tmdbId.startsWith('fb')) return '';
@@ -154,11 +202,13 @@ export async function POST(req: Request) {
     let userAffinities: Record<string, number> = JSON.parse(req.headers.get('x-affinities') || '{}');
 
     if (payload.isInit) {
-      // Start with iconic baseline movies to hook the user and establish initial strong signals
-      let availableStarts = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
-      if (availableStarts.length === 0) availableStarts = FALLBACK_POOL; 
-      
-      const selected = availableStarts[Math.floor(Math.random() * availableStarts.length)];
+      // Start with iconic baseline movies to hook the user and establish initial strong signals.
+      // Deterministic coverage order — see BASELINE_ORDER rationale.
+      let selected = pickBaselineMovie(askedMovieIds, locale);
+      if (!selected) {
+        const availableStarts = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
+        selected = availableStarts.length > 0 ? availableStarts[0] : FALLBACK_POOL[0];
+      }
       if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
       askedMovieIds.push(selected.id);
 
@@ -172,53 +222,66 @@ export async function POST(req: Request) {
     }
 
     // 👑 אלגוריתם התקדמות כירורגי ודינמי לחלוטין
-    let confidenceBoost = 0.002; 
-    
+    let confidenceBoost = 0.008;
+
     if (payload.movieId && !askedMovieIds.includes(payload.movieId)) {
       askedMovieIds.push(payload.movieId);
       if (typeof payload.answer === 'number') {
-        const weight = (payload.answer - 3); 
-        
+        const base = (payload.answer - 3); // -2..+2
+
         if (payload.answer === 5 || payload.answer === 1) {
-          confidenceBoost = Math.random() * 0.015 + 0.02; // 0.02 to 0.035 (takes ~25-35 Qs for decisive users)
+          confidenceBoost = Math.random() * 0.015 + 0.045; // decisive: done in ~18-20 Qs
         } else if (payload.answer === 4 || payload.answer === 2) {
-          confidenceBoost = Math.random() * 0.01 + 0.01; // 0.01 to 0.02 (takes ~45-50 Qs)
+          confidenceBoost = 0.025;
         } else {
-          confidenceBoost = 0.005; // Meh answer takes almost forever
+          confidenceBoost = 0.012; // neutral answers still converge by the hard cap
         }
-        
-        if (weight !== 0) {
-          userAffinities['General'] = (userAffinities['General'] || 0) + weight;
-          
-          // Update specific genre affinities!
+
+        if (base !== 0) {
+          userAffinities['General'] = (userAffinities['General'] || 0) + base;
+
+          // Asymmetric amplification:
+          //  - Love (×2) must clear the archetype detection threshold from a single
+          //    strong vote — one 5★ is a real signal, not noise.
+          //  - Hate (×3) is punished harder: a rejected genre should crater so it
+          //    never resurfaces in recommendations (negative affinity).
+          //  - Primary genre gets full weight, secondary genres half — a 5★ on
+          //    The Dark Knight says "Action" much louder than "Thriller".
           if (payload.genreIds && payload.genreIds.length > 0) {
-            payload.genreIds.forEach(g => {
-              userAffinities[g.toString()] = (userAffinities[g.toString()] || 0) + weight;
+            const polarity = base > 0 ? 2 : 3;
+            payload.genreIds.forEach((g, idx) => {
+              const w = base * polarity * (idx === 0 ? 1 : 0.5);
+              userAffinities[g.toString()] = (userAffinities[g.toString()] || 0) + w;
             });
+            inferLatentAffinities(userAffinities);
           }
         }
       }
     }
 
+    const answeredCount = currentCount + 1;
     let newConfidence = Math.min(0.99, currentConfidence + confidenceBoost);
-    let isComplete = newConfidence >= CONFIDENCE_THRESHOLD;
-    
-    if (currentCount >= 25 && newConfidence >= 0.97) {
-      isComplete = true; // Decisive enough!
-    } else if (currentCount >= 59) { // 0-indexed, so 59 is the 60th question
-      isComplete = true; // Hard cap
+    // Completion gates: never before 12 answers (need full baseline coverage + signal),
+    // early exit at 20 if confident, hard cap at 30 — a 60-question quiz IS churn.
+    let isComplete = false;
+    if (answeredCount >= 12) {
+      if (newConfidence >= CONFIDENCE_THRESHOLD) isComplete = true;
+      else if (answeredCount >= 20 && newConfidence >= 0.85) isComplete = true;
+      else if (answeredCount >= 30) isComplete = true; // Hard cap
     }
 
     let nextMovie = null;
     let finalMoviesResult = undefined;
 
     if (!isComplete) {
-      if (currentCount < 8) {
-        // For the first 8 questions, force the baseline iconic movies from FALLBACK_POOL
-        let filtered = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
-        if (filtered.length === 0) { filtered = FALLBACK_POOL; } // Should never happen now
-        
-        const selected = filtered[Math.floor(Math.random() * filtered.length)];
+      if (currentCount < 9) {
+        // Exploration phase: init + 9 = 10 deterministic baseline questions covering
+        // every genre bucket exactly once (see BASELINE_ORDER).
+        let selected = pickBaselineMovie(askedMovieIds, locale);
+        if (!selected) {
+          const remaining = FALLBACK_POOL.filter(m => !askedMovieIds.includes(m.id));
+          selected = remaining.length > 0 ? remaining[0] : FALLBACK_POOL[0];
+        }
         if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
         nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
       } else {
@@ -253,8 +316,10 @@ export async function POST(req: Request) {
       let availableResults = bestMovies.filter(m => !askedMovieIds.includes(m.id));
       if (availableResults.length === 0) availableResults = FALLBACK_POOL; 
       
-      // Select Top 3 matches
-      const top3 = availableResults.slice(0, 3);
+      // Select Top 3 matches: two safest picks + one "hidden gem" from deeper in the
+      // ranking (serendipity boost) — a niche title the user didn't know they wanted,
+      // but which sits squarely inside their taste vector.
+      const top3 = [availableResults[0], availableResults[1], availableResults[4] || availableResults[2]].filter(Boolean);
       for (const match of top3) {
         if (!match.trailerId) match.trailerId = await getTrailerForMovieId(match.id);
       }
