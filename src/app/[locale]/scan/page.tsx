@@ -194,6 +194,7 @@ export default function ScanMovieEvaluation() {
           sessionId: session!.sessionId, questionId: session!.currentQuestion!.id,
           answer, movieId: session!.currentQuestion!.movie?.id,
           genreIds: session!.currentQuestion!.movie?._genreIds || [],
+          niches: session!.currentQuestion!.movie?._niches || [],
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the
           // server exclude them. Body (not header) because Hebrew titles aren't
           // valid ISO-8859-1 header values.
@@ -388,6 +389,17 @@ export default function ScanMovieEvaluation() {
                     <div className="bg-zinc-900/95 backdrop-blur-3xl border border-rose-500/40 rounded-[2rem] p-6 sm:p-10 max-w-lg w-full text-center shadow-[0_0_80px_rgba(225,29,72,0.25)] animate-in slide-in-from-bottom-10 fade-in duration-700">
                       <div className="text-5xl mb-6">🤫</div>
                       <h4 className="text-3xl font-black text-white mb-4">{t('your_movie_waits')}</h4>
+                      {/* Personalized hook: the user's MEASURED taste axes — real data
+                          is the most persuasive sales copy there is. */}
+                      {(session.currentVectorState?.leadingMicroGenres?.length ?? 0) > 1 && (
+                        <div className="flex flex-wrap justify-center gap-2 mb-4">
+                          {session.currentVectorState.leadingMicroGenres.slice(1, 4).map((axis) => (
+                            <span key={axis} className="px-3 py-1 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 rounded-full text-sm font-bold">
+                              {axis}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-zinc-400 mb-8 text-lg font-medium leading-relaxed">
                         {t('cut_bullshit')}
                       </p>

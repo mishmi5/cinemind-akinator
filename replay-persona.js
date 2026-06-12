@@ -68,7 +68,7 @@ async function main() {
       },
       body: JSON.stringify({
         sessionId, questionId: state.currentQuestion.id, answer: vote,
-        movieId: movie.id, genreIds: movie._genreIds || [], askedTitles: seenTitles.slice(-60),
+        movieId: movie.id, genreIds: movie._genreIds || [], niches: movie._niches || [], askedTitles: seenTitles.slice(-60),
       }),
     });
     if (!res.ok) { console.log(`Q${q} HTTP_${res.status} — vote LOST`); continue; }

@@ -67,6 +67,66 @@ Must follow:
 // Old hardcoded pool had stale poster paths that rendered WRONG artwork
 // (Se7en displayed Detective Pikachu's poster).
 import { pickBaselineMovie, fullBaselinePool } from '@/lib/engine/baselinePool';
+import { nichesForKeywords, nicheKey, isNicheKey, NICHE_HE } from '@/lib/engine/subGenres';
+
+// ---- Sub-genre (niche) layer: see TASTE-FORMULA.md §1-2 ----
+// Keywords per movie are fetched once and cached for the server's lifetime;
+// the niche list rides MovieContext._niches → client → answer payload.
+const nicheCache = new Map<string, string[]>();
+async function getNichesForMovie(tmdbId: string): Promise<string[]> {
+  if (!TMDB_API_KEY || !/^\d+$/.test(tmdbId)) return [];
+  const cached = nicheCache.get(tmdbId);
+  if (cached) return cached;
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/keywords?api_key=${TMDB_API_KEY}`, { next: { revalidate: 86400 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const niches = nichesForKeywords((data.keywords || []).map((k: any) => k.name));
+    nicheCache.set(tmdbId, niches);
+    return niches;
+  } catch { return []; }
+}
+
+// Recommendation score — TASTE-FORMULA.md §4. Niches weigh double: that's
+// where individuality lives. Hard negative gate kills anything the user
+// actively rejected.
+function scoreMovieForUser(movie: MovieContext, aff: Record<string, number>): number {
+  let s = 0;
+  (movie._genreIds || []).forEach((g, idx) => {
+    const a = aff[g.toString()] || 0;
+    if (a <= -4) { s = -Infinity; return; }
+    const idf = GENRE_IDF[g.toString()] ?? 1;
+    s += a * (idx === 0 ? 1 : 0.5) * idf;
+  });
+  if (s === -Infinity) return s;
+  (movie._niches || []).forEach(n => { s += (aff[nicheKey(n)] || 0) * 2; });
+  s += ((movie.rating || 7) - 7) * 0.3; // quality nudge
+  return s;
+}
+
+// Top taste axes in Hebrew/English for personalized paywall copy.
+function topTasteAxes(aff: Record<string, number>, locale: string, n: number = 3): string[] {
+  const entries = Object.entries(aff)
+    .filter(([k, v]) => k !== 'General' && v >= 2)
+    .sort((a, b) => b[1] - a[1]);
+  const names: string[] = [];
+  for (const [k] of entries) {
+    if (names.length >= n) break;
+    if (isNicheKey(k)) {
+      const niche = k.slice(2);
+      names.push(locale === 'he' ? (NICHE_HE[niche] || niche) : niche.replace(/-/g, ' '));
+    } else {
+      const g = GENRE_MAP[parseInt(k, 10)];
+      if (g) names.push(locale === 'he' ? g.name : (TMDB_GENRES_EN[k] || ''));
+    }
+  }
+  return names.filter(Boolean);
+}
+const TMDB_GENRES_EN: Record<string, string> = {
+  '28': 'Action', '12': 'Adventure', '16': 'Animation', '35': 'Comedy', '80': 'Crime',
+  '18': 'Drama', '10751': 'Family', '14': 'Fantasy', '27': 'Horror', '9648': 'Mystery',
+  '10749': 'Romance', '878': 'Sci-Fi', '53': 'Thriller'
+};
 
 // Genre informativeness (IDF): Action/Drama/Thriller tag nearly every blockbuster,
 // so each occurrence carries little information about personal taste; Mystery,
@@ -205,6 +265,7 @@ export async function POST(req: Request) {
         selected = pool.length > 0 ? pool[0] : fullBaselinePool(locale)[0];
       }
       if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
+      selected._niches = await getNichesForMovie(selected.id);
       // Do NOT pre-push the served movie into askedMovieIds: the answer handler
       // guards affinity updates with `!askedMovieIds.includes(movieId)` to block
       // double-counting, so a pre-pushed id made the user's FIRST vote — usually
@@ -262,6 +323,17 @@ export async function POST(req: Request) {
             });
             inferLatentAffinities(userAffinities);
           }
+
+          // Sub-genre layer (TASTE-FORMULA.md §2): each tagged niche moves at
+          // 0.75 — rarer, self-selected signals; capped upstream at 4/movie.
+          if (payload.niches && payload.niches.length > 0) {
+            payload.niches.slice(0, 4).forEach(n => {
+              const polarity = base > 0 ? 2 : 3;
+              const w = base * polarity * 0.75;
+              const key = nicheKey(n);
+              userAffinities[key] = (userAffinities[key] || 0) + w;
+            });
+          }
         }
       }
     }
@@ -291,6 +363,7 @@ export async function POST(req: Request) {
           selected = remaining.length > 0 ? remaining[0] : fullBaselinePool(locale)[0];
         }
         if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
+        selected._niches = await getNichesForMovie(selected.id);
         nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
       } else {
         // As confidence grows, we fetch from earlier pages (most popular) that match
@@ -321,6 +394,7 @@ export async function POST(req: Request) {
         if (!isComplete) {
           const selected = filtered[Math.floor(Math.random() * filtered.length)];
           if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
+          selected._niches = await getNichesForMovie(selected.id);
           nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
         }
       }
@@ -332,16 +406,29 @@ export async function POST(req: Request) {
       let availableResults = bestMovies.filter(m => !askedMovieIds.includes(m.id));
       if (availableResults.length === 0) availableResults = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id)).slice(0, 8); 
       
-      // Select Top 3 matches: two safest picks + one "hidden gem" from deeper in the
-      // ranking (serendipity boost) — a niche title the user didn't know they wanted,
-      // but which sits squarely inside their taste vector.
-      const top3 = [availableResults[0], availableResults[1], availableResults[4] || availableResults[2]].filter(Boolean);
-      for (const match of top3) {
-        if (!match.trailerId) match.trailerId = await getTrailerForMovieId(match.id);
+      // TASTE-FORMULA.md §4: rank candidates by the FULL taste vector, not
+      // popularity. Enrich the top candidates with their niches, score, and
+      // pick top-2 + one serendipity gem (best-scoring from outside the top 5
+      // popularity ranks — a movie they didn't know they wanted).
+      const pool = availableResults.slice(0, 14);
+      for (const m of pool) m._niches = await getNichesForMovie(m.id);
+      const scored = pool
+        .map(m => ({ m, s: scoreMovieForUser(m, userAffinities) }))
+        .filter(x => Number.isFinite(x.s))
+        .sort((a, b) => b.s - a.s);
+      const gem = scored.find(x => pool.indexOf(x.m) >= 5 && x !== scored[0] && x !== scored[1]);
+      const picks = [scored[0], scored[1], gem || scored[2]].filter(Boolean);
+      const sMax = picks[0]?.s ?? 1, sMin = scored[scored.length - 1]?.s ?? 0;
+      const span = Math.max(1e-6, sMax - sMin);
+      for (const p of picks) {
+        if (!p.m.trailerId) p.m.trailerId = await getTrailerForMovieId(p.m.id);
       }
-      finalMoviesResult = top3.map(bestMatch => ({
-        id: `res_${bestMatch.id}`, title: bestMatch.title, matchScore: 99, 
-        posterUrl: bestMatch.posterUrl, trailerId: bestMatch.trailerId, overview: bestMatch.overview
+      finalMoviesResult = picks.map(p => ({
+        id: `res_${p.m.id}`, title: p.m.title,
+        // Real per-movie match: normalized score mapped to 84-99 — honest
+        // variance instead of a constant fake 99.
+        matchScore: Math.round(84 + 15 * Math.max(0, Math.min(1, (p.s - sMin) / span))),
+        posterUrl: p.m.posterUrl, trailerId: p.m.trailerId, overview: p.m.overview
       }));
     }
 
@@ -349,6 +436,14 @@ export async function POST(req: Request) {
     const remainingMovies = isComplete ? 1 : Math.max(2, Math.floor(85432 * Math.pow(1 - newConfidence, 4.5)));
     
     let psychologicalMessage = locale === 'en' ? 'Catching your vibe...' : 'קולט את הווייב שלך...';
+    if (isComplete) {
+      const axes = topTasteAxes(userAffinities, locale);
+      if (axes.length > 0) {
+        psychologicalMessage = locale === 'en'
+          ? `Your taste decoded: ${axes.join(' · ')}. Matches locked in.`
+          : `הטעם שלך פוענח: ${axes.join(' · ')}. ההתאמות ננעלו.`;
+      }
+    }
     if (newConfidence > 0.8) psychologicalMessage = locale === 'en' ? 'Wow, you have a very specific taste. Only a few movies match...' : 'אוקיי, יש לך טעם ממש מיוחד. נשארו סרטים בודדים שיכולים להתאים...';
     else if (newConfidence > 0.5) psychologicalMessage = locale === 'en' ? 'Filtering out thousands of irrelevant movies...' : 'מעיף עכשיו אלפי סרטים שלא בכיוון שלך בכלל...';
     else if (newConfidence > 0.3) psychologicalMessage = locale === 'en' ? 'Starting to understand you...' : 'מתחיל להבין אותך...';
@@ -369,7 +464,7 @@ export async function POST(req: Request) {
       sessionId: payload.sessionId || `session_${Date.now()}`,
       isComplete, confidenceScore: isComplete ? 1.0 : newConfidence,
       historyCount: currentCount + 1, askedMovieIds, userAffinities, 
-      currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: [psychologicalMessage] },
+      currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: isComplete ? [psychologicalMessage, ...topTasteAxes(userAffinities, locale)] : [psychologicalMessage] },
       currentQuestion: isComplete ? null : nextMovie,
       finalMovies: finalMoviesResult,
       proofToken
