@@ -21,7 +21,7 @@
   },
   {
     "persona": "The Adrenaline Junkie",
-    "locale": "en",
+    "locale": "he",
     "questionsAnswered": 12,
     "archetype": "The Action Junkie",
     "roastText": "Derived locally",
@@ -31,7 +31,7 @@
   },
   {
     "persona": "The Rom-Com Dreamer",
-    "locale": "en",
+    "locale": "he",
     "questionsAnswered": 12,
     "archetype": "The Hopeless Romantic",
     "roastText": "Derived locally",
@@ -41,7 +41,7 @@
   },
   {
     "persona": "The Horror Gore-Hound",
-    "locale": "en",
+    "locale": "he",
     "questionsAnswered": 12,
     "archetype": "The Cinematic Edge-Lord",
     "roastText": "Derived locally",
@@ -51,7 +51,7 @@
   },
   {
     "persona": "The Nostalgic Retro Buff",
-    "locale": "he",
+    "locale": "en",
     "questionsAnswered": 12,
     "archetype": "The Escapist",
     "roastText": "Derived locally",
@@ -61,7 +61,7 @@
   },
   {
     "persona": "The Pretentious Art-House Snob",
-    "locale": "en",
+    "locale": "he",
     "questionsAnswered": 12,
     "archetype": "The Pretentious Cinephile",
     "roastText": "Derived locally",

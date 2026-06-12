@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ReactNode } from 'react';
+import { ReactNode, JSX } from 'react';
 
 interface MotionWrapperProps {
   children: ReactNode;
