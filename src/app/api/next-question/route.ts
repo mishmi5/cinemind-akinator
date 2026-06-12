@@ -173,8 +173,17 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return FALLBACK_POOL;
-    const data = await res.json();
-    
+    let data = await res.json();
+
+    // A year+genre+vote_count-filtered discover query often has far fewer pages
+    // than requested — TMDB returns an empty result set past total_pages, which
+    // silently starved the live phase back to the 12-movie fallback pool.
+    if ((!data.results || data.results.length === 0) && page > 1) {
+      const retry = await fetch(url.replace(`page=${page}`, 'page=1'), { next: { revalidate: 0 } });
+      if (retry.ok) data = await retry.json();
+    }
+    if (!data.results || data.results.length === 0) return FALLBACK_POOL;
+
     return data.results.filter((m: any) => m.poster_path && m.overview).map((m: any) => {
       const mainGenreId = m.genre_ids && m.genre_ids.length > 0 ? m.genre_ids[0] : 28;
       const eggType = GENRE_MAP[mainGenreId]?.egg || 'oscar';
@@ -285,8 +294,10 @@ export async function POST(req: Request) {
         if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
         nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
       } else {
-        // As confidence grows, we fetch from earlier pages (most popular) that match the affinities
-        const maxPage = Math.max(1, Math.floor(500 * (1 - newConfidence))); 
+        // As confidence grows, we fetch from earlier pages (most popular) that match
+        // the affinities. Capped at 10 — filtered discover queries rarely have more
+        // pages, and requesting past total_pages returns an empty set.
+        const maxPage = Math.min(10, Math.max(1, Math.floor(500 * (1 - newConfidence))));
         const randomPage = Math.floor(Math.random() * maxPage) + 1;
         let availableMovies = await fetchMoviesFromTMDB(randomPage, userAffinities, locale);
         let filtered = availableMovies.filter(m => !askedMovieIds.includes(m.id));
