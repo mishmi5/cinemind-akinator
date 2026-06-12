@@ -184,7 +184,24 @@ const SITE_PAGES = ['/', '/pricing', '/arena', '/arena/leaderboard', '/pulse', '
 // movie represents the bucket this session.
 // defaultVote: vote when no bucket/keyword matches. notSeenChance: odds of
 // clicking "haven't seen" (attention-span simulation).
-const PERSONAS = [
+const { WAVE2_PERSONAS } = (() => { try { return require('./personas-wave2'); } catch { return { WAVE2_PERSONAS: [] }; } })();
+
+// Signature-niche expectations for wave-2 niche specialists: the measured
+// nicheLoves must contain at least one of these for the persona to subscribe.
+const NICHE_EXPECTATIONS = {
+  'W2 Parody Connoisseur (26, m)': ['dark-comedy', 'satire', 'parody', 'party-comedy'],
+  'W2 Supernatural-Only Believer (44, f)': ['supernatural-horror', 'occult', 'whodunit'],
+  'W2 Found-Footage Hunter (21, m)': ['supernatural-horror', 'monster', 'slasher', 'zombie', 'post-apocalyptic', 'serial-killer'],
+  'W2 Heist Architect (39, m)': ['heist', 'gangster', 'assassin', 'noir'],
+  'W2 Noir Detective Soul (57, f)': ['noir', 'whodunit', 'serial-killer'],
+  'W2 Time-Loop Obsessive (30, f)': ['time-travel', 'ai-scifi', 'space', 'dystopia', 'cyberpunk'],
+  'W2 Kaiju Monster Fan (33, m)': ['monster', 'zombie', 'post-apocalyptic', 'slasher'],
+  'W2 Musical Theater Kid (19, f)': ['musical', 'music-film', 'rom-com', 'epic-romance'],
+  'W2 True-Crime Documentary Nerd (48, f)': ['true-story', 'biopic', 'whodunit', 'serial-killer'],
+  'W2 Sports Underdog Junkie (36, m)': ['sports', 'class-drama', 'friendship', 'prison', 'true-story'],
+};
+
+const WAVE1_PERSONAS = [
   // ----- Edge-Lords (Horror) -----
   { name: 'Slasher Teen (16, m)', expected: 'The Cinematic Edge-Lord',
     bucketVotes: { horror: 5, horror2: 5, family: 1, romance: 1 },
@@ -287,6 +304,8 @@ const PERSONAS = [
     bucketVotes: {}, defaultVote: 1, loves: [], hates: [] },
 ];
 
+const PERSONAS = process.env.WAVE === '2' ? WAVE2_PERSONAS : WAVE1_PERSONAS;
+
 // ---------- helpers ----------
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // Humans don't click at fixed 900ms intervals — they read, hesitate, scroll.
@@ -379,7 +398,9 @@ async function run() {
     const persona = PERSONAS[i];
     const locale = i % 2 === 0 ? 'he' : 'en';
     const mobile = i % 3 === 0;
-    const assignedPages = [SITE_PAGES[(i * 2) % SITE_PAGES.length], SITE_PAGES[(i * 2 + 1) % SITE_PAGES.length]];
+    const pageCount = (persona.wanderPages || (persona.behavior && persona.behavior.wanderer ? 4 : 2));
+    const assignedPages = Array.from({ length: pageCount }, (_, k) => SITE_PAGES[(i * 2 + k) % SITE_PAGES.length]);
+    if (process.env.WAVE === '2' && !assignedPages.includes('/pricing')) assignedPages[assignedPages.length - 1] = '/pricing';
     console.log(`\n🎭 [${i + 1}/30] ${persona.name} | ${locale} | ${mobile ? 'mobile' : 'desktop'} | pages: ${assignedPages.join(', ')}`);
 
     const context = await browser.createBrowserContext();
@@ -466,13 +487,30 @@ async function run() {
           if (!clicked) {
             await page.evaluate(() => { const s = document.querySelectorAll('button.group'); if (s.length >= 5) s[2].click(); });
           }
-          await humanPause();
+          const pace = persona.fastestPace || (persona.behavior && persona.behavior.fastClicker)
+          ? sleep(300 + Math.random() * 400)
+          : (persona.behavior && persona.behavior.slowReader)
+            ? sleep(1600 + Math.random() * 1800)
+            : humanPause();
+        await pace;
           continue;
+        }
+
+        // Back-button abuser: revisits the previous question, then moves on.
+        if (persona.backButtonChance && Math.random() < persona.backButtonChance) {
+          await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const b = btns.find(x => x.innerText.includes('אחורה') || x.innerText.toLowerCase().includes('back'));
+            if (b) b.click();
+          });
+          await sleep(800);
         }
 
         // Trailer spot-check: a real user clicks the trailer sometimes. Verify
         // the player opens with a non-empty YouTube embed and closes cleanly.
-        if (trailersChecked < 3 && Math.random() < 0.18) {
+        const trailerCap = persona.trailerEvery ? 8 : (persona.behavior && persona.behavior.trailerFocus ? 5 : 3);
+        const trailerOdds = persona.trailerEvery ? 0.9 : (persona.behavior && persona.behavior.trailerFocus ? 0.35 : 0.18);
+        if (trailersChecked < trailerCap && Math.random() < trailerOdds) {
           const opened = await page.evaluate(() => {
             const btns = Array.from(document.querySelectorAll('button'));
             const b = btns.find(x => x.innerText.includes('טריילר') || x.innerText.toLowerCase().includes('trailer'));
@@ -550,11 +588,31 @@ async function run() {
     const questionsSane = questionCount >= 15 && questionCount <= 45;
     const noQuizErrors = quizConsoleErrors.length === 0;
 
+    // Subscription tier offers: the completion paywall must present BOTH the
+    // ₪9 starter reveal and the Elite path; the persona's profile determines
+    // which one they would buy (expectedTier).
+    let tierOffersOk = true;
+    let paywallText = '';
+    try {
+      const pw = await context.newPage();
+      await pw.goto(`http://localhost:3000/${locale}/pricing`, { waitUntil: 'networkidle2', timeout: 30000 });
+      paywallText = await pw.evaluate(() => document.body.innerText);
+      await pw.close();
+      const has9 = /₪\s*9|9\s*₪|\b9\b/.test(paywallText);
+      const has34 = /₪\s*34|34\s*₪|\b34\b/.test(paywallText);
+      tierOffersOk = has9 && has34;
+    } catch { tierOffersOk = false; }
+
+    // Signature-niche assertion (wave-2 niche specialists)
+    const expectedNiches = NICHE_EXPECTATIONS[persona.name];
+    const measuredNiches = (tasteProfile(finalAffinities).nicheLoves || []).map(x => x.split(' ')[0]);
+    const nicheOk = !expectedNiches || expectedNiches.some(n => measuredNiches.includes(n));
+
     const noPosterBugs = posterBugs.length === 0;
     const noDuplicates = duplicateTitles.length === 0;
     const finalsWithTrailers = finalMovies.filter(m => m.trailerId && m.trailerId.length > 5).length;
     const trailersOk = trailerBugs.length === 0 && (finalMovies.length === 0 || finalsWithTrailers >= 2);
-    const subscribe = archetypeMatch && quizComplete && personalized && noQuizErrors && pagesHealthy && questionsSane && noPosterBugs && noDuplicates && trailersOk;
+    const subscribe = archetypeMatch && quizComplete && personalized && noQuizErrors && pagesHealthy && questionsSane && noPosterBugs && noDuplicates && trailersOk && tierOffersOk && nicheOk;
     const reasons = [];
     if (!archetypeMatch) reasons.push(`archetype: got "${archetype}", wanted "${persona.expected}"`);
     if (!quizComplete) reasons.push('quiz never completed');
@@ -565,6 +623,8 @@ async function run() {
     if (!noPosterBugs) reasons.push(`broken/placeholder posters: ${posterBugs.slice(0, 3).join(' | ')}`);
     if (!noDuplicates) reasons.push(`duplicate movies in one quiz: ${duplicateTitles.slice(0, 3).join(' | ')}`);
     if (!trailersOk) reasons.push(`trailer issues: ${trailerBugs.slice(0, 2).join(' | ') || `only ${finalsWithTrailers}/3 final recs have trailers`}`);
+    if (!tierOffersOk) reasons.push('pricing page missing one of the tiers (9/34)');
+    if (!nicheOk) reasons.push(`signature niche missing: expected one of [${(expectedNiches || []).join(', ')}], measured [${measuredNiches.join(', ')}]`);
 
     const tp = tasteProfile(finalAffinities);
     console.log(`   ${subscribe ? '✅ SUBSCRIBES' : '❌ CHURNS'} | ${archetype} | Q=${questionCount}${reasons.length ? ' | ' + reasons.join(' ; ') : ''}`);
@@ -576,6 +636,7 @@ async function run() {
       persona: persona.name, locale, viewport: mobile ? 'mobile' : 'desktop',
       pages: assignedPages, questionCount, archetype, expected: persona.expected,
       archetypeMatch, personalized, recs: finalMovies.map(m => m.title),
+      tier: persona.tier || 'starter', tierOffersOk, nicheOk,
       trailerBugs, finalsWithTrailers,
       tasteProfile: tasteProfile(finalAffinities),
       finalAffinities,
@@ -604,6 +665,7 @@ async function run() {
     md.push(`- 🤢 Exact taste — hates: ${r.tasteProfile.hates.join(', ') || 'none'}`);
     md.push(`- 🧬 Sub-genre taste — loves: ${(r.tasteProfile.nicheLoves || []).slice(0, 6).join(', ') || 'none'}`);
     md.push(`- 🎬 Recommended movies: ${r.recs.join(', ') || 'none'}`);
+    if (r.tier) md.push(`- 💳 Subscription: would buy **${r.tier === 'elite' ? 'Elite ₪34/mo' : 'Starter ₪9'}** (offers verified: ${r.tierOffersOk ? 'yes' : 'NO'})`);
     if (r.reasons.length) md.push(`- ⚠️ Issues: ${r.reasons.join(' ; ')}`);
     md.push('');
   }
