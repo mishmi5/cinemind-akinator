@@ -14,14 +14,26 @@ interface StartingMovie extends MovieContext {
   dynamicQuestion: string;
 }
 
-// Hermetic fallback component — if image fails, renders a clean CSS placeholder
+// Hermetic fallback component — transient network blips get ONE retry with a
+// cache-buster before surrendering to the CSS placeholder. A single dropped
+// packet must not blank the poster for the whole question.
 const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, className: string }) => {
   const [error, setError] = useState(false);
-  
-  useEffect(() => { 
-    setError(false); 
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    setError(false);
+    setAttempt(0);
   }, [src]);
-  
+
+  const handleError = () => {
+    if (attempt < 1) {
+      setTimeout(() => setAttempt(a => a + 1), 1200);
+    } else {
+      setError(true);
+    }
+  };
+
   if (error || !src) {
     return (
       <div className={`absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-800 to-zinc-950 ${className.replace('opacity-90', '').replace('opacity-80', '')}`}>
@@ -33,7 +45,8 @@ const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, 
     );
   }
   
-  return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+  const effectiveSrc = attempt > 0 ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src;
+  return <img key={effectiveSrc} src={effectiveSrc} alt={alt} className={className} onError={handleError} />;
 };
 
 const STARTING_POOL: StartingMovie[] = [

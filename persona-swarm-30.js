@@ -28,6 +28,7 @@ function computeContrarianScore(affinities) {
   const mainstream = ['Action', 'Comedy', 'Romance', 'Adventure'];
   let score = 0, total = 0;
   for (const [genreId, weight] of Object.entries(affinities)) {
+    if (genreId === 'General' || genreId.startsWith('k:')) continue;
     const genre = TMDB_GENRES[genreId] || 'Unknown';
     if (weight > 0) {
       if (!mainstream.includes(genre)) score += weight;
@@ -57,8 +58,10 @@ function pickArchetype(affinities, contrarian) {
 // sorted by strength — this is the persona's measured taste fingerprint.
 function tasteProfile(affinities) {
   const mapped = {};
+  const niches = {};
   for (const [id, w] of Object.entries(affinities || {})) {
     if (id === 'General') continue;
+    if (id.startsWith('k:')) { niches[id.slice(2)] = (niches[id.slice(2)] || 0) + w; continue; }
     const name = TMDB_GENRES[id] || 'Unknown';
     mapped[name] = (mapped[name] || 0) + w;
   }
@@ -67,13 +70,18 @@ function tasteProfile(affinities) {
     .map(([g, w]) => `${g} (+${Math.round(w * 10) / 10})`);
   const hates = entries.filter(([, w]) => w <= -2).sort((a, b) => a[1] - b[1])
     .map(([g, w]) => `${g} (${Math.round(w * 10) / 10})`);
-  return { loves, hates };
+  const nicheEntries = Object.entries(niches);
+  const nicheLoves = nicheEntries.filter(([, w]) => w >= 2).sort((a, b) => b[1] - a[1])
+    .map(([g, w]) => `${g} (+${Math.round(w * 10) / 10})`);
+  const nicheHates = nicheEntries.filter(([, w]) => w <= -3).sort((a, b) => a[1] - b[1])
+    .map(([g, w]) => `${g} (${Math.round(w * 10) / 10})`);
+  return { loves, hates, nicheLoves, nicheHates };
 }
 
 function deriveTaste(affinities) {
   const mapped = {};
   for (const [id, weight] of Object.entries(affinities)) {
-    if (id === 'General') continue;
+    if (id === 'General' || id.startsWith('k:')) continue;
     const name = TMDB_GENRES[id] || 'Unknown';
     mapped[name] = (mapped[name] || 0) + weight;
   }
@@ -562,6 +570,7 @@ async function run() {
     console.log(`   ${subscribe ? '✅ SUBSCRIBES' : '❌ CHURNS'} | ${archetype} | Q=${questionCount}${reasons.length ? ' | ' + reasons.join(' ; ') : ''}`);
     console.log(`   🎬 Recommended: ${finalMovies.map(m => m.title).join(', ') || 'none'}`);
     console.log(`   👅 Taste: loves [${tp.loves.join(', ') || '-'}] | hates [${tp.hates.join(', ') || '-'}]`);
+    console.log(`   🧬 Niches: loves [${tp.nicheLoves.slice(0, 5).join(', ') || '-'}] | hates [${tp.nicheHates.slice(0, 4).join(', ') || '-'}]`);
 
     results.push({
       persona: persona.name, locale, viewport: mobile ? 'mobile' : 'desktop',
@@ -593,6 +602,7 @@ async function run() {
     md.push(`- Archetype: **${r.archetype}** (expected: ${r.expected}) | ${r.locale} | ${r.viewport} | Q=${r.questionCount}`);
     md.push(`- 👅 Exact taste — loves: ${r.tasteProfile.loves.join(', ') || 'none'}`);
     md.push(`- 🤢 Exact taste — hates: ${r.tasteProfile.hates.join(', ') || 'none'}`);
+    md.push(`- 🧬 Sub-genre taste — loves: ${(r.tasteProfile.nicheLoves || []).slice(0, 6).join(', ') || 'none'}`);
     md.push(`- 🎬 Recommended movies: ${r.recs.join(', ') || 'none'}`);
     if (r.reasons.length) md.push(`- ⚠️ Issues: ${r.reasons.join(' ; ')}`);
     md.push('');

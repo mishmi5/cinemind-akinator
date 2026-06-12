@@ -72,6 +72,16 @@ import { nichesForKeywords, nicheKey, isNicheKey, NICHE_HE } from '@/lib/engine/
 // ---- Sub-genre (niche) layer: see TASTE-FORMULA.md §1-2 ----
 // Keywords per movie are fetched once and cached for the server's lifetime;
 // the niche list rides MovieContext._niches → client → answer payload.
+// Fire-and-forget poster warm-up: kick the TMDB image into Next's data cache
+// the moment a movie is selected, so when the browser requests /api/poster a
+// second later the bytes are already local. Cold TMDB image fetches for
+// obscure titles can exceed 8s — users see a placeholder and churn.
+function warmPoster(posterUrl: string) {
+  const m = posterUrl.match(/path=(\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp))/);
+  if (!m) return;
+  fetch(`https://image.tmdb.org/t/p/w500${m[1]}`, { next: { revalidate: 31536000 } }).catch(() => {});
+}
+
 const nicheCache = new Map<string, string[]>();
 async function getNichesForMovie(tmdbId: string): Promise<string[]> {
   if (!TMDB_API_KEY || !/^\d+$/.test(tmdbId)) return [];
@@ -184,11 +194,18 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
   let hatedGenres: string[] = [];
   
   Object.entries(affinities).forEach(([genreId, score]) => {
-    if (genreId !== 'General') {
+    if (genreId !== 'General' && !genreId.startsWith('k:')) {
       if (score >= 2) likedGenres.push(genreId);
-      if (score <= -2) hatedGenres.push(genreId);
+      if (score <= -5) hatedGenres.push(genreId);
     }
   });
+  // API-level exclusion is a blunt instrument: a horror lover who hates Comedy
+  // would lose every horror-comedy and horror-mystery too (secondary tags).
+  // Exclude only the 3 STRONGEST hates; the scoring gate handles the rest.
+  hatedGenres = hatedGenres
+    .sort((a, b) => (affinities[a] || 0) - (affinities[b] || 0))
+    .slice(0, 3)
+    .filter(g => !likedGenres.includes(g));
 
   const langParam = locale === 'en' ? 'en-US' : 'he-IL';
   
@@ -266,6 +283,7 @@ export async function POST(req: Request) {
       }
       if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
       selected._niches = await getNichesForMovie(selected.id);
+      warmPoster(selected.posterUrl);
       // Do NOT pre-push the served movie into askedMovieIds: the answer handler
       // guards affinity updates with `!askedMovieIds.includes(movieId)` to block
       // double-counting, so a pre-pushed id made the user's FIRST vote — usually
@@ -364,6 +382,7 @@ export async function POST(req: Request) {
         }
         if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
         selected._niches = await getNichesForMovie(selected.id);
+      warmPoster(selected.posterUrl);
         nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
       } else {
         // As confidence grows, we fetch from earlier pages (most popular) that match
@@ -395,6 +414,7 @@ export async function POST(req: Request) {
           const selected = filtered[Math.floor(Math.random() * filtered.length)];
           if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
           selected._niches = await getNichesForMovie(selected.id);
+      warmPoster(selected.posterUrl);
           nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
         }
       }
@@ -410,18 +430,34 @@ export async function POST(req: Request) {
       // popularity. Enrich the top candidates with their niches, score, and
       // pick top-2 + one serendipity gem (best-scoring from outside the top 5
       // popularity ranks — a movie they didn't know they wanted).
-      const pool = availableResults.slice(0, 14);
+      let pool = availableResults.slice(0, 14);
       for (const m of pool) m._niches = await getNichesForMovie(m.id);
-      const scored = pool
+      let scored = pool
         .map(m => ({ m, s: scoreMovieForUser(m, userAffinities) }))
         .filter(x => Number.isFinite(x.s))
         .sort((a, b) => b.s - a.s);
+
+      // Extreme haters can gate almost everything out. Never deliver fewer
+      // than 3 recommendations — widen to an unfiltered popular pool and keep
+      // the best non-gated survivors.
+      if (scored.length < 3) {
+        const wide = (await fetchMoviesFromTMDB(1, {}, locale, true))
+          .filter(m => !askedMovieIds.includes(m.id) && !pool.some(p => p.id === m.id))
+          .slice(0, 14);
+        for (const m of wide) m._niches = await getNichesForMovie(m.id);
+        pool = pool.concat(wide);
+        scored = scored.concat(
+          wide.map(m => ({ m, s: scoreMovieForUser(m, userAffinities) }))
+            .filter(x => Number.isFinite(x.s))
+        ).sort((a, b) => b.s - a.s);
+      }
       const gem = scored.find(x => pool.indexOf(x.m) >= 5 && x !== scored[0] && x !== scored[1]);
       const picks = [scored[0], scored[1], gem || scored[2]].filter(Boolean);
       const sMax = picks[0]?.s ?? 1, sMin = scored[scored.length - 1]?.s ?? 0;
       const span = Math.max(1e-6, sMax - sMin);
       for (const p of picks) {
         if (!p.m.trailerId) p.m.trailerId = await getTrailerForMovieId(p.m.id);
+        warmPoster(p.m.posterUrl);
       }
       finalMoviesResult = picks.map(p => ({
         id: `res_${p.m.id}`, title: p.m.title,
