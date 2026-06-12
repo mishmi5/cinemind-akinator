@@ -50,6 +50,8 @@ export interface SessionState {
   currentVectorState: VectorState;
   finalMovies?: RecommendedMovie[];
   historyCount: number;
+  /** Honest display progress (0-100): climbs smoothly, hits 100 only at completion */
+  progressPercent?: number;
   askedMovieIds: string[];
   /** Accumulated user taste affinities per genre/tag */
   userAffinities: Record<string, number>;

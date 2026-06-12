@@ -82,6 +82,25 @@ function warmPoster(posterUrl: string) {
   fetch(`https://image.tmdb.org/t/p/w500${m[1]}`, { next: { revalidate: 31536000 } }).catch(() => {});
 }
 
+// Reverse lookup niche -> TMDB keyword id (resolved once via /search/keyword,
+// cached for the server lifetime). Used to inject niche-true candidates into
+// the recommendation pool with OR semantics (id1|id2) — AND would intersect
+// the stream to nothing, the same starvation mode as over-eager without_genres.
+const keywordIdCache = new Map<string, number | null>();
+async function keywordIdForNiche(niche: string): Promise<number | null> {
+  if (!TMDB_API_KEY) return null;
+  if (keywordIdCache.has(niche)) return keywordIdCache.get(niche)!;
+  try {
+    const q = encodeURIComponent(niche.replace(/-/g, ' '));
+    const res = await fetch(`https://api.themoviedb.org/3/search/keyword?api_key=${TMDB_API_KEY}&query=${q}`, { next: { revalidate: 604800 } });
+    if (!res.ok) { keywordIdCache.set(niche, null); return null; }
+    const data = await res.json();
+    const id = data.results?.[0]?.id ?? null;
+    keywordIdCache.set(niche, id);
+    return id;
+  } catch { keywordIdCache.set(niche, null); return null; }
+}
+
 const nicheCache = new Map<string, string[]>();
 async function getNichesForMovie(tmdbId: string): Promise<string[]> {
   if (!TMDB_API_KEY || !/^\d+$/.test(tmdbId)) return [];
@@ -100,11 +119,11 @@ async function getNichesForMovie(tmdbId: string): Promise<string[]> {
 // Recommendation score — TASTE-FORMULA.md §4. Niches weigh double: that's
 // where individuality lives. Hard negative gate kills anything the user
 // actively rejected.
-function scoreMovieForUser(movie: MovieContext, aff: Record<string, number>): number {
+function scoreMovieForUser(movie: MovieContext, aff: Record<string, number>, ignoreGate: boolean = false): number {
   let s = 0;
   (movie._genreIds || []).forEach((g, idx) => {
     const a = aff[g.toString()] || 0;
-    if (a <= -4) { s = -Infinity; return; }
+    if (!ignoreGate && a <= -4) { s = -Infinity; return; }
     const idf = GENRE_IDF[g.toString()] ?? 1;
     s += a * (idx === 0 ? 1 : 0.5) * idf;
   });
@@ -431,6 +450,38 @@ export async function POST(req: Request) {
       // pick top-2 + one serendipity gem (best-scoring from outside the top 5
       // popularity ranks — a movie they didn't know they wanted).
       let pool = availableResults.slice(0, 14);
+
+      // Niche-direct injection (TASTE-FORMULA.md §7): when the user has strong
+      // niche axes, pull candidates that CARRY those niches by construction —
+      // an esoteric taste deserves esoteric movies, not generic genre-mates.
+      const strongNiches = Object.entries(userAffinities)
+        .filter(([k, v]) => isNicheKey(k) && v >= 4)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([k]) => k.slice(2));
+      if (strongNiches.length > 0) {
+        const ids = (await Promise.all(strongNiches.map(keywordIdForNiche))).filter((x): x is number => x !== null);
+        if (ids.length > 0) {
+          try {
+            const langParam = locale === 'en' ? 'en-US' : 'he-IL';
+            const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&language=${langParam}&sort_by=popularity.desc&vote_count.gte=100&with_keywords=${ids.join('|')}&page=1`, { next: { revalidate: 0 } });
+            if (res.ok) {
+              const data = await res.json();
+              const nicheTrue = (data.results || [])
+                .filter((m: any) => m.poster_path && m.overview && !askedMovieIds.includes(m.id.toString()) && !pool.some(p => p.id === m.id.toString()))
+                .slice(0, 10)
+                .map((m: any) => ({
+                  id: m.id.toString(), title: m.title,
+                  originalDetails: `${m.original_title} · ${m.release_date ? m.release_date.split('-')[0] : ''}`,
+                  rating: m.vote_average, posterUrl: `/api/poster?path=${m.poster_path}`, overview: m.overview,
+                  trailerId: '', easterEgg: { type: 'oscar' as const }, _genreIds: m.genre_ids
+                }));
+              pool = nicheTrue.concat(pool);
+            }
+          } catch { /* pool stays as-is */ }
+        }
+      }
+
       for (const m of pool) m._niches = await getNichesForMovie(m.id);
       let scored = pool
         .map(m => ({ m, s: scoreMovieForUser(m, userAffinities) }))
@@ -452,7 +503,17 @@ export async function POST(req: Request) {
         ).sort((a, b) => b.s - a.s);
       }
       const gem = scored.find(x => pool.indexOf(x.m) >= 5 && x !== scored[0] && x !== scored[1]);
-      const picks = [scored[0], scored[1], gem || scored[2]].filter(Boolean);
+      let picks = [scored[0], scored[1], gem || scored[2]].filter(Boolean);
+
+      // All-hater fallback: someone who 1-stars everything gates out all of
+      // cinema. Serve the LEAST-BAD three (gate-free scoring) — an honest
+      // answer beats an empty screen.
+      if (picks.length === 0 && pool.length > 0) {
+        picks = pool
+          .map(m => ({ m, s: scoreMovieForUser(m, userAffinities, true) }))
+          .sort((a, b) => b.s - a.s)
+          .slice(0, 3);
+      }
       const sMax = picks[0]?.s ?? 1, sMin = scored[scored.length - 1]?.s ?? 0;
       const span = Math.max(1e-6, sMax - sMin);
       for (const p of picks) {
@@ -496,9 +557,17 @@ export async function POST(req: Request) {
       });
     }
 
+    // Display progress (TASTE-FORMULA / UX): the bar must climb smoothly to
+    // 100 exactly at completion — never snap 60→100. Two honest racers:
+    // confidence path (decisive users) and question-count path (neutral users).
+    const progressPercent = isComplete
+      ? 100
+      : Math.min(99, Math.round(100 * Math.max(newConfidence / 0.97, answeredCount / 40)));
+
     return NextResponse.json({
       sessionId: payload.sessionId || `session_${Date.now()}`,
       isComplete, confidenceScore: isComplete ? 1.0 : newConfidence,
+      progressPercent,
       historyCount: currentCount + 1, askedMovieIds, userAffinities, 
       currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: isComplete ? [psychologicalMessage, ...topTasteAxes(userAffinities, locale)] : [psychologicalMessage] },
       currentQuestion: isComplete ? null : nextMovie,

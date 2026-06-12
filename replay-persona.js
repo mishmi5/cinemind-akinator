@@ -25,17 +25,17 @@ function bucketOf(title) {
 }
 
 // Horror Purist Hates Everything
-const persona = {
-  bucketVotes: { horror: 5, horror2: 5, action: 1, scifi: 1, space: 1, romance: 1, family: 1, mystery: 1, crime: 1, drama: 1, epic: 1, comedy: 1 },
-  loves: ['horror'], hates: [],
-};
+const TROLL = process.env.TROLL === '1';
+const persona = TROLL
+  ? { bucketVotes: {}, loves: [], hates: [], defaultVote: 1 }
+  : { bucketVotes: { horror: 5, horror2: 5, action: 1, scifi: 1, space: 1, romance: 1, family: 1, mystery: 1, crime: 1, drama: 1, epic: 1, comedy: 1 }, loves: ['horror'], hates: [] };
 
 function resolveVote(titleText, qNum) {
   const bucket = qNum <= 13 ? bucketOf(titleText) : null;
   if (bucket && persona.bucketVotes[bucket] !== undefined) return persona.bucketVotes[bucket];
   const loves = persona.loves.some(kw => titleText.toLowerCase().includes(kw));
   if (loves) return 5;
-  return 3;
+  return persona.defaultVote ?? 3;
 }
 
 async function main() {
@@ -74,10 +74,11 @@ async function main() {
     if (!res.ok) { console.log(`Q${q} HTTP_${res.status} — vote LOST`); continue; }
     const next = await res.json();
     const bucket = q <= 13 ? (bucketOf(movie.title) || '·') : '·';
-    console.log(`Q${q.toString().padStart(2)} [${bucket.padEnd(8)}] vote=${vote} "${movie.title}" genres=${JSON.stringify(movie._genreIds)} -> aff=${JSON.stringify(next.userAffinities)}`);
+    console.log(`Q${q.toString().padStart(2)} [${bucket.padEnd(8)}] vote=${vote} prog=${next.progressPercent}% "${movie.title}"`);
     state = next;
   }
-  console.log('\nCOMPLETE:', state.isComplete, '| final affinities:', JSON.stringify(state.userAffinities));
+  console.log('\nCOMPLETE:', state.isComplete, '| finals:', (state.finalMovies||[]).map(m=>m.title+' ('+m.matchScore+'%)').join(', '));
+  console.log('AFFINITIES:', JSON.stringify(state.userAffinities).slice(0, 220));
 }
 
 main().catch(e => console.error('REPLAY FATAL', e));

@@ -96,6 +96,7 @@ export default function ScanMovieEvaluation() {
   // Titles shown this session — sent to the server so same-title movies
   // (remakes, re-releases) are never served twice in one quiz.
   const seenTitlesRef = useRef<string[]>([]);
+  const maxProgressRef = useRef(0);
 
   useEffect(() => {
     Object.keys(SOUNDS).forEach(key => {
@@ -305,7 +306,11 @@ export default function ScanMovieEvaluation() {
     );
   }
 
-  const confidencePercentage = Math.max(1, Math.round(session.confidenceScore * 100));
+  // Honest meter: server's progressPercent (confidence-vs-questions racer),
+  // kept monotonic — a progress bar must never move backwards.
+  const rawProgress = session.progressPercent ?? Math.round(session.confidenceScore * 100);
+  if (rawProgress > maxProgressRef.current) maxProgressRef.current = rawProgress;
+  const confidencePercentage = Math.max(1, maxProgressRef.current);
   const dynamicPhrase = getDynamicPhrase(session.historyCount);
   return (
     <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
