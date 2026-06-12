@@ -18,6 +18,8 @@ export interface MovieContext {
   easterEgg?: EasterEgg;
   /** TMDB genre IDs used internally by the recommendation engine */
   _genreIds?: number[];
+  /** Curated sub-genre niches (from TMDB keywords) — the individuality layer */
+  _niches?: string[];
 }
 
 export interface Question {
@@ -48,6 +50,8 @@ export interface SessionState {
   currentVectorState: VectorState;
   finalMovies?: RecommendedMovie[];
   historyCount: number;
+  /** Honest display progress (0-100): climbs smoothly, hits 100 only at completion */
+  progressPercent?: number;
   askedMovieIds: string[];
   /** Accumulated user taste affinities per genre/tag */
   userAffinities: Record<string, number>;
@@ -59,4 +63,8 @@ export interface AnswerPayload {
   answer?: number | 'SKIP';
   isInit?: boolean;
   genreIds?: number[];
+  /** Titles already shown this session — blocks same-title repeats (remakes, re-releases) */
+  askedTitles?: string[];
+  /** Niches of the answered movie — feeds the sub-genre taste layer */
+  niches?: string[];
 }

@@ -22,6 +22,7 @@ function computeContrarianScore(affinities: Record<string, number>): number {
   let score = 0;
   let total = 0;
   for (const [genreId, weight] of Object.entries(affinities)) {
+    if (genreId === 'General' || genreId.startsWith('k:')) continue;
     const genre = TMDB_GENRES[genreId] || 'Unknown';
     if (weight > 0) {
       if (!mainstream.includes(genre)) {
@@ -64,6 +65,7 @@ export function deriveTaste(affinities: Record<string, number>, confidence: numb
   const mappedAffinities: Record<string, number> = {};
   for (const [id, weight] of Object.entries(affinities)) {
     if (id === 'General') continue; // Skip the general tracking key
+    if (id.startsWith('k:')) continue; // Niche axes are engine-internal — archetype math is genre-level
     const name = TMDB_GENRES[id] || 'Unknown';
     mappedAffinities[name] = (mappedAffinities[name] || 0) + weight;
   }

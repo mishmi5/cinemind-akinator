@@ -14,14 +14,26 @@ interface StartingMovie extends MovieContext {
   dynamicQuestion: string;
 }
 
-// Hermetic fallback component — if image fails, renders a clean CSS placeholder
+// Hermetic fallback component — transient network blips get ONE retry with a
+// cache-buster before surrendering to the CSS placeholder. A single dropped
+// packet must not blank the poster for the whole question.
 const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, className: string }) => {
   const [error, setError] = useState(false);
-  
-  useEffect(() => { 
-    setError(false); 
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    setError(false);
+    setAttempt(0);
   }, [src]);
-  
+
+  const handleError = () => {
+    if (attempt < 1) {
+      setTimeout(() => setAttempt(a => a + 1), 1200);
+    } else {
+      setError(true);
+    }
+  };
+
   if (error || !src) {
     return (
       <div className={`absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-800 to-zinc-950 ${className.replace('opacity-90', '').replace('opacity-80', '')}`}>
@@ -33,21 +45,22 @@ const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, 
     );
   }
   
-  return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+  const effectiveSrc = attempt > 0 ? `${src}${src.includes('?') ? '&' : '?'}retry=${attempt}` : src;
+  return <img key={effectiveSrc} src={effectiveSrc} alt={alt} className={className} onError={handleError} />;
 };
 
 const STARTING_POOL: StartingMovie[] = [
-  { id: "155", title: "האביר האפל", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/qJ2tW6WMUDux911r6m7haRef0WH.jpg", overview: "באטמן מתמודד עם הג'וקר, פושע פסיכופתי...", trailerId: "EXeTwQWrcwY", dynamicQuestion: "האם היית רוצה לראות מאבק פסיכולוגי בין גיבור לא נחמד לנבל גאון?", easterEgg: { type: 'oscar' }, _genreIds: [28, 80] },
-  { id: "27205", title: "התחלה", originalDetails: "Inception · 2010", rating: 8.8, posterUrl: "/api/poster?path=/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg", overview: "גנב מקצועי נכנס לחלומות של אנשים...", trailerId: "YoHD9XEInc0", dynamicQuestion: "מד\"ב מתוחכם על חלומות ומציאות מדומה נשמע טוב?",easterEgg: { type: 'oscar' }, _genreIds: [28, 878] },
-  { id: "680", title: "ספרות זולה", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/d5iIlFn5s0ImszYzBPbOYKQruzY.jpg", overview: "סיפוריהם של פושעים בלוס אנג'לס...", trailerId: "s7EdQ4FqbhY", dynamicQuestion: "עד כמה אתה מתחבר לדיאלוגים שנונים, דם, וקפיצות בזמן?",easterEgg: { type: 'wazzap' }, _genreIds: [80] },
-  { id: "348", title: "הנוסע השמיני", originalDetails: "Alien · 1979", rating: 8.5, posterUrl: "/api/poster?path=/vfrQk5IPloGg1v9Rzbh2Eg3VGyM.jpg", overview: "צוות חללית נתקל ביצור חייזרי קטלני...", trailerId: "LjLamj-b0I8", dynamicQuestion: "קלאסיקת אימה בחלל עם מפלצת בלתי ניתנת לעצירה - כן או לא?",easterEgg: { type: 'blood' }, _genreIds: [27, 878] },
-  { id: "603", title: "מטריקס", originalDetails: "The Matrix · 1999", rating: 8.7, posterUrl: "/api/poster?path=/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg", overview: "העולם שאנחנו מכירים הוא בעצם אשליה.", trailerId: "vKQi3bBA1y8", dynamicQuestion: "האם מציאות מדומה, סייברפאנק וקרבות קונג-פו עושים לך את זה?",easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
-  { id: "98", title: "גלדיאטור", originalDetails: "Gladiator · 2000", rating: 8.2, posterUrl: "/api/poster?path=/ty8TGRuvJLPUmAR1H1nRIsgwvqV.jpg", overview: "גנרל רומי נבגד והופך לגלדיאטור...", trailerId: "owK1qxDselE", dynamicQuestion: "אפוס היסטורי ענק עם קרבות חרבות עד המוות - מדבר אליך?",easterEgg: { type: 'oscar' }, _genreIds: [28, 12] },
-  { id: "157336", title: "בין כוכבים", originalDetails: "Interstellar · 2014", rating: 8.6, posterUrl: "/api/poster?path=/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg", overview: "מסע אפי בחלל להצלת האנושות...", trailerId: "zSWdZVtXT7E", dynamicQuestion: "מסע חלל מרהיב שגורם לך לחשוב על משמעות החיים - איך זה נשמע?",easterEgg: { type: 'oscar' }, _genreIds: [878, 12] },
-  { id: "4232", title: "צעקה", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/xQZkMWe02OaVdK3xXyZ0B61rAEd.jpg", overview: "רוצח סדרתי במסכה רודף אחרי קבוצת בני נוער.", trailerId: "AWm_mkbdpCA", dynamicQuestion: "האם מתאים לך רוצח בשר ודם שמחסל בני נוער אחד אחד (סלאשר)?",easterEgg: { type: 'wazzap' }, _genreIds: [27] },
-  { id: "22970", title: "בקתה ביער", originalDetails: "The Cabin in the Woods · 2011", rating: 8.0, posterUrl: "/api/poster?path=/aC1242vB3k1KhyS7s5R7a303gZJ.jpg", overview: "חמישה חברים נוסעים לבקתה מבודדת ומגלים שהכל חלק מניסוי מטורף.", trailerId: "NsIilFNNmkY", dynamicQuestion: "האם היית רוצה סרט שמפרק את כל חוקי האימה בצורה קומית וגאונית?",easterEgg: { type: 'blood' }, _genreIds: [27, 35] },
-  { id: "11036", title: "היומן", originalDetails: "The Notebook · 2004", rating: 8.0, posterUrl: "/api/poster?path=/rNzQyW4f8B8cQeg7Dgj3n6eT5k9.jpg", overview: "סיפור אהבה מרגש חוצה עשורים מעבר להבדלי מעמדות.", trailerId: "FC6biTjEyZw", dynamicQuestion: "בא לך סיפור אהבה קלאסי סוחף ורומנטי שיגרום לך לבכות?", easterEgg: { type: 'oscar' }, _genreIds: [10749, 18] },
-  { id: "862", title: "צעצוע של סיפור", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/uXDfjJbdP4ijW5hWSBrPrlKpxab.jpg", overview: "צעצועים קמים לתחייה כשבני האדם לא מסתכלים.", trailerId: "v-PjgYDrg70", dynamicQuestion: "היית זורם על הרפתקת אנימציה מופלאה ומחממת לב לכל המשפחה?", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
+  { id: "155", title: "האביר האפל", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/3KAtr9OX8Bq2FAvZtrjYcdUuBYp.jpg", overview: "באטמן מתמודד עם הג'וקר, פושע פסיכופתי...", trailerId: "EXeTwQWrcwY", dynamicQuestion: "האם היית רוצה לראות מאבק פסיכולוגי בין גיבור לא נחמד לנבל גאון?", easterEgg: { type: 'oscar' }, _genreIds: [28, 80] },
+  { id: "27205", title: "התחלה", originalDetails: "Inception · 2010", rating: 8.8, posterUrl: "/api/poster?path=/nPO8aNT4uGtDAY0bZZZACfP66Lo.jpg", overview: "גנב מקצועי נכנס לחלומות של אנשים...", trailerId: "YoHD9XEInc0", dynamicQuestion: "מד\"ב מתוחכם על חלומות ומציאות מדומה נשמע טוב?",easterEgg: { type: 'oscar' }, _genreIds: [28, 878] },
+  { id: "680", title: "ספרות זולה", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/hBS14aC5tyUasDhMGy0ihvp8hTB.jpg", overview: "סיפוריהם של פושעים בלוס אנג'לס...", trailerId: "s7EdQ4FqbhY", dynamicQuestion: "עד כמה אתה מתחבר לדיאלוגים שנונים, דם, וקפיצות בזמן?",easterEgg: { type: 'wazzap' }, _genreIds: [80] },
+  { id: "348", title: "הנוסע השמיני", originalDetails: "Alien · 1979", rating: 8.5, posterUrl: "/api/poster?path=/odmhIedIOFZXj98yLcXRBl5UrNq.jpg", overview: "צוות חללית נתקל ביצור חייזרי קטלני...", trailerId: "LjLamj-b0I8", dynamicQuestion: "קלאסיקת אימה בחלל עם מפלצת בלתי ניתנת לעצירה - כן או לא?",easterEgg: { type: 'blood' }, _genreIds: [27, 878] },
+  { id: "603", title: "מטריקס", originalDetails: "The Matrix · 1999", rating: 8.7, posterUrl: "/api/poster?path=/xC1MsxS9wJ3EcBjIRJv8PkhFtzJ.jpg", overview: "העולם שאנחנו מכירים הוא בעצם אשליה.", trailerId: "vKQi3bBA1y8", dynamicQuestion: "האם מציאות מדומה, סייברפאנק וקרבות קונג-פו עושים לך את זה?",easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
+  { id: "98", title: "גלדיאטור", originalDetails: "Gladiator · 2000", rating: 8.2, posterUrl: "/api/poster?path=/zJjf7dAIBBHsJjK6L38D3bzOWek.jpg", overview: "גנרל רומי נבגד והופך לגלדיאטור...", trailerId: "owK1qxDselE", dynamicQuestion: "אפוס היסטורי ענק עם קרבות חרבות עד המוות - מדבר אליך?",easterEgg: { type: 'oscar' }, _genreIds: [28, 12] },
+  { id: "157336", title: "בין כוכבים", originalDetails: "Interstellar · 2014", rating: 8.6, posterUrl: "/api/poster?path=/9W7qYnmi1W3648YXVJvpjk82MUf.jpg", overview: "מסע אפי בחלל להצלת האנושות...", trailerId: "zSWdZVtXT7E", dynamicQuestion: "מסע חלל מרהיב שגורם לך לחשוב על משמעות החיים - איך זה נשמע?",easterEgg: { type: 'oscar' }, _genreIds: [878, 12] },
+  { id: "4232", title: "צעקה", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/lr9ZIrmuwVmZhpZuTCW8D9g0ZJe.jpg", overview: "רוצח סדרתי במסכה רודף אחרי קבוצת בני נוער.", trailerId: "AWm_mkbdpCA", dynamicQuestion: "האם מתאים לך רוצח בשר ודם שמחסל בני נוער אחד אחד (סלאשר)?",easterEgg: { type: 'wazzap' }, _genreIds: [27] },
+  { id: "22970", title: "בקתה ביער", originalDetails: "The Cabin in the Woods · 2011", rating: 8.0, posterUrl: "/api/poster?path=/zZZe5wn0udlhMtdlDjN4NB72R6e.jpg", overview: "חמישה חברים נוסעים לבקתה מבודדת ומגלים שהכל חלק מניסוי מטורף.", trailerId: "NsIilFNNmkY", dynamicQuestion: "האם היית רוצה סרט שמפרק את כל חוקי האימה בצורה קומית וגאונית?",easterEgg: { type: 'blood' }, _genreIds: [27, 35] },
+  { id: "11036", title: "היומן", originalDetails: "The Notebook · 2004", rating: 8.0, posterUrl: "/api/poster?path=/s4kMNZZwJ0LXnR6iHpDMfuehhHe.jpg", overview: "סיפור אהבה מרגש חוצה עשורים מעבר להבדלי מעמדות.", trailerId: "FC6biTjEyZw", dynamicQuestion: "בא לך סיפור אהבה קלאסי סוחף ורומנטי שיגרום לך לבכות?", easterEgg: { type: 'oscar' }, _genreIds: [10749, 18] },
+  { id: "862", title: "צעצוע של סיפור", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/oLII3pJFSfeLFDKCZbaUIAXEqqz.jpg", overview: "צעצועים קמים לתחייה כשבני האדם לא מסתכלים.", trailerId: "v-PjgYDrg70", dynamicQuestion: "היית זורם על הרפתקת אנימציה מופלאה ומחממת לב לכל המשפחה?", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
 ];
 
 const SOUNDS = {
@@ -80,6 +93,10 @@ export default function ScanMovieEvaluation() {
   const [timeLeft, setTimeLeft] = useState(899); // 14:59 in seconds
   const [showSocialProof, setShowSocialProof] = useState(false);
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
+  // Titles shown this session — sent to the server so same-title movies
+  // (remakes, re-releases) are never served twice in one quiz.
+  const seenTitlesRef = useRef<string[]>([]);
+  const maxProgressRef = useRef(0);
 
   useEffect(() => {
     Object.keys(SOUNDS).forEach(key => {
@@ -167,15 +184,19 @@ export default function ScanMovieEvaluation() {
 
   const submitAnswer = async (answer: AnswerType) => {
     setLoading(true);
-    setAnimateCard(true); 
+    setAnimateCard(true);
 
     // שמירה בהיסטוריה כדי לאפשר "אחורה"
     setHistoryState(prev => [...prev, session!]);
+    const currentTitle = session!.currentQuestion?.movie?.title;
+    if (currentTitle && !seenTitlesRef.current.includes(currentTitle)) {
+      seenTitlesRef.current.push(currentTitle);
+    }
 
     try {
-      const response = await fetch('/api/next-question', {
+      const doFetch = () => fetch('/api/next-question', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'x-current-confidence': session!.confidenceScore.toString(),
           'x-history-count': session!.historyCount.toString(),
@@ -186,12 +207,30 @@ export default function ScanMovieEvaluation() {
         body: JSON.stringify({
           sessionId: session!.sessionId, questionId: session!.currentQuestion!.id,
           answer, movieId: session!.currentQuestion!.movie?.id,
-          genreIds: session!.currentQuestion!.movie?._genreIds || []
+          genreIds: session!.currentQuestion!.movie?._genreIds || [],
+          niches: session!.currentQuestion!.movie?._niches || [],
+          // Same-title repeats (remakes/re-releases) feel like duplicates — let the
+          // server exclude them. Body (not header) because Hebrew titles aren't
+          // valid ISO-8859-1 header values.
+          askedTitles: seenTitlesRef.current.slice(-60)
         })
       });
 
+      let response = await doFetch();
+      // A rate-limited or transiently failing request must NOT silently swallow
+      // the user's vote — that erodes their taste profile without any feedback.
+      // Back off briefly and retry up to twice before giving up.
+      for (let attempt = 0; !response.ok && (response.status === 429 || response.status >= 500) && attempt < 2; attempt++) {
+        await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+        response = await doFetch();
+      }
+
       if (!response.ok) throw new Error('Failed');
       const newState: SessionState = await response.json();
+      // Union with everything this session has already seen — after using "Back",
+      // the restored (older) asked-list could let the server re-serve a movie the
+      // user already answered. A movie must never appear twice in one quiz.
+      newState.askedMovieIds = Array.from(new Set([...(session!.askedMovieIds || []), ...(newState.askedMovieIds || [])]));
       localStorage.setItem('cinemind_asked_movies', JSON.stringify(newState.askedMovieIds));
       
       // EXPOSE STATE FOR E2E TESTING
@@ -233,7 +272,9 @@ export default function ScanMovieEvaluation() {
     if (historyState.length > 0) {
       const prevState = historyState[historyState.length - 1];
       setHistoryState(prev => prev.slice(0, -1));
-      setSession(prevState);
+      // Restore the previous question but KEEP the full asked-history — rolling
+      // it back would let already-seen movies be served again.
+      setSession({ ...prevState, askedMovieIds: session?.askedMovieIds || prevState.askedMovieIds });
       showToast(quizToasts.backButtonToasts, '🙄');
     }
   };
@@ -265,7 +306,11 @@ export default function ScanMovieEvaluation() {
     );
   }
 
-  const confidencePercentage = Math.max(1, Math.round(session.confidenceScore * 100));
+  // Honest meter: server's progressPercent (confidence-vs-questions racer),
+  // kept monotonic — a progress bar must never move backwards.
+  const rawProgress = session.progressPercent ?? Math.round(session.confidenceScore * 100);
+  if (rawProgress > maxProgressRef.current) maxProgressRef.current = rawProgress;
+  const confidencePercentage = Math.max(1, maxProgressRef.current);
   const dynamicPhrase = getDynamicPhrase(session.historyCount);
   return (
     <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
@@ -362,6 +407,17 @@ export default function ScanMovieEvaluation() {
                     <div className="bg-zinc-900/95 backdrop-blur-3xl border border-rose-500/40 rounded-[2rem] p-6 sm:p-10 max-w-lg w-full text-center shadow-[0_0_80px_rgba(225,29,72,0.25)] animate-in slide-in-from-bottom-10 fade-in duration-700">
                       <div className="text-5xl mb-6">🤫</div>
                       <h4 className="text-3xl font-black text-white mb-4">{t('your_movie_waits')}</h4>
+                      {/* Personalized hook: the user's MEASURED taste axes — real data
+                          is the most persuasive sales copy there is. */}
+                      {(session.currentVectorState?.leadingMicroGenres?.length ?? 0) > 1 && (
+                        <div className="flex flex-wrap justify-center gap-2 mb-4">
+                          {session.currentVectorState.leadingMicroGenres.slice(1, 4).map((axis) => (
+                            <span key={axis} className="px-3 py-1 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 rounded-full text-sm font-bold">
+                              {axis}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-zinc-400 mb-8 text-lg font-medium leading-relaxed">
                         {t('cut_bullshit')}
                       </p>

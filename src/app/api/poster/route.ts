@@ -15,13 +15,18 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL('/placeholder-movie.png', req.url));
   }
 
-  const tmdbUrl = `https://image.tmdb.org/t/p/w780${path}`;
+  // w500 (not w780): question cards render ≤650px wide — w500 is visually
+  // identical there at ~40% fewer bytes, cutting first-paint latency on the
+  // image that IS the quiz experience. Server-side cache (revalidate) means
+  // each unique poster is fetched from TMDB once, not once per visitor.
+  const tmdbUrl = `https://image.tmdb.org/t/p/w500${path}`;
 
   try {
     const response = await fetch(tmdbUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
-      }
+      },
+      next: { revalidate: 31536000 }
     });
     
     if (!response.ok) {

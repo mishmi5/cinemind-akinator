@@ -7,8 +7,11 @@ import { usePathname, useSearchParams } from 'next/navigation';
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || 'phc_placeholder_key', {
+    // Without a real key, init fires network requests that get rejected with 401s.
+    // posthog-js no-ops capture() calls safely when never initialized.
+    const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    if (typeof window !== 'undefined' && key) {
+      posthog.init(key, {
         api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com',
         capture_pageview: false // Disable automatic pageview capture, as we capture manually
       });
