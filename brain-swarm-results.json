@@ -1,22 +1,5 @@
 [
   {
-    "persona": "Slasher Devotee",
-    "taste": "Loves 80s/90s SLASHER horror (Halloween, Scream, Friday the 13th, masked-killer body-count films). Dislikes supernatural/ghost horror and torture-porn. Neutral on everything non-horror.",
-    "pass": true,
-    "score": 90,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified and recommended classic examples of the user's preferred slasher sub-genre without including any disliked styles.",
-    "missed": "",
-    "tasteSummary": "Loves slasher",
-    "recs": [
-      "Halloween",
-      "Friday the 13th",
-      "My Bloody Valentine"
-    ],
-    "questions": 12
-  },
-  {
     "persona": "Cerebral Hard-SF",
     "taste": "Loves cerebral, idea-driven HARD science fiction (Arrival, Ex Machina, Primer, 2001). Dislikes space-opera spectacle and superhero films. Neutral elsewhere.",
     "pass": true,
@@ -31,58 +14,58 @@
       "Ex Machina",
       "Primer"
     ],
-    "questions": 18
+    "questions": 27
   },
   {
-    "persona": "Body Horror",
-    "taste": "Loves Cronenberg-style BODY HORROR (The Fly, The Thing, Possessor). Dislikes light comedy and romance. Neutral elsewhere.",
+    "persona": "Heist Caper Fan",
+    "taste": "Loves clever HEIST / caper thrillers (Ocean's Eleven, Inside Man, Heat). Dislikes war films and superhero action. Neutral elsewhere.",
     "pass": true,
     "score": 100,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's taste in Cronenberg-style body horror and provided appropriate recommendations.",
+    "verdict": "The AI accurately identified the specific sub-genre and provided perfect recommendations.",
     "missed": "",
-    "tasteSummary": "Loves body horror",
+    "tasteSummary": "Loves heist",
     "recs": [
-      "The Fly",
-      "The Thing",
-      "Videodrome"
+      "Heat",
+      "The Italian Job",
+      "Inside Man"
     ],
-    "questions": 13
+    "questions": 35
   },
   {
-    "persona": "Cosmic Sci-Fi Epic",
-    "taste": "Loves grand COSMIC SCI-FI EPICS (Interstellar, Dune, Contact, 2001). Dislikes campy space opera (Guardians) and superhero. Neutral elsewhere.",
+    "persona": "Deadpan Whimsy",
+    "taste": "Loves quirky, symmetrical DEADPAN comedy-drama (Wes Anderson, Yorgos Lanthimos). Dislikes crude/gross-out comedy. Neutral elsewhere.",
     "pass": true,
     "score": 90,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's love for cosmic sci-fi epics and provided appropriate recommendations.",
+    "verdict": "The AI accurately identified the specific sub-genre of 'deadpan comedy' and provided recommendations that fit well within the user's preferred style without any missteps.",
     "missed": "",
-    "tasteSummary": "Loves cosmic sci-fi epic",
+    "tasteSummary": "Loves deadpan comedy",
     "recs": [
-      "Interstellar",
-      "Dune",
-      "Contact"
-    ],
-    "questions": 19
-  },
-  {
-    "persona": "Musical Theater",
-    "taste": "Loves big MUSICALS (La La Land, Les Misérables, The Greatest Showman). Dislikes horror and gritty crime. Neutral elsewhere.",
-    "pass": true,
-    "score": 90,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI correctly identified the specific sub-genre of big MUSICALS and provided appropriate recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves musical",
-    "recs": [
-      "La La Land",
-      "The Greatest Showman",
-      "Chicago"
+      "The Lobster",
+      "Moonrise Kingdom",
+      "The Royal Tenenbaums"
     ],
     "questions": 46
+  },
+  {
+    "persona": "Kaiju Monster Fan",
+    "taste": "Loves giant-MONSTER / kaiju films (Godzilla, Pacific Rim, King Kong). Dislikes quiet human dramas and romance. Neutral elsewhere.",
+    "pass": true,
+    "score": 100,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the user's love for giant-monster films and provided appropriate recommendations.",
+    "missed": "",
+    "tasteSummary": "Loves kaiju monster",
+    "recs": [
+      "Godzilla",
+      "King Kong",
+      "Cloverfield"
+    ],
+    "questions": 17
   },
   {
     "persona": "Slow Cinema Arthouse",
@@ -91,7 +74,7 @@
     "score": 100,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the specific sub-genre of slow arthouse cinema and provided appropriate recommendations.",
+    "verdict": "The AI accurately identified the user's taste in slow arthouse cinema and provided appropriate recommendations.",
     "missed": "",
     "tasteSummary": "Loves slow cinema arthouse",
     "recs": [

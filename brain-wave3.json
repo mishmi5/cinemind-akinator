@@ -1,0 +1,22 @@
+[
+  { "name": "Folk Horror", "taste": "Loves FOLK HORROR — pagan ritual, rural dread (The Wicker Man, The Witch, Kill List, Apostle). Dislikes slasher and jump-scare supernatural. Neutral elsewhere." },
+  { "name": "Vampire Gothic", "taste": "Loves VAMPIRE films (Nosferatu, Let the Right One In, Interview with the Vampire, Bram Stoker's Dracula). Dislikes zombies and slashers. Neutral elsewhere." },
+  { "name": "Werewolf Horror", "taste": "Loves WEREWOLF films (The Howling, An American Werewolf in London, Dog Soldiers, Ginger Snaps). Dislikes ghost/supernatural horror. Neutral elsewhere." },
+  { "name": "Surrealist Cinema", "taste": "Loves SURREALIST cinema (David Lynch's Eraserhead/Mulholland Drive, Jodorowsky, Buñuel — dream logic). Dislikes straightforward blockbusters. Neutral elsewhere." },
+  { "name": "Mumblecore Indie", "taste": "Loves MUMBLECORE — naturalistic low-budget relationship indies (Frances Ha, The Puffy Chair, Hannah Takes the Stairs). Dislikes CGI blockbusters and broad comedy. Neutral elsewhere." },
+  { "name": "Road Movie", "taste": "Loves ROAD MOVIES (Thelma & Louise, Easy Rider, Little Miss Sunshine, Y Tu Mamá También). Dislikes contained chamber dramas and horror. Neutral elsewhere." },
+  { "name": "Prison Drama", "taste": "Loves PRISON dramas (The Shawshank Redemption, A Prophet, Cool Hand Luke, A Prophet). Dislikes fantasy and musicals. Neutral elsewhere." },
+  { "name": "Techno-Thriller", "taste": "Loves TECHNO-THRILLERS — science-gone-wrong (Jurassic Park, The Andromeda Strain, Contagion, Outbreak). Dislikes sword-and-sorcery fantasy and romance. Neutral elsewhere." },
+  { "name": "Political Thriller", "taste": "Loves POLITICAL THRILLERS (All the President's Men, Z, The Manchurian Candidate, The Ides of March). Dislikes superhero action and horror. Neutral elsewhere." },
+  { "name": "Epic Historical", "taste": "Loves EPIC HISTORICAL dramas (Gladiator, Braveheart, Lawrence of Arabia, Kingdom of Heaven). Dislikes modern rom-coms and horror. Neutral elsewhere." },
+  { "name": "Revenge Thriller", "taste": "Loves stylish REVENGE THRILLERS (Oldboy, Kill Bill, John Wick, I Saw the Devil). Dislikes gentle dramas and musicals. Neutral elsewhere." },
+  { "name": "Buddy Cop Action", "taste": "Loves BUDDY-COP action-comedy (Lethal Weapon, Bad Boys, Rush Hour, Hot Fuzz). Dislikes slow art films and horror. Neutral elsewhere." },
+  { "name": "Sci-Fi Horror", "taste": "Loves SCI-FI HORROR — monster-in-space dread (Alien, Event Horizon, Life, The Thing). Dislikes light comedy and romance. Neutral elsewhere." },
+  { "name": "Monster Romance", "taste": "Loves MONSTER / creature ROMANCE (The Shape of Water, Crimson Peak, Edward Scissorhands, Beauty and the Beast). Dislikes gory horror and war. Neutral elsewhere." },
+  { "name": "Dance Film", "taste": "Loves DANCE films (Step Up, Footloose, Dirty Dancing, Magic Mike). Dislikes horror and bleak drama. Neutral elsewhere." },
+  { "name": "Blaxploitation", "taste": "Loves 70s BLAXPLOITATION (Shaft, Super Fly, Foxy Brown, Coffy). Dislikes fantasy and musicals. Neutral elsewhere." },
+  { "name": "Surreal Adult Animation", "taste": "Loves SURREAL / adult ANIMATION (Waltz with Bashir, Fantastic Planet, Fritz the Cat, Mary and Max). Dislikes cute kids' CGI and live-action blockbusters. Neutral elsewhere." },
+  { "name": "Survival Wilderness", "taste": "Loves SURVIVAL / man-vs-nature films (127 Hours, The Revenant, All Is Lost, Into the Wild). Dislikes comedy and fantasy. Neutral elsewhere." },
+  { "name": "Heist Comedy", "taste": "Loves HEIST COMEDIES — light caper romps (The Pink Panther, Tower Heist, Going in Style, A Fish Called Wanda). Dislikes grim war films and horror. Neutral elsewhere." },
+  { "name": "Spaghetti vs Revisionist", "taste": "Loves REVISIONIST WESTERNS — morally grey, elegiac (Unforgiven, The Assassination of Jesse James, Dead Man). Dislikes campy superhero and rom-coms. Neutral elsewhere." }
+]

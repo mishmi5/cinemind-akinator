@@ -23,6 +23,15 @@ const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hi
 // robust to that dilution — three confirmed Halloween/Friday-13th 5★ lock it regardless.
 type ProbeScores = Record<string, { sum: number; n: number; hi: number; lo: number }>;
 
+// Cross-over family adjacency for the early-stop (e.g. cosmic-horror ↔ hard-SF, thrillers
+// span crime/action). A leader can only early-lock once its family AND these neighbours are
+// explored, so a true love in an adjacent family is never skipped.
+const FAMILY_ADJ: Record<string, string[]> = {
+  horror: ['scifi'], scifi: ['horror', 'action'], action: ['crime', 'scifi'],
+  crime: ['action', 'drama'], comedy: ['drama'], drama: ['comedy', 'crime'],
+  western: ['action', 'drama'], animation: [], fantasy: ['scifi', 'action'],
+};
+
 function questionText(title: string, locale: string): string {
   const he = [
     `כמה כוכבים תיתן ל"${title}"? (1 = שונא, 5 = אוהב)`,
@@ -128,7 +137,13 @@ export async function POST(req: Request) {
     // (no perfect 5★) keeps exploring to the full sweep. avg===5 is only reachable when
     // EVERY rating for that sub-genre was a strict-bullseye 5, so it can't be a stray hit.
     const leaderFam = leader ? subGenreFamily(leader.t) : undefined;
-    const leaderFamilyExplored = !!leaderFam && !uncovered.some(c => subGenreFamily(samplerProbeOf(c.id) || '') === leaderFam);
+    // Families that share cross-over sub-genres (e.g. a hard-SF fan also rates cosmic-horror
+    // high). Before early-stopping on a leader, its family AND these adjacent families must
+    // be explored, so the true love in a neighbour family isn't skipped.
+    const adj = leaderFam ? (FAMILY_ADJ[leaderFam] || []) : [];
+    const famsToClear = leaderFam ? [leaderFam, ...adj] : [];
+    const leaderFamilyExplored = famsToClear.length > 0 &&
+      !uncovered.some(c => famsToClear.includes(subGenreFamily(samplerProbeOf(c.id) || '') || ''));
     const earlyExploit = !!leader && leader.avg === 5 && leader.hi >= 1 && leaderFamilyExplored && history.length >= MIN_Q;
     const exploitNow = sweepDone || earlyExploit;
     // DRILL-OFF: drill the least-explored close contender first so every 5★ neighbour gets
