@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { brainRecommend, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
-import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, recommendBySubGenre, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
+import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, subGenreFamily, recommendBySubGenre, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
 
 // Taste-brain quiz endpoint (Akinator-style). DETERMINISTIC sub-genre navigation:
 // the route — not the LLM — decides what to ask. Why: a 14B local model is unreliable
@@ -121,14 +121,22 @@ export async function POST(req: Request) {
     const uncovered = samplerAll
       .filter(c => { const t = samplerProbeOf(c.id); return t && !probe[t] && !disliked.includes(t); });
     const sweepDone = uncovered.length === 0;
-    // Drill target (post-sweep only): the DRILL-OFF. Drill the least-explored close
-    // contender first so every 5★ neighbour gets its 2nd exemplar before we lock; once all
-    // contenders are drilled, fall to the leader. This replaces an arbitrary list-order
-    // tiebreak with a data-driven one (the real love accrues more hits from its own keyword
-    // pool). We never drill mid-sweep — a stray hit must not hijack the lock before its
-    // true rival is explored.
+    // EARLY-STOP (adaptive length): if the leader is a PERFECT 5★ love AND its whole family
+    // has been explored — so every close neighbour was compared and the drill-off settled —
+    // we may exploit without sweeping the remaining families. A focused taste (all 5s for
+    // one sub-genre, neutral elsewhere) thus finishes in ~13 questions; an ambiguous taste
+    // (no perfect 5★) keeps exploring to the full sweep. avg===5 is only reachable when
+    // EVERY rating for that sub-genre was a strict-bullseye 5, so it can't be a stray hit.
+    const leaderFam = leader ? subGenreFamily(leader.t) : undefined;
+    const leaderFamilyExplored = !!leaderFam && !uncovered.some(c => subGenreFamily(samplerProbeOf(c.id) || '') === leaderFam);
+    const earlyExploit = !!leader && leader.avg === 5 && leader.hi >= 1 && leaderFamilyExplored && history.length >= MIN_Q;
+    const exploitNow = sweepDone || earlyExploit;
+    // DRILL-OFF: drill the least-explored close contender first so every 5★ neighbour gets
+    // its 2nd exemplar before we lock; once all are drilled, fall to the leader. Data-driven
+    // tiebreak (the real love accrues more hits from its own keyword pool) instead of list
+    // order. Never drill mid-sweep unless early-stop conditions hold.
     const needDrill = contenders.filter(s => s.n < 2).sort((a, b) => a.n - b.n || b.avg - a.avg);
-    const drillTarget = !lockedLove && sweepDone ? (needDrill[0] || leader) : null;
+    const drillTarget = !lockedLove && exploitNow ? (needDrill[0] || leader) : null;
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
     if (drillTarget) {

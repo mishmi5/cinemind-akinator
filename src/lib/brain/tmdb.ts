@@ -161,6 +161,24 @@ const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
   { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', 'The Hobbit: An Unexpected Journey'] },
   { term: 'sword and sorcery fantasy', titles: ['Conan the Barbarian', 'Krull'] },
 ];
+// Each sub-genre's broad FAMILY — used by the engine's early-stop: once a confirmed 5★
+// leader's WHOLE family has been explored (so all its close neighbours were compared), it
+// is safe to lock without sweeping the remaining families (a focused taste won't suddenly
+// love an unrelated family more). This is what makes the quiz length adaptive (~13 for a
+// sharp taste, full sweep for an ambiguous one) instead of a fixed ~48 questions.
+const FAMILY_OF: Record<string, string> = {
+  'giallo': 'horror', 'slasher': 'horror', 'splatter horror comedy': 'horror', 'body horror': 'horror', 'zombie': 'horror', 'creature feature': 'horror', 'kaiju monster': 'horror', 'cosmic horror': 'horror', 'found-footage horror': 'horror', 'psychological horror': 'horror', 'supernatural horror': 'horror',
+  'cosmic sci-fi epic': 'scifi', 'hard science fiction': 'scifi', 'cyberpunk': 'scifi', 'time travel': 'scifi', 'space opera': 'scifi',
+  'stop-motion animation': 'animation', 'mecha anime': 'animation', 'hand-drawn anime': 'animation',
+  'wuxia': 'action', 'martial arts': 'action', 'heist': 'action', 'war epic': 'action', 'superhero': 'action', 'disaster': 'action',
+  'spaghetti western': 'western',
+  'classic film noir': 'crime', 'psychological thriller': 'crime', 'whodunit mystery': 'crime', 'neo-noir': 'crime', 'cerebral spy thriller': 'crime', 'action spy thriller': 'crime', 'courtroom drama': 'crime', 'erotic thriller': 'crime',
+  'satire': 'comedy', 'black comedy': 'comedy', 'deadpan comedy': 'comedy', 'slapstick comedy': 'comedy', 'romantic comedy': 'comedy', 'holiday christmas': 'comedy',
+  'coming-of-age': 'drama', 'period costume drama': 'drama', 'sports drama': 'drama', 'slow cinema arthouse': 'drama', 'musical': 'drama',
+  'epic high fantasy': 'fantasy', 'sword and sorcery fantasy': 'fantasy',
+};
+export function subGenreFamily(term: string): string | undefined { return FAMILY_OF[term]; }
+
 let samplerCache: BrainCandidate[] | null = null;
 const samplerProbeMap = new Map<string, string>(); // movieId -> sub-genre probe term
 export function samplerProbeOf(movieId: string): string | undefined { return samplerProbeMap.get(movieId); }

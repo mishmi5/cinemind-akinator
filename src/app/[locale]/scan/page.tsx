@@ -14,15 +14,19 @@ interface StartingMovie extends MovieContext {
   dynamicQuestion: string;
 }
 
-// Engine switch: `?brain=mock` (deterministic, no model) or `?brain=1` (live LLM,
-// needs OLLAMA_MODEL / OPENAI_API_KEY) routes the quiz through the Akinator-style
-// taste brain; default is the v12 formula engine. The two endpoints share a
-// response shape, so the rest of the UI is identical.
+// Engine switch. The DETERMINISTIC sub-genre brain is now the DEFAULT for every user
+// (surgical sub-genre resolution, adaptive length). Opt OUT to the legacy v12 formula
+// with `?engine=formula` (or `?brain=0`); `?brain=mock` runs the brain's offline mock.
+// All three endpoints share a response shape, so the rest of the UI is identical.
 function getEngine(): { url: string; brainHeaders: Record<string, string>; isBrain: boolean } {
-  if (typeof window === 'undefined') return { url: '/api/next-question', brainHeaders: {}, isBrain: false };
-  const b = new URLSearchParams(window.location.search).get('brain');
-  if (!b) return { url: '/api/next-question', brainHeaders: {}, isBrain: false };
-  return { url: '/api/brain-question', brainHeaders: b === 'mock' ? { 'x-brain-mock': '1' } : {}, isBrain: true };
+  const FORMULA = { url: '/api/next-question', brainHeaders: {}, isBrain: false };
+  const BRAIN = (mock = false) => ({ url: '/api/brain-question', brainHeaders: mock ? { 'x-brain-mock': '1' } : {}, isBrain: true });
+  if (typeof window === 'undefined') return BRAIN();
+  const params = new URLSearchParams(window.location.search);
+  const engine = params.get('engine');
+  const b = params.get('brain');
+  if (engine === 'formula' || b === '0') return FORMULA;
+  return BRAIN(b === 'mock');
 }
 
 // Hermetic fallback component — transient network blips get ONE retry with a
@@ -112,17 +116,15 @@ export default function ScanMovieEvaluation() {
   const recentRef = useRef<string[]>([]);
   const maxProgressRef = useRef(0);
 
-  // E2E probe: mirror the live rated clock to window so the persona swarm can
-  // assert that a NOT_SEEN never advances ratedCount/completion (the omitted-item
-  // invariant). Cheap, test-only, no UI impact.
+  // E2E probe: mirror the FULL live session to window so the persona swarms can read the
+  // served question (currentQuestion), the final picks (finalMovies) and the rated clock
+  // (ratedCount — the NOT_SEEN omitted-item invariant). Cheap, test-only, no UI impact.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     (window as any).__cinemind_session = session
       ? {
+          ...session,
           ratedCount: session.ratedCount ?? session.historyCount,
-          historyCount: session.historyCount,
-          isComplete: session.isComplete,
-          confidenceScore: session.confidenceScore,
           progressPercent: session.progressPercent ?? 0,
           genreObs: session.genreObs || {},
         }

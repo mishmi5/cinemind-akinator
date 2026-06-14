@@ -1,0 +1,19 @@
+[
+  {
+    "persona": "Slasher Devotee",
+    "taste": "Loves 80s/90s SLASHER horror (Halloween, Scream, Friday the 13th, masked-killer body-count films). Dislikes supernatural/ghost horror and torture-porn. Neutral on everything non-horror.",
+    "pass": true,
+    "score": 95,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified and recommended classic slasher films.",
+    "missed": "",
+    "tasteSummary": "Loves slasher",
+    "recs": [
+      "Friday the 13th",
+      "Black Christmas",
+      "My Bloody Valentine"
+    ],
+    "questions": 12
+  }
+]

@@ -1,199 +1,63 @@
 [
   {
-    "persona": "Giallo Horror",
-    "taste": "Loves Italian GIALLO horror (Argento's Suspiria, Deep Red, Tenebrae — black-gloved killers, lurid color, baroque set-pieces). Dislikes generic American slasher and supernatural ghost films. Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's love for Italian GIALLO horror and provided appropriate recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves giallo",
-    "recs": [
-      "Deep Red",
-      "Tenebrae",
-      "Blood and Black Lace"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Splatter Gorehound",
-    "taste": "Loves over-the-top SPLATTER horror-comedy (Evil Dead 2, Braindead/Dead Alive, Re-Animator). Dislikes slow-burn atmospheric horror and supernatural. Neutral elsewhere.",
+    "persona": "Slasher Devotee",
+    "taste": "Loves 80s/90s SLASHER horror (Halloween, Scream, Friday the 13th, masked-killer body-count films). Dislikes supernatural/ghost horror and torture-porn. Neutral on everything non-horror.",
     "pass": true,
     "score": 90,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the specific sub-genre and provided appropriate recommendations.",
+    "verdict": "The AI accurately identified and recommended classic examples of the user's preferred slasher sub-genre without including any disliked styles.",
     "missed": "",
-    "tasteSummary": "Loves splatter horror comedy",
+    "tasteSummary": "Loves slasher",
     "recs": [
-      "The Evil Dead",
-      "Evil Dead II",
-      "Bad Taste"
+      "Halloween",
+      "Friday the 13th",
+      "My Bloody Valentine"
     ],
-    "questions": 48
+    "questions": 12
   },
   {
-    "persona": "Found-Footage Horror",
-    "taste": "Loves FOUND-FOOTAGE horror (The Blair Witch Project, Paranormal Activity, REC, Cloverfield). Dislikes glossy studio horror and period costume drama. Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's specific sub-genre of 'found-footage horror' and provided perfect recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves found-footage horror",
-    "recs": [
-      "Paranormal Activity",
-      "Cloverfield",
-      "[REC]"
-    ],
-    "questions": 49
-  },
-  {
-    "persona": "Mecha Anime",
-    "taste": "Loves MECHA anime (Neon Genesis Evangelion, Gundam, giant-robot pilots). Dislikes cute pastoral hand-drawn Ghibli and romance. Neutral elsewhere.",
-    "pass": true,
-    "score": 95,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's love for mecha anime and provided recommendations that are canonical examples of this sub-genre without including any disliked styles.",
-    "missed": "",
-    "tasteSummary": "Loves mecha anime",
-    "recs": [
-      "Neon Genesis Evangelion: The End of Evangelion",
-      "Patlabor: The Movie",
-      "Evangelion: 1.0 You Are (Not) Alone"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Stop-Motion Animation",
-    "taste": "Loves STOP-MOTION animation (Coraline, Kubo and the Two Strings, Wallace & Gromit, Fantastic Mr. Fox). Dislikes CGI-blockbuster animation. Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's love for stop-motion animation and provided perfect recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves stop-motion animation",
-    "recs": [
-      "Wallace & Gromit: The Curse of the Were-Rabbit",
-      "Kubo and the Two Strings",
-      "Fantastic Mr. Fox"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Spaghetti Western",
-    "taste": "Loves SPAGHETTI WESTERNS (Leone's The Good the Bad and the Ugly, Once Upon a Time in the West, Django). Dislikes modern superhero action and horror. Neutral elsewhere.",
-    "pass": true,
-    "score": 90,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's love for spaghetti westerns and provided appropriate recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves spaghetti western",
-    "recs": [
-      "The Good, the Bad and the Ugly",
-      "A Fistful of Dollars",
-      "Django Unchained"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Classic Film Noir",
-    "taste": "Loves 1940s-50s CLASSIC FILM NOIR (Double Indemnity, The Maltese Falcon, Out of the Past — chiaroscuro, femme fatales). Dislikes modern neon neo-noir and action. Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified and recommended canonical examples of the user's preferred sub-genre without any errors.",
-    "missed": "",
-    "tasteSummary": "Loves classic film noir",
-    "recs": [
-      "Double Indemnity",
-      "The Big Sleep",
-      "Out of the Past"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Fincher Psych-Thriller",
-    "taste": "Loves grounded PSYCHOLOGICAL THRILLERS (Se7en, Zodiac, Prisoners, Gone Girl — methodical, dark, no supernatural). Dislikes supernatural horror and broad comedy. Neutral elsewhere.",
-    "pass": true,
-    "score": 90,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the specific sub-genre and provided correct recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves psychological thriller",
-    "recs": [
-      "Se7en",
-      "Zodiac",
-      "Prisoners"
-    ],
-    "questions": 49
-  },
-  {
-    "persona": "Disaster Spectacle",
-    "taste": "Loves DISASTER films (Twister, The Day After Tomorrow, 2012, San Andreas). Dislikes quiet character dramas and romance. Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's love for specific DISASTER sub-genre films and provided perfect recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves disaster",
-    "recs": [
-      "Twister",
-      "2012",
-      "San Andreas"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Courtroom Drama",
-    "taste": "Loves COURTROOM dramas (12 Angry Men, A Few Good Men, The Verdict, A Time to Kill). Dislikes action and fantasy. Neutral elsewhere.",
+    "persona": "Cerebral Hard-SF",
+    "taste": "Loves cerebral, idea-driven HARD science fiction (Arrival, Ex Machina, Primer, 2001). Dislikes space-opera spectacle and superhero films. Neutral elsewhere.",
     "pass": true,
     "score": 95,
     "subGenre": true,
     "hatesAvoided": true,
     "verdict": "The AI accurately identified the specific sub-genre and provided perfect recommendations.",
     "missed": "",
-    "tasteSummary": "Loves courtroom drama",
+    "tasteSummary": "Loves hard science fiction",
     "recs": [
-      "12 Angry Men",
-      "A Time to Kill",
-      "The Verdict"
+      "Arrival",
+      "Ex Machina",
+      "Primer"
     ],
-    "questions": 48
+    "questions": 18
   },
   {
-    "persona": "Coming-of-Age Indie",
-    "taste": "Loves COMING-OF-AGE indie dramas (Lady Bird, Boyhood, Stand By Me, Call Me By Your Name). Dislikes loud action and horror. Neutral elsewhere.",
+    "persona": "Body Horror",
+    "taste": "Loves Cronenberg-style BODY HORROR (The Fly, The Thing, Possessor). Dislikes light comedy and romance. Neutral elsewhere.",
     "pass": true,
     "score": 100,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the specific sub-genre and provided perfect recommendations.",
+    "verdict": "The AI accurately identified the user's taste in Cronenberg-style body horror and provided appropriate recommendations.",
     "missed": "",
-    "tasteSummary": "Loves coming-of-age",
+    "tasteSummary": "Loves body horror",
     "recs": [
-      "Stand by Me",
-      "Boyhood",
-      "Call Me by Your Name"
+      "The Fly",
+      "The Thing",
+      "Videodrome"
     ],
-    "questions": 48
+    "questions": 13
   },
   {
     "persona": "Cosmic Sci-Fi Epic",
-    "taste": "Loves grand COSMIC SCI-FI EPICS (Interstellar, Dune, Contact, 2001 — awe, scale, ideas). Dislikes campy space opera (Guardians) and superhero. Neutral elsewhere.",
+    "taste": "Loves grand COSMIC SCI-FI EPICS (Interstellar, Dune, Contact, 2001). Dislikes campy space opera (Guardians) and superhero. Neutral elsewhere.",
     "pass": true,
-    "score": 95,
+    "score": 90,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's preference for cosmic sci-fi epics and provided appropriate recommendations.",
+    "verdict": "The AI accurately identified the user's love for cosmic sci-fi epics and provided appropriate recommendations.",
     "missed": "",
     "tasteSummary": "Loves cosmic sci-fi epic",
     "recs": [
@@ -201,109 +65,24 @@
       "Dune",
       "Contact"
     ],
-    "questions": 51
+    "questions": 19
   },
   {
-    "persona": "Creature Feature",
-    "taste": "Loves CREATURE FEATURES — natural/animal monsters (Jaws, Tremors, The Descent, Crawl). Dislikes supernatural ghost horror and giant city-stomping kaiju. Neutral elsewhere.",
-    "pass": false,
-    "score": 30,
-    "subGenre": false,
-    "hatesAvoided": true,
-    "verdict": "The AI failed to identify the specific sub-genre of creature features and instead recommended disaster films which do not align with the user's taste.",
-    "missed": "The AI did not recognize the user's love for natural/animal monster movies. Instead, it provided recommendations that fall under the broad genre of disaster films.",
-    "tasteSummary": "Loves disaster",
-    "recs": [
-      "The Day After Tomorrow",
-      "2012",
-      "San Andreas"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Le Carre Spy",
-    "taste": "Loves slow CEREBRAL ESPIONAGE (Tinker Tailor Soldier Spy, The Spy Who Came in from the Cold, Bridge of Spies). Dislikes flashy Bond/Mission-Impossible action-spy spectacle. Neutral elsewhere.",
+    "persona": "Musical Theater",
+    "taste": "Loves big MUSICALS (La La Land, Les Misérables, The Greatest Showman). Dislikes horror and gritty crime. Neutral elsewhere.",
     "pass": true,
     "score": 90,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified and recommended specific cerebral espionage sub-genre films without including any disliked action-spy spectacle.",
+    "verdict": "The AI correctly identified the specific sub-genre of big MUSICALS and provided appropriate recommendations.",
     "missed": "",
-    "tasteSummary": "Loves cerebral spy thriller",
+    "tasteSummary": "Loves musical",
     "recs": [
-      "Tinker Tailor Soldier Spy",
-      "Munich",
-      "The Spy Who Came In from the Cold"
+      "La La Land",
+      "The Greatest Showman",
+      "Chicago"
     ],
-    "questions": 48
-  },
-  {
-    "persona": "Wuxia Poet",
-    "taste": "Loves poetic WUXIA (Hero, House of Flying Daggers, Crouching Tiger — wirework, painterly). Dislikes gritty modern MMA brawlers (The Raid). Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the specific sub-genre of poetic WUXIA and provided correct recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves wuxia",
-    "recs": [
-      "Hero",
-      "Once Upon a Time in China",
-      "Crouching Tiger, Hidden Dragon"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Black Comedy",
-    "taste": "Loves DARK / BLACK COMEDY (In Bruges, Fargo, Burn After Reading, Three Billboards). Dislikes broad slapstick and gross-out. Neutral elsewhere.",
-    "pass": true,
-    "score": 90,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's taste in dark/black comedy and provided appropriate recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves black comedy",
-    "recs": [
-      "In Bruges",
-      "Burn After Reading",
-      "Seven Psychopaths"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Holiday Christmas",
-    "taste": "Loves feel-good CHRISTMAS movies (Elf, Home Alone, The Holiday, Love Actually). Dislikes horror and bleak drama. Neutral elsewhere.",
-    "pass": true,
-    "score": 100,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified and recommended specific feel-good CHRISTMAS movies without any disliked genres.",
-    "missed": "",
-    "tasteSummary": "Loves holiday christmas",
-    "recs": [
-      "Elf",
-      "The Holiday",
-      "Love Actually"
-    ],
-    "questions": 48
-  },
-  {
-    "persona": "Epic High Fantasy",
-    "taste": "Loves EPIC HIGH FANTASY (The Lord of the Rings, The Hobbit, Willow — grand quests, good vs evil). Dislikes grimdark and modern superhero. Neutral elsewhere.",
-    "pass": true,
-    "score": 90,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's taste in epic high fantasy and provided appropriate recommendations.",
-    "missed": "",
-    "tasteSummary": "Loves epic high fantasy",
-    "recs": [
-      "The Lord of the Rings: The Fellowship of the Ring",
-      "The Hobbit: An Unexpected Journey",
-      "The Chronicles of Narnia: The Lion, the Witch and the Wardrobe"
-    ],
-    "questions": 49
+    "questions": 46
   },
   {
     "persona": "Slow Cinema Arthouse",
@@ -312,31 +91,14 @@
     "score": 100,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified the user's taste in slow arthouse cinema and provided perfect recommendations.",
+    "verdict": "The AI accurately identified the specific sub-genre of slow arthouse cinema and provided appropriate recommendations.",
     "missed": "",
     "tasteSummary": "Loves slow cinema arthouse",
     "recs": [
       "Stalker",
-      "Autour de Jeanne Dielman",
-      "Andrei Rublev"
+      "Andrei Rublev",
+      "Autour de Jeanne Dielman"
     ],
-    "questions": 48
-  },
-  {
-    "persona": "Erotic Thriller",
-    "taste": "Loves 90s EROTIC THRILLERS (Basic Instinct, Fatal Attraction, Body Heat). Dislikes gore horror and fantasy. Neutral elsewhere.",
-    "pass": false,
-    "score": 83,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI correctly identified the user's love for erotic thrillers but made a minor mistake with one recommendation.",
-    "missed": "Disclosure Day is not an erotic thriller and does not fit within the user's stated preferences.",
-    "tasteSummary": "Loves erotic thriller",
-    "recs": [
-      "Basic Instinct",
-      "Body Heat",
-      "Disclosure Day"
-    ],
-    "questions": 48
+    "questions": 46
   }
 ]
