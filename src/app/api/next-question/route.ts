@@ -227,14 +227,48 @@ function movieEIG(aff: Record<string, number>, ids?: number[]): number {
   });
   return eig / Math.max(1, ids.length);
 }
-// effective_EIG = EIG · P(seen) — the research-backed exposure-adjusted item
-// selection (CAT/IRT). We rank live candidates by this, then sample from the top
-// few (not pure argmax) to keep quizzes varied and dodge same-poster monotony.
+// Predicted enjoyment of a movie under the current taste vector — the same shape
+// as the recommendation score (primary genre full, secondaries half, IDF-weighted).
+// Positive = the user is likely to LOVE it, negative = likely to reject it. This is
+// the EXPLOITATION signal: serving must honor what the user already told us.
+function predictedLike(aff: Record<string, number>, ids?: number[]): number {
+  if (!ids || ids.length === 0) return 0;
+  let s = 0;
+  ids.forEach((g, idx) => {
+    s += (aff[g.toString()] || 0) * (idx === 0 ? 1 : 0.5) * (GENRE_IDF[g.toString()] ?? 1);
+  });
+  return s;
+}
+// A genre the user RATED into the negative is one they dislike — never serve more
+// of it. −2.5 catches a single decisive 1★ on a primary genre (−6) and an
+// accumulated secondary dislike alike. This is the front-line "respect the rating"
+// gate; the discover query's without_genres is only a coarse backstop.
+const DISLIKE_GATE = -2.5;
+function isHatedMovie(aff: Record<string, number>, ids?: number[]): boolean {
+  return (ids || []).some(g => (aff[g.toString()] || 0) <= DISLIKE_GATE);
+}
+// Live question selection = EXPLOIT (predicted enjoyment) + EXPLORE (EIG), gated by
+// exposure P(seen) and HARD-filtered against disliked genres. Strong opinions are
+// honored: a 1★'d style is dropped from the pool entirely, and among what remains
+// the user's liked genres are preferred while neutral axes still get explored for
+// signal. Pure-EIG (the old behavior) ignored the sign of the user's feeling — it
+// would keep serving a style the user just rejected because that axis still looked
+// "uncertain". That is the "I hate it but keep getting it" bug.
 function pickLiveCandidate(
   cands: MovieContext[], aff: Record<string, number>, stats: GenreStats
 ): MovieContext {
-  const ranked = cands
-    .map(m => ({ m, score: movieEIG(aff, m._genreIds) * movieSeenProb(stats, m._genreIds) }))
+  // 1. Respect explicit dislike: never serve a genre the user rated negative.
+  let pool = cands.filter(m => !isHatedMovie(aff, m._genreIds));
+  if (pool.length === 0) pool = cands; // never starve the quiz to a dead end
+  // 2. Rank by (exploit + explore) · P(seen). predictedLike (±, large when the user
+  //    has a strong opinion) dominates for decided axes; EIG (0..~1.2) drives the
+  //    choice only among genres the user is still neutral on.
+  const ranked = pool
+    .map(m => ({
+      m,
+      score: (predictedLike(aff, m._genreIds) * 0.7 + movieEIG(aff, m._genreIds) * 3)
+        * movieSeenProb(stats, m._genreIds),
+    }))
     .sort((a, b) => b.score - a.score);
   const topK = ranked.slice(0, Math.min(4, ranked.length));
   return topK[Math.floor(Math.random() * topK.length)].m;
@@ -264,7 +298,11 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
   Object.entries(affinities).forEach(([genreId, score]) => {
     if (genreId !== 'General' && !genreId.startsWith('k:')) {
       if (score >= 2) likedGenres.push(genreId);
-      if (score <= -5) hatedSet.add(genreId);
+      // −4 (was −5): a single decisive 1★ on a primary genre lands at −6 and two
+      // secondary-tag hates accumulate past −4, so a clearly rejected style is
+      // pruned from the discover stream fast — the live picker's −2.5 gate is the
+      // finer front-line, this is the coarse API-level backstop.
+      if (score <= -4) hatedSet.add(genreId);
     }
   });
   // Exposure-adjusted exclusion (TASTE-FORMULA.md §8): a genre the user keeps
@@ -370,7 +408,7 @@ export async function POST(req: Request) {
       // Start with iconic baseline movies to hook the user and establish initial strong signals.
       // Deterministic coverage order — see BASELINE_ORDER rationale.
       const sessionId = payload.sessionId || `session_${Date.now()}`;
-      let selected = pickBaselineMovie(sessionId, askedMovieIds, locale);
+      let selected = pickBaselineMovie(sessionId, askedMovieIds, locale, userAffinities);
       if (!selected) {
         const pool = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
         selected = pool.length > 0 ? pool[0] : fullBaselinePool(locale)[0];
@@ -433,13 +471,16 @@ export async function POST(req: Request) {
             const polarity = base > 0 ? 2 : 3;
             payload.genreIds.forEach((g, idx) => {
               const idf = GENRE_IDF[g.toString()] ?? 1;
-              // Loving a movie endorses all its flavors (secondaries at half
-              // weight). Hating a movie rejects what it primarily IS — its
-              // secondary tags say nothing about the user's taste. A drama
-              // lover who hates a comedy-drama hates the comedy, not drama;
-              // punishing secondaries cratered exactly that drama signal.
-              const positionWeight = idx === 0 ? 1 : (base > 0 ? 0.5 : 0);
-              if (positionWeight === 0) return;
+              // A 1★ is the user shouting "NOT this." Hate must reject the whole
+              // movie's STYLE — primary at full weight, secondaries at 0.4. The old
+              // "primary-only" rule (secondary weight 0) let a disliked style survive
+              // whenever it rode as a SECONDARY tag: animated films are often tagged
+              // [Comedy, Animation] or [Adventure, Animation], so 1-starring them
+              // cratered Comedy/Adventure but left Animation untouched — and the user
+              // kept getting animations. Secondaries are weaker than the primary but
+              // are NOT zero: hating a comedy-drama still nudges drama down a little,
+              // which a true drama lover's accumulated +love easily absorbs.
+              const positionWeight = idx === 0 ? 1 : (base > 0 ? 0.5 : 0.4);
               const w = base * polarity * positionWeight * idf;
               userAffinities[g.toString()] = (userAffinities[g.toString()] || 0) + w;
             });
@@ -487,7 +528,7 @@ export async function POST(req: Request) {
         // Exploration phase: 12 RATED baseline movies — every genre bucket measured
         // at least once (see BASELINE_ORDER). Keyed on the RATED clock, not total
         // screens, so a skipper still earns the full baseline before live drilling.
-        let selected = pickBaselineMovie(payload.sessionId || '', askedMovieIds, locale);
+        let selected = pickBaselineMovie(payload.sessionId || '', askedMovieIds, locale, userAffinities);
         if (!selected) {
           const remaining = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
           selected = remaining.length > 0 ? remaining[0] : fullBaselinePool(locale)[0];
