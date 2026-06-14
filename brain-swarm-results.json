@@ -1,0 +1,19 @@
+[
+  {
+    "persona": "Hand-Drawn Anime",
+    "taste": "Loves hand-drawn STUDIO GHIBLI-style anime (Spirited Away, Princess Mononoke, Your Name). Dislikes CGI-blockbuster animation. Neutral elsewhere.",
+    "pass": true,
+    "score": 90,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the specific sub-genre of hand-drawn anime and recommended classic Studio Ghibli films without any disliked styles.",
+    "missed": "",
+    "tasteSummary": "Loves hand-drawn anime",
+    "recs": [
+      "Spirited Away",
+      "Princess Mononoke",
+      "My Neighbor Totoro"
+    ],
+    "questions": 28
+  }
+]

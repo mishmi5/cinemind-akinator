@@ -266,6 +266,8 @@ export default function ScanMovieEvaluation() {
           // Brain engine round-trips the rating history + title/year in the BODY
           // (Hebrew titles can't go in headers). Harmless for the formula engine.
           ratingHistory: session!.ratingHistory || [],
+          searchHint: (session as any)!.searchHint || '',
+          probeScores: (session as any)!.probeScores || {},
           title: session!.currentQuestion!.movie?.title,
           year: yearMatch ? yearMatch[1] : undefined,
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the

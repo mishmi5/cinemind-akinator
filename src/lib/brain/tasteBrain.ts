@@ -28,6 +28,7 @@ const BrainResult = z.object({
   tasteSummary: z.string().describe('One or two sentences describing the taste you have inferred so far, at sub-genre resolution (e.g. "loves self-aware/meta horror-comedy, dislikes earnest supernatural; prefers 90s practical-effects over modern CGI").'),
   nextPickId: z.union([z.string(), z.number(), z.null()]).optional().describe('When phase="ask": the id (from the provided candidate pool) of the movie that will MOST narrow/resolve the taste. Null/omit when phase="done".'),
   nextReason: z.union([z.string(), z.null()]).optional().describe('When phase="ask": short reason this movie best separates your live hypotheses.'),
+  searchHint: z.union([z.string(), z.null()]).optional().describe('CRITICAL for sub-genre resolution: a short search phrase naming the SPECIFIC sub-genre/style you want to probe NEXT, so the next batch of candidate movies targets your live hypothesis (e.g. "slasher horror", "supernatural horror", "heist thriller", "cerebral hard sci-fi", "space opera", "rom-com", "wuxia martial arts"). Change it as your hypothesis shifts. Without this, narrow niche tastes are invisible in a generic popular pool.'),
   recommendations: z.array(z.object({
     title: z.string(),
     year: z.union([z.string(), z.number(), z.null()]).optional(),
@@ -56,9 +57,20 @@ CORE PRINCIPLES (follow exactly):
    affinities. Build the read from THIS user's evidence — never force a favorite theory.
 2. RATINGS ARE LITERAL — 5 = loves it, 1 = actively dislikes that style, 3 = neutral.
    A low rating must steer you AWAY from that style; a high rating toward it.
-3. RESOLVE BY CONTRAST — pick the next movie that best SEPARATES your live hypotheses
-   (e.g. they liked a slasher → ask about a supernatural horror to test "slasher vs
-   horror"). Maximize information gain; never ask about something already settled.
+3. DRILL THE LOVE, DROP THE HATE — this is how you win.
+   • The moment a movie scores 4-5, that is a HOT LEAD. Identify its MOST SPECIFIC
+     sub-genre and set "searchHint" to exactly that, then serve SEVERAL more of that
+     precise sub-genre to confirm it's the pattern (not a fluke). Do not wander to
+     adjacent labels.
+   • Be precise about near-neighbours — they are different tastes, never merge them:
+     slasher (masked/human killer, body count) ≠ supernatural horror (ghosts, demons,
+     possession) ≠ psychological horror (madness, unreliable mind) ≠ body horror.
+     Likewise space-opera ≠ hard-SF ≠ cyberpunk; rom-com ≠ tragic romance; satire ≠
+     slapstick. If they LOVE one and you have evidence, name THAT one — not the umbrella.
+   • Once a sub-genre scores 1-2, it is CONFIRMED disliked: stop serving it and never
+     recommend it. Don't keep probing a region you've ruled out.
+   • Early on (no clear love yet) hint different sub-genres each turn to find the
+     region; the opening questions already sample many sub-genres for you.
 4. HONEST CONFIDENCE — be confident ONLY when you understand both LIKES and DISLIKES at
    sub-genre resolution. Thin evidence (few ratings) or contradictions (loved and hated
    similar films) = LOW confidence. Do not claim to know the user after a few clicks.
@@ -158,7 +170,12 @@ const RecResult = z.object({
     reason: z.string(),
   })).default([]),
 });
-export async function brainRecommend(history: BrainHistoryItem[], opts?: { mock?: boolean }): Promise<{ tasteSummary: string; recommendations: { title: string; year?: string | number | null; reason: string }[] } | null> {
+export async function brainRecommend(
+  history: BrainHistoryItem[],
+  opts?: { mock?: boolean; loved?: string[]; disliked?: string[] },
+): Promise<{ tasteSummary: string; recommendations: { title: string; year?: string | number | null; reason: string }[] } | null> {
+  const loved = opts?.loved || [];
+  const disliked = opts?.disliked || [];
   if (opts?.mock || process.env.BRAIN_MOCK === '1') {
     // mock: recommend by strongest-liked genre names (grounded later by the route via pool)
     const liked: Record<string, number> = {};
@@ -168,13 +185,31 @@ export async function brainRecommend(history: BrainHistoryItem[], opts?: { mock?
   }
   const model = tasteModel();
   if (!model) return null;
+  // The route has already DETERMINISTICALLY resolved which sub-genre(s) the user loves
+  // (from their actual 4-5 ratings, scored per probed sub-genre) and which they hate.
+  // The model's ONLY job here is to name 3 well-known titles squarely inside the loved
+  // sub-genre — it does NOT get to re-decide the sub-genre. This removes the unreliable
+  // per-turn LLM navigation that previously mislabeled slasher/hard-SF as "psychological".
+  const lovedLine = loved.length
+    ? `CONFIRMED loved sub-genre(s), in priority order: ${loved.join(', ')}. Recommend squarely inside the FIRST one.`
+    : `No single sub-genre dominated; infer the best fit from the ratings below.`;
+  const hateLine = disliked.length
+    ? `CONFIRMED DISLIKED sub-genres (NEVER recommend, no overlap): ${disliked.join(', ')}.`
+    : `No confirmed dislikes.`;
   const prompt = `A user rated these movies:
 ${fmtHistory(history)}
 
-Decode their taste at SUB-GENRE resolution (e.g. "loves self-aware/meta horror, not earnest supernatural"; "prefers cerebral sci-fi over space-opera"), respecting that low ratings mean they DISLIKE that style. Then recommend EXACTLY 3 real, well-known movies they have most likely NOT already rated above but will love, each with its release year and a reason tied to specific evidence.`;
+${lovedLine}
+${hateLine}
+
+Recommend EXACTLY 3 real, well-known movies that sit squarely IN the loved sub-genre
+named above (NOT a broader umbrella genre, NOT an adjacent sub-genre), which the user
+most likely has NOT already rated here. Each needs its release year and a one-line
+reason citing the specific sub-genre. Do NOT recommend anything from a disliked
+sub-genre. tasteSummary must name the precise loved sub-genre.`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const { object } = await generateObject({ model, schema: RecResult, system: SYSTEM, prompt, temperature: 0.5 });
+      const { object } = await generateObject({ model, schema: RecResult, system: SYSTEM, prompt, temperature: 0.4 });
       if (object.recommendations.length > 0) return object;
     } catch { /* retry */ }
   }

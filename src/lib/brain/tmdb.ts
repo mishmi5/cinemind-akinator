@@ -40,6 +40,194 @@ export async function fetchCandidatePool(seenIds: string[], locale = 'he', size 
   } catch { return []; }
 }
 
+// Resolve a free-text sub-genre hint ("slasher horror", "heist thriller") to a TMDB
+// keyword id, cached. Lets the brain DRILL toward a niche the generic popular pool
+// would never surface.
+const hintKeywordCache = new Map<string, number | null>();
+async function keywordIdForHint(hint: string): Promise<number | null> {
+  if (!KEY) return null;
+  const k = hint.trim().toLowerCase();
+  if (hintKeywordCache.has(k)) return hintKeywordCache.get(k)!;
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/search/keyword?api_key=${KEY}&query=${encodeURIComponent(k)}`, { next: { revalidate: 604800 } });
+    const data = res.ok ? await res.json() : { results: [] };
+    const id = data.results?.[0]?.id ?? null;
+    hintKeywordCache.set(k, id);
+    return id;
+  } catch { hintKeywordCache.set(k, null); return null; }
+}
+
+/** Targeted candidate pool matching a sub-genre hint — by TMDB keyword (preferred,
+ *  precise) then by free-text movie search as a fallback. The brain's drilling
+ *  mechanism: how a narrow niche becomes visible. */
+export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 'he', size = 14): Promise<BrainCandidate[]> {
+  if (!KEY || !hint) return [];
+  const seen = new Set(seenIds);
+  const toCand = (m: any): BrainCandidate => ({
+    id: m.id.toString(), title: m.title || m.original_title,
+    year: m.release_date ? m.release_date.split('-')[0] : undefined,
+    genres: genreNames(m.genre_ids), _genreIds: m.genre_ids,
+  });
+  const lang = langOf(locale);
+  try {
+    const kwId = await keywordIdForHint(hint);
+    if (kwId) {
+      const page = 1 + Math.floor(Math.random() * 3);
+      const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&with_keywords=${kwId}&page=${page}`, { next: { revalidate: 0 } });
+      if (res.ok) {
+        const data = await res.json();
+        const out = (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
+        if (out.length >= 4) return out;
+      }
+    }
+    // fallback: free-text movie search on the hint
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=${lang}&query=${encodeURIComponent(hint)}`, { next: { revalidate: 86400 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
+  } catch { return []; }
+}
+
+// Distinct sub-genres to PROBE in the opening phase, each with TWO instantly-recognizable,
+// iconic exemplars. We resolve these by TITLE (not by TMDB keyword top-result, which is
+// noisy and often surfaces obscure films the user won't recognize) — so a narrow taste
+// gets a clear, unambiguous hit on a film they actually know. The sub-genre TERM is what
+// the deterministic engine scores and later recommends within. Exemplars are chosen to be
+// UNMISTAKABLE members of their sub-genre and minimally cross-contaminating with neighbours.
+// ORDER MATTERS: when two near-neighbour sub-genres tie (a fan rates BOTH exemplars 5),
+// the engine breaks the tie by this list order. So the NARROWER / more distinctive member
+// of each family is listed BEFORE its broader "elevated" neighbour — e.g. body horror
+// before psychological horror, whodunit before neo-noir, hard-SF before space-opera. A fan
+// of the narrow taste rates its distinctive exemplar high AND wins the tie; a fan of the
+// broad taste rates the narrow exemplar low, so no tie occurs and the avg separates them.
+const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
+  // Horror — visceral/distinctive first, atmospheric/default last.
+  { term: 'slasher', titles: ['Halloween', 'Scream'] },
+  { term: 'body horror', titles: ['The Fly', 'The Thing'] },
+  { term: 'zombie', titles: ['Dawn of the Dead', '28 Days Later'] },
+  { term: 'kaiju monster', titles: ['Godzilla', 'Pacific Rim'] },
+  { term: 'cosmic horror', titles: ['The Lighthouse', 'Annihilation'] },
+  { term: 'psychological horror', titles: ['Hereditary', 'The Babadook'] },
+  { term: 'supernatural horror', titles: ['The Conjuring', 'Insidious'] },
+  // Sci-fi — cerebral/narrow first, spectacle last.
+  { term: 'hard science fiction', titles: ['Arrival', 'Ex Machina'] },
+  { term: 'cyberpunk', titles: ['Blade Runner', 'The Matrix'] },
+  { term: 'time travel', titles: ['Back to the Future', 'Looper'] },
+  { term: 'space opera', titles: ['Star Wars', 'Guardians of the Galaxy'] },
+  // Action.
+  { term: 'martial arts', titles: ['Crouching Tiger, Hidden Dragon', 'Ip Man'] },
+  { term: 'heist', titles: ["Ocean's Eleven", 'Heat'] },
+  { term: 'spy thriller', titles: ['Skyfall', 'Mission: Impossible'] },
+  { term: 'war epic', titles: ['Saving Private Ryan', '1917'] },
+  { term: 'superhero', titles: ['The Avengers', 'The Dark Knight'] },
+  // Crime / mystery — puzzle-narrow first, tonal last.
+  { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express'] },
+  { term: 'neo-noir', titles: ['Chinatown', 'Drive'] },
+  // Comedy — distinctive first.
+  { term: 'satire', titles: ['Dr. Strangelove', 'Thank You for Smoking'] },
+  { term: 'deadpan comedy', titles: ['The Grand Budapest Hotel', 'The Lobster'] },
+  { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Naked Gun'] },
+  { term: 'romantic comedy', titles: ['Notting Hill', 'When Harry Met Sally'] },
+  // Drama / other.
+  { term: 'period costume drama', titles: ['Pride & Prejudice', 'Atonement'] },
+  { term: 'sports drama', titles: ['Rocky', 'Rudy'] },
+  { term: 'musical', titles: ['La La Land', 'Les Misérables'] },
+  { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name'] },
+  { term: 'sword and sorcery fantasy', titles: ['The Lord of the Rings', 'Conan the Barbarian'] },
+];
+let samplerCache: BrainCandidate[] | null = null;
+const samplerProbeMap = new Map<string, string>(); // movieId -> sub-genre probe term
+export function samplerProbeOf(movieId: string): string | undefined { return samplerProbeMap.get(movieId); }
+
+// Resolve a curated exemplar TITLE to a real TMDB candidate (search en-US for reliable
+// matching, then carry genre ids). Returns null if not found / no poster.
+async function candidateByTitle(title: string): Promise<BrainCandidate | null> {
+  if (!KEY) return null;
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}`, { next: { revalidate: 604800 } });
+    if (!res.ok) return null;
+    const d = await res.json();
+    const hit = (d.results || []).find((m: any) => m.poster_path && m.overview) || (d.results || [])[0];
+    if (!hit || !hit.poster_path) return null;
+    return {
+      id: hit.id.toString(), title: hit.title || hit.original_title,
+      year: hit.release_date ? hit.release_date.split('-')[0] : undefined,
+      genres: genreNames(hit.genre_ids), _genreIds: hit.genre_ids,
+    };
+  } catch { return null; }
+}
+
+export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandidate[]> {
+  if (samplerCache) return samplerCache;
+  if (!KEY) return [];
+  const resolved = await Promise.all(
+    SUBGENRE_EXEMPLARS.flatMap(({ term, titles }) =>
+      titles.map(async t => ({ term, cand: await candidateByTitle(t) }))),
+  );
+  const byId = new Map<string, BrainCandidate>();
+  for (const { term, cand } of resolved) {
+    if (cand && !byId.has(cand.id)) { byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); }
+  }
+  samplerCache = Array.from(byId.values());
+  return samplerCache;
+}
+
+// Canonical, PURE recommendation seeds per sub-genre. The deterministic engine confirms a
+// sub-genre, then recommends from THIS list (resolved against TMDB, filtered to unseen) —
+// not from an LLM that drifts to adjacent/contaminated titles, and not from a noisy keyword
+// pool. Every title is a defensible, central member of its sub-genre with minimal neighbour
+// bleed (e.g. slasher excludes supernatural "Nightmare on Elm St" and torture-porn "Saw").
+const SUBGENRE_RECS: Record<string, string[]> = {
+  'slasher': ['Halloween', 'Scream', 'Friday the 13th', 'Black Christmas', 'My Bloody Valentine', 'Prom Night', 'Happy Death Day', 'Sleepaway Camp'],
+  'supernatural horror': ['The Conjuring', 'Insidious', 'The Exorcist', 'Sinister', 'The Ring', 'Poltergeist', 'The Conjuring 2', 'Ouija'],
+  'psychological horror': ['Hereditary', 'The Witch', 'Midsommar', 'The Babadook', 'Black Swan', 'Repulsion', 'Saint Maud', 'Relic'],
+  'zombie': ['Dawn of the Dead', '28 Days Later', 'Shaun of the Dead', 'Train to Busan', 'Night of the Living Dead', 'World War Z', 'Zombieland', '28 Weeks Later'],
+  'body horror': ['The Fly', 'The Thing', 'Videodrome', 'Possessor', 'Tetsuo: The Iron Man', 'Society', 'From Beyond', 'Titane'],
+  'cosmic horror': ['The Lighthouse', 'Annihilation', 'Color Out of Space', 'The Mist', 'In the Mouth of Madness', 'Event Horizon', 'The Void', 'Underwater'],
+  'hard science fiction': ['Arrival', 'Ex Machina', 'Primer', '2001: A Space Odyssey', 'Gattaca', 'Solaris', 'Coherence', 'Contact'],
+  'space opera': ['Star Wars', 'Guardians of the Galaxy', 'The Fifth Element', 'Flash Gordon', 'Valerian and the City of a Thousand Planets', 'Jupiter Ascending', 'John Carter', 'Star Wars: The Force Awakens'],
+  'cyberpunk': ['Blade Runner', 'The Matrix', 'Ghost in the Shell', 'Akira', 'Blade Runner 2049', 'Strange Days', 'Upgrade', 'Johnny Mnemonic'],
+  'time travel': ['Back to the Future', 'Looper', '12 Monkeys', 'Edge of Tomorrow', 'Predestination', 'Timecrimes', 'About Time', 'Primer'],
+  'heist': ["Ocean's Eleven", 'Heat', 'The Italian Job', 'Inside Man', 'The Town', 'Reservoir Dogs', 'Logan Lucky', 'Baby Driver'],
+  'spy thriller': ['Skyfall', 'Mission: Impossible', 'Tinker Tailor Soldier Spy', 'The Bourne Identity', 'Casino Royale', 'Bridge of Spies', 'Munich', 'Spy Game'],
+  'martial arts': ['Ip Man', 'Crouching Tiger, Hidden Dragon', 'The Raid', 'Enter the Dragon', 'Hero', 'Drunken Master', 'Ong-Bak', 'Kung Fu Hustle'],
+  'war epic': ['Saving Private Ryan', '1917', 'Apocalypse Now', 'Platoon', 'Dunkirk', 'Full Metal Jacket', 'Black Hawk Down', 'Hacksaw Ridge'],
+  'neo-noir': ['Chinatown', 'Drive', 'L.A. Confidential', 'Nightcrawler', 'Sin City', 'Brick', 'The Nice Guys', 'Mulholland Drive'],
+  'whodunit mystery': ['Knives Out', 'Murder on the Orient Express', 'Gone Girl', 'Zodiac', 'The Girl with the Dragon Tattoo', 'Death on the Nile', 'Glass Onion', 'Clue'],
+  'romantic comedy': ['Notting Hill', 'When Harry Met Sally', '10 Things I Hate About You', "Bridget Jones's Diary", 'Crazy Rich Asians', 'The Proposal', 'Pretty Woman', 'Love Actually'],
+  'period costume drama': ['Pride & Prejudice', 'Atonement', 'Little Women', 'Sense and Sensibility', 'Emma', 'The Age of Innocence', 'A Room with a View', 'Far from the Madding Crowd'],
+  'musical': ['La La Land', 'Les Misérables', 'The Greatest Showman', 'Chicago', 'Moulin Rouge!', 'West Side Story', 'Mamma Mia!', 'Hairspray'],
+  'satire': ['Dr. Strangelove', 'Thank You for Smoking', 'In the Loop', 'Wag the Dog', 'Network', 'Idiocracy', 'The Death of Stalin', 'Election'],
+  'slapstick comedy': ['Dumb and Dumber', 'The Naked Gun', 'Airplane!', 'Hot Shots!', 'The Pink Panther', 'Tommy Boy', 'Ace Ventura: Pet Detective', "Mr. Bean's Holiday"],
+  'superhero': ['The Dark Knight', 'Spider-Man', 'Iron Man', 'Logan', 'Black Panther', 'Wonder Woman', 'The Avengers', 'Spider-Man: Into the Spider-Verse'],
+  'sword and sorcery fantasy': ['The Lord of the Rings: The Fellowship of the Ring', 'Conan the Barbarian', 'The Hobbit: An Unexpected Journey', 'Willow', 'Excalibur', 'Dragonslayer', 'The Princess Bride', 'Krull'],
+  'hand-drawn anime': ['Spirited Away', 'Your Name', 'Princess Mononoke', 'My Neighbor Totoro', "Howl's Moving Castle", "Kiki's Delivery Service", 'Weathering with You', 'Castle in the Sky'],
+  'sports drama': ['Rocky', 'Rudy', 'Miracle', 'Warrior', 'Remember the Titans', 'Coach Carter', 'Creed', 'The Blind Side'],
+  'deadpan comedy': ['The Grand Budapest Hotel', 'The Lobster', 'Moonrise Kingdom', 'Fargo', 'The Royal Tenenbaums', 'Napoleon Dynamite', 'Fantastic Mr. Fox', 'The Favourite'],
+  'kaiju monster': ['Godzilla', 'Pacific Rim', 'King Kong', 'Cloverfield', 'Shin Godzilla', 'Kong: Skull Island', 'The Host', 'Rampage'],
+};
+export function subGenreRecTitles(term: string): string[] { return SUBGENRE_RECS[term] || []; }
+
+/** Deterministically recommend up to `n` real, unseen films squarely inside a CONFIRMED
+ *  sub-genre, from the curated canonical seeds. Surgical: no LLM title drift, no keyword
+ *  noise. Returns full MovieContexts (grounded). `seenIds` excludes already-rated films. */
+export async function recommendBySubGenre(term: string, seenIds: string[], locale = 'he', n = 3): Promise<MovieContext[]> {
+  const titles = SUBGENRE_RECS[term];
+  if (!titles || !titles.length) return [];
+  const seen = new Set(seenIds);
+  // Shuffle so successive quizzes of the same taste surface different (still on-genre) picks.
+  const order = titles.map((t, i) => ({ t, k: (i + 1) * (1 + Math.random()) })).sort((a, b) => a.k - b.k).map(x => x.t);
+  const out: MovieContext[] = [];
+  for (const title of order) {
+    if (out.length >= n) break;
+    const cand = await candidateByTitle(title);
+    if (!cand || seen.has(cand.id) || out.some(m => m.id === cand.id)) continue;
+    const m = await movieById(cand.id, locale);
+    if (m) out.push(m);
+  }
+  return out;
+}
+
 /** Build a full MovieContext for a TMDB movie id (poster, overview, genres). */
 export async function movieById(id: string, locale = 'he'): Promise<MovieContext | null> {
   if (!KEY || !/^\d+$/.test(id)) return null;
