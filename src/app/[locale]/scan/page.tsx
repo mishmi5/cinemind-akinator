@@ -14,6 +14,17 @@ interface StartingMovie extends MovieContext {
   dynamicQuestion: string;
 }
 
+// Engine switch: `?brain=mock` (deterministic, no model) or `?brain=1` (live LLM,
+// needs OLLAMA_MODEL / OPENAI_API_KEY) routes the quiz through the Akinator-style
+// taste brain; default is the v12 formula engine. The two endpoints share a
+// response shape, so the rest of the UI is identical.
+function getEngine(): { url: string; brainHeaders: Record<string, string>; isBrain: boolean } {
+  if (typeof window === 'undefined') return { url: '/api/next-question', brainHeaders: {}, isBrain: false };
+  const b = new URLSearchParams(window.location.search).get('brain');
+  if (!b) return { url: '/api/next-question', brainHeaders: {}, isBrain: false };
+  return { url: '/api/brain-question', brainHeaders: b === 'mock' ? { 'x-brain-mock': '1' } : {}, isBrain: true };
+}
+
 // Hermetic fallback component — transient network blips get ONE retry with a
 // cache-buster before surrendering to the CSS placeholder. A single dropped
 // packet must not blank the poster for the whole question.
@@ -132,13 +143,15 @@ export default function ScanMovieEvaluation() {
 
     const initSession = async () => {
       try {
-        const res = await fetch('/api/next-question', {
+        const eng = getEngine();
+        const res = await fetch(eng.url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-asked-ids': JSON.stringify(localAsked),
             'x-recent-ids': JSON.stringify(recentRef.current),
-            'x-locale': locale
+            'x-locale': locale,
+            ...eng.brainHeaders,
           },
           body: JSON.stringify({ sessionId: `session_${Date.now()}`, isInit: true })
         });
@@ -224,7 +237,9 @@ export default function ScanMovieEvaluation() {
     }
 
     try {
-      const doFetch = () => fetch('/api/next-question', {
+      const eng = getEngine();
+      const yearMatch = (session!.currentQuestion!.movie?.originalDetails || '').match(/(\d{4})/);
+      const doFetch = () => fetch(eng.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -240,13 +255,19 @@ export default function ScanMovieEvaluation() {
           'x-genre-stats': JSON.stringify(session!.genreStats || {}),
           'x-asked-ids': JSON.stringify(session!.askedMovieIds),
           'x-affinities': JSON.stringify(session!.userAffinities || {}),
-          'x-locale': locale
+          'x-locale': locale,
+          ...eng.brainHeaders,
         },
         body: JSON.stringify({
           sessionId: session!.sessionId, questionId: session!.currentQuestion!.id,
           answer, movieId: session!.currentQuestion!.movie?.id,
           genreIds: session!.currentQuestion!.movie?._genreIds || [],
           niches: session!.currentQuestion!.movie?._niches || [],
+          // Brain engine round-trips the rating history + title/year in the BODY
+          // (Hebrew titles can't go in headers). Harmless for the formula engine.
+          ratingHistory: session!.ratingHistory || [],
+          title: session!.currentQuestion!.movie?.title,
+          year: yearMatch ? yearMatch[1] : undefined,
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the
           // server exclude them. Body (not header) because Hebrew titles aren't
           // valid ISO-8859-1 header values.

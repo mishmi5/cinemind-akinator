@@ -66,6 +66,10 @@ export interface SessionState {
   genreObs?: Record<string, { n: number; sum: number; sq: number }>;
   /** v12 raw per-niche (sub-genre) observations {n,sum,sq}. */
   nicheObs?: Record<string, { n: number; sum: number; sq: number }>;
+  /** Brain engine: accumulated rating history [{title,year,genres,rating}] (round-tripped in body). */
+  ratingHistory?: { title: string; year?: string; genres: string[]; rating: number }[];
+  /** Brain engine: the model's natural-language taste summary. */
+  tasteSummary?: string;
 }
 
 export interface AnswerPayload {
