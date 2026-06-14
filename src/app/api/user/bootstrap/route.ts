@@ -30,7 +30,12 @@ export async function POST(req: Request) {
     const { verifySessionState } = await import('@/lib/sessionToken');
     const validState = verifySessionState(proofToken);
 
-    if (!validState || !validState.affinities || validState.totalAnswers < 25 || !validState.sessionId) {
+    // Floor matches the engine's RATED completion floor (TASTE-FORMULA.md §3/§9):
+    // a legit quiz completes at ≥15 REAL ratings. The old `< 25` was silently
+    // satisfied only because NOT_SEEN used to inflate the answer count — once skips
+    // stopped advancing the clock, honest fast-completers (18–24 real ratings) were
+    // wrongly 403'd here. proofToken.totalAnswers now carries ratedCount.
+    if (!validState || !validState.affinities || validState.totalAnswers < 15 || !validState.sessionId) {
       return NextResponse.json({ error: 'Invalid or missing proof token. Quiz must be completed legitimately.' }, { status: 403 });
     }
 

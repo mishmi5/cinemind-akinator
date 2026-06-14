@@ -98,6 +98,16 @@ export default function ScanMovieEvaluation() {
   const seenTitlesRef = useRef<string[]>([]);
   const maxProgressRef = useRef(0);
 
+  // E2E probe: mirror the live rated clock to window so the persona swarm can
+  // assert that a NOT_SEEN never advances ratedCount/completion (the omitted-item
+  // invariant). Cheap, test-only, no UI impact.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).__cinemind_session = session
+      ? { ratedCount: session.ratedCount ?? session.historyCount, historyCount: session.historyCount, isComplete: session.isComplete }
+      : null;
+  }, [session]);
+
   useEffect(() => {
     Object.keys(SOUNDS).forEach(key => {
       const audio = new Audio(SOUNDS[key as keyof typeof SOUNDS]);
@@ -200,6 +210,11 @@ export default function ScanMovieEvaluation() {
           'Content-Type': 'application/json',
           'x-current-confidence': session!.confidenceScore.toString(),
           'x-history-count': session!.historyCount.toString(),
+          // Rated clock + Fisher info + genre exposure tally round-trip the
+          // server's stateless taste estimate (NOT_SEEN never advances the clock).
+          'x-rated-count': (session!.ratedCount ?? session!.historyCount).toString(),
+          'x-info': (session!.infoSum ?? 0).toString(),
+          'x-genre-stats': JSON.stringify(session!.genreStats || {}),
           'x-asked-ids': JSON.stringify(session!.askedMovieIds),
           'x-affinities': JSON.stringify(session!.userAffinities || {}),
           'x-locale': locale
@@ -278,6 +293,16 @@ export default function ScanMovieEvaluation() {
       showToast(quizToasts.backButtonToasts, '🙄');
     }
   };
+
+  // TEMPORARY paywall bypass (env-gated, removable with one flag flip): while the
+  // taste engine is under QA we want the FULL flow — quiz → real recommendations —
+  // without the ₪9 gate blocking inspection. Set NEXT_PUBLIC_BYPASS_PAYWALL=true to
+  // auto-reveal the picks on completion; unset/false restores the live paywall.
+  useEffect(() => {
+    if (session?.isComplete && process.env.NEXT_PUBLIC_BYPASS_PAYWALL === 'true') {
+      setIsRevealed(true);
+    }
+  }, [session?.isComplete]);
 
   // FOMO Mechanics Effect
   useEffect(() => {

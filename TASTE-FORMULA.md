@@ -108,6 +108,63 @@ archetype accuracy, sub-genre accuracy (planned: parody-vs-comedy persona),
 posters load, trailers load and match, no duplicates, every page healthy —
 churn target 0%, then and only then ship.
 
+## 8. Exposure-Adjusted Serving — the Beta-Binomial skip weight (v11)
+
+A NOT_SEEN carries **zero taste signal** (it's an omitted item, MCAR — see
+`notseen-is-omitted-item`), so it never touches the affinity vector, the rated
+clock, or confidence. But it carries a strong **exposure** signal: a genre the
+user keeps skipping is one we should stop spending questions on.
+
+Per genre we keep a tally `{n, s}` — `n` = times SERVED, `s` = times SKIPPED — and
+derive a continuous serving weight:
+
+```
+w_g = (N_g − S_g + 2) / (N_g + 3)        // posterior mean of a Beta(2,1) prior
+```
+
+- Unseen genre → 0.67 (gentle optimism). Always-rated → →1. Always-skipped → →0.
+- This **replaces the brittle binary** "exclude after 3 skips": a skip-rate, not a
+  cliff. A genre is hard-excluded from the live `discover` query only once
+  `w_g < 0.3` **and** `N_g ≥ 3` (sustained, not one unlucky miss), capped at 3
+  exclusions so a horror lover who hates comedy keeps horror-comedies.
+- `P(seen)` of a whole movie = `min` of its genres' weights (one reliably-skipped
+  tag sinks the title — a disliked niche can't ride in on a popular co-genre).
+
+## 9. Adaptive Stopping by Standard Error (v11, CAT/IRT)
+
+Question selection and the stop rule are now information-theoretic:
+
+```
+effective_EIG(movie) = EIG(movie) · P(seen)        // research-backed item pick
+   EIG(movie)  = Σ_genres (1 − |tanh(aff/4)|) · IDF // high where taste is UNKNOWN
+   P(seen)     = min_g w_g                          // §8 exposure weight
+```
+
+Live candidates are ranked by `effective_EIG` and sampled from the top few (not
+pure argmax — keeps quizzes varied). We spend each question where taste is most
+uncertain **and** the user is most likely to have actually seen the title.
+
+Stopping uses the estimate's **standard error**, not an ad-hoc confidence drip:
+
+```
+infoSum += base² · IDF(primary)  (+0.5·base² if the movie carries niches)
+SE = 1 / √(1 + infoSum)            // shrinks as informative ratings accumulate
+```
+
+`base² ∈ {0,1,4}` — a fence-sitting 3★ adds **zero** information, a decisive 1★/5★
+adds four. Completion gates (RATED clock only; NOT_SEEN never advances):
+
+```
+ratedCount ≥ 18 ∧ SE ≤ 0.13   ⇒ done   (decisive raters exit ~18 Qs)
+ratedCount ≥ 26 ∧ SE ≤ 0.20   ⇒ done
+ratedCount ≥ 40               ⇒ hard cap (fence-sitters; never premature)
+```
+
+A heavy skipper who skips 55 and rates 8 is therefore **never** rushed to a
+low-confidence read — they keep getting questions until 15+ informative ratings
+land. Validated headless (decisive→18 Q, skipper→18 rated/31 screens,
+fence-sitter→40, all-hater→3 recs) and by the live persona swarm.
+
 ## 7. Planned: Niche-Direct Candidate Injection (post-v9)
 
 When a niche axis is strong (aff[k:niche] ≥ 4), the recommendation pool gains a

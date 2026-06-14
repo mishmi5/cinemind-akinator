@@ -5,7 +5,6 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 
-const CONFIDENCE_THRESHOLD = 0.97;
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 const GENRE_MAP: Record<number, { name: string, egg: 'oscar' | 'blood' | 'wazzap' | 'matrix' }> = {
@@ -191,6 +190,56 @@ function inferLatentAffinities(aff: Record<string, number>) {
   }
 }
 
+// ── Beta-Binomial genre serving weight (TASTE-FORMULA.md §8) ──────────────────
+// w_g = (N_g − S_g + 2)/(N_g + 3): the exposure-adjusted P(seen) for a genre,
+// where N_g = times the genre was SERVED and S_g = times it was SKIPPED. This is
+// the posterior mean of a Beta(2,1) prior over "user has seen this genre" — it
+// starts at 0.67 (gentle optimism), rises toward 1 for genres the user always
+// rates, and decays CONTINUOUSLY toward 0 for genres they keep skipping. It
+// replaces the brittle binary "without_genres after 3 skips": a skip-rate signal,
+// not a cliff. NOT_SEEN is MCAR for taste but MAR for exposure — it tells us
+// nothing about preference yet everything about what to stop showing.
+type GenreStats = Record<string, { n: number; s: number }>;
+function betaWeight(stats: GenreStats, genreId: string): number {
+  const e = stats[genreId];
+  if (!e) return 2 / 3; // prior mean, unseen genre
+  return (e.n - e.s + 2) / (e.n + 3);
+}
+// P(seen) of a whole movie = the weakest of its genres' weights. One reliably
+// skipped genre on a movie is enough to make the whole title a likely skip — we
+// gate on the min, not the mean, so a niche-but-disliked tag can't ride in on a
+// popular co-genre.
+function movieSeenProb(stats: GenreStats, ids?: number[]): number {
+  if (!ids || ids.length === 0) return 2 / 3;
+  return Math.min(...ids.map(g => betaWeight(stats, g.toString())));
+}
+// Expected information gain of asking about a movie: highest where the user's
+// stance on its genres is still UNKNOWN (affinity near 0). tanh saturates as
+// evidence piles up, so a genre we've already pinned contributes ~0 — we stop
+// re-litigating settled axes and spend questions where uncertainty lives.
+function movieEIG(aff: Record<string, number>, ids?: number[]): number {
+  if (!ids || ids.length === 0) return 0.4;
+  let eig = 0;
+  ids.forEach((g, idx) => {
+    const a = aff[g.toString()] || 0;
+    const idf = GENRE_IDF[g.toString()] ?? 1;
+    eig += (1 - Math.abs(Math.tanh(a / 4))) * idf * (idx === 0 ? 1 : 0.5);
+  });
+  return eig / Math.max(1, ids.length);
+}
+// effective_EIG = EIG · P(seen) — the research-backed exposure-adjusted item
+// selection (CAT/IRT). We rank live candidates by this, then sample from the top
+// few (not pure argmax) to keep quizzes varied and dodge same-poster monotony.
+function pickLiveCandidate(
+  cands: MovieContext[], aff: Record<string, number>, stats: GenreStats
+): MovieContext {
+  const ranked = cands
+    .map(m => ({ m, score: movieEIG(aff, m._genreIds) * movieSeenProb(stats, m._genreIds) }))
+    .sort((a, b) => b.score - a.score);
+  const topK = ranked.slice(0, Math.min(4, ranked.length));
+  return topK[Math.floor(Math.random() * topK.length)].m;
+}
+
 async function getTrailerForMovieId(tmdbId: string): Promise<string> {
   if (!TMDB_API_KEY || tmdbId.startsWith('fb')) return '';
   try {
@@ -204,25 +253,36 @@ async function getTrailerForMovieId(tmdbId: string): Promise<string> {
   }
 }
 
-async function fetchMoviesFromTMDB(page: number, affinities: Record<string, number>, locale: string = 'he', disableRandomYear: boolean = false): Promise<MovieContext[]> {
+async function fetchMoviesFromTMDB(page: number, affinities: Record<string, number>, locale: string = 'he', disableRandomYear: boolean = false, stats: GenreStats = {}): Promise<MovieContext[]> {
   const POOL = fullBaselinePool(locale);
   if (!TMDB_API_KEY) return POOL;
-  
+
   // 1. Analyze Affinities to dynamically build API query
   let likedGenres: string[] = [];
-  let hatedGenres: string[] = [];
-  
+  let hatedSet = new Set<string>();
+
   Object.entries(affinities).forEach(([genreId, score]) => {
     if (genreId !== 'General' && !genreId.startsWith('k:')) {
       if (score >= 2) likedGenres.push(genreId);
-      if (score <= -5) hatedGenres.push(genreId);
+      if (score <= -5) hatedSet.add(genreId);
     }
+  });
+  // Exposure-adjusted exclusion (TASTE-FORMULA.md §8): a genre the user keeps
+  // SKIPPING is also worth pruning from the live stream — but CONTINUOUSLY, never
+  // a hard count cliff. We exclude a genre once its Beta-Binomial seen-weight
+  // drops below 0.3 AND it has real exposure (n≥3), i.e. a sustained skip-rate,
+  // not one unlucky miss. This fuses behavior (skips) where the old code had only
+  // explicit hate (affinity≤−5) — a user who silently skips every horror title
+  // never has to 1★ one for us to stop serving them.
+  Object.entries(stats).forEach(([g, e]) => {
+    if (e.n >= 3 && betaWeight(stats, g) < 0.3) hatedSet.add(g);
   });
   // API-level exclusion is a blunt instrument: a horror lover who hates Comedy
   // would lose every horror-comedy and horror-mystery too (secondary tags).
-  // Exclude only the 3 STRONGEST hates; the scoring gate handles the rest.
-  hatedGenres = hatedGenres
-    .sort((a, b) => (affinities[a] || 0) - (affinities[b] || 0))
+  // Exclude only the 3 STRONGEST signals (most-hated, then most-skipped); the
+  // scoring gate + EIG·P(seen) picker handle the rest softly.
+  let hatedGenres = Array.from(hatedSet)
+    .sort((a, b) => ((affinities[a] || 0) - betaWeight(stats, a)) - ((affinities[b] || 0) - betaWeight(stats, b)))
     .slice(0, 3)
     .filter(g => !likedGenres.includes(g));
 
@@ -285,11 +345,26 @@ export async function POST(req: Request) {
     if (!checkRateLimit(rateKey, 120, 60000)) {
       return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
     }
-    const currentConfidence = parseFloat(req.headers.get('x-current-confidence') || '0.01');
     const currentCount = parseInt(req.headers.get('x-history-count') || '0', 10);
     const locale = req.headers.get('x-locale') || 'he';
     let askedMovieIds: string[] = JSON.parse(req.headers.get('x-asked-ids') || '[]');
     let userAffinities: Record<string, number> = JSON.parse(req.headers.get('x-affinities') || '{}');
+    // RATED clock — only real 1–5★ answers advance completion. A NOT_SEEN is an
+    // omitted item (MCAR): zero taste signal, must NEVER raise count/confidence.
+    // Back-compat: fall back to total history when the rated header is absent.
+    let ratedCount = parseInt(req.headers.get('x-rated-count') ?? String(currentCount), 10);
+    // Fisher information of the taste estimate (SE = 1/√(1+infoSum)) — adaptive
+    // stopping driver (TASTE-FORMULA.md §9). Seeded from legacy confidence if absent.
+    let infoSum = parseFloat(req.headers.get('x-info') ?? '0');
+    // Per-genre exposure tally for the Beta-Binomial serving weight (§8).
+    let genreStats: Record<string, { n: number; s: number }> =
+      JSON.parse(req.headers.get('x-genre-stats') || '{}');
+    const noteServed = (ids?: number[]) => (ids || []).forEach(g => {
+      const k = g.toString(); const e = genreStats[k] || { n: 0, s: 0 }; e.n++; genreStats[k] = e;
+    });
+    const noteSkipped = (ids?: number[]) => (ids || []).forEach(g => {
+      const k = g.toString(); const e = genreStats[k] || { n: 0, s: 0 }; e.s++; genreStats[k] = e;
+    });
 
     if (payload.isInit) {
       // Start with iconic baseline movies to hook the user and establish initial strong signals.
@@ -303,6 +378,7 @@ export async function POST(req: Request) {
       if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
       selected._niches = await getNichesForMovie(selected.id);
       warmPoster(selected.posterUrl);
+      noteServed(selected._genreIds); // exposure tally starts at the first served movie
       // Do NOT pre-push the served movie into askedMovieIds: the answer handler
       // guards affinity updates with `!askedMovieIds.includes(movieId)` to block
       // double-counting, so a pre-pushed id made the user's FIRST vote — usually
@@ -312,6 +388,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         sessionId: payload.sessionId || `session_${Date.now()}`,
         isComplete: false, confidenceScore: 0.01, historyCount: 0,
+        ratedCount: 0, infoSum: 0, genreStats,
         askedMovieIds, userAffinities: {},
         currentVectorState: { possibleMoviesRemaining: 85432, leadingMicroGenres: [locale === 'en' ? 'Initializing global scan...' : 'מאתחל סריקה גלובלית...'] },
         currentQuestion: { id: `init_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected }
@@ -319,20 +396,28 @@ export async function POST(req: Request) {
     }
 
     // 👑 אלגוריתם התקדמות כירורגי ודינמי לחלוטין
-    let confidenceBoost = 0.008;
+    // A real 1–5★ rating is a measured item; a NOT_SEEN is an omitted item (MCAR)
+    // — it advances neither the rated clock nor confidence, only the exposure tally.
+    const isSkip = typeof payload.answer !== 'number';
 
     if (payload.movieId && !askedMovieIds.includes(payload.movieId)) {
       askedMovieIds.push(payload.movieId);
-      if (typeof payload.answer === 'number') {
+      if (isSkip) {
+        // Omitted item: zero taste signal. Record only that these genres were
+        // shown-and-skipped, feeding the Beta-Binomial serving weight (§8).
+        noteSkipped(payload.genreIds);
+      } else if (typeof payload.answer === 'number') {
         const base = (payload.answer - 3); // -2..+2
+        ratedCount++; // ← the completion clock only ticks on real ratings
 
-        if (payload.answer === 5 || payload.answer === 1) {
-          confidenceBoost = Math.random() * 0.015 + 0.045; // decisive: done in ~18-20 Qs
-        } else if (payload.answer === 4 || payload.answer === 2) {
-          confidenceBoost = 0.025;
-        } else {
-          confidenceBoost = 0.012; // neutral answers still converge by the hard cap
-        }
+        // Fisher information of this item: 0 for a fence-sitting 3★, 1 for a 2/4★,
+        // 4 for a decisive 1/5★ — scaled by the primary genre's IDF (a rare genre
+        // pins taste harder) plus a niche bonus (esoteric votes are high-signal).
+        const idfPrimary = (payload.genreIds && payload.genreIds.length > 0)
+          ? (GENRE_IDF[payload.genreIds[0].toString()] ?? 1) : 1;
+        let infoGain = base * base * idfPrimary;
+        if (payload.niches && payload.niches.length > 0) infoGain += 0.5 * base * base;
+        infoSum += infoGain;
 
         if (base !== 0) {
           userAffinities['General'] = (userAffinities['General'] || 0) + base;
@@ -375,25 +460,33 @@ export async function POST(req: Request) {
       }
     }
 
-    const answeredCount = currentCount + 1;
-    let newConfidence = Math.min(0.99, currentConfidence + confidenceBoost);
-    // Completion gates — precision over speed: a few more questions for an exact
-    // taste read beats a fast almost-right one. Floor of 15 guarantees the full
-    // 12-movie baseline plus live-pool refinement; cap of 40 still kills churn.
+    // Adaptive stopping by STANDARD ERROR (TASTE-FORMULA.md §9, CAT/IRT). The taste
+    // estimate's SE shrinks as informative ratings accumulate: SE = 1/√(1+infoSum).
+    // We stop when the measurement is precise enough — decisive raters earn a fast
+    // exit (~18 Qs), fence-sitters keep going to the hard cap. `answeredCount` is
+    // the RATED clock: NOT_SEEN never moves it, so a heavy skipper is never rushed
+    // to a premature, low-confidence read.
+    const answeredCount = ratedCount;
+    const SE = 1 / Math.sqrt(1 + infoSum);
+    let newConfidence = Math.max(0.01, Math.min(0.99, 1 - SE));
+    // Floor of 15 RATED guarantees the full 12-movie baseline plus live refinement;
+    // cap of 40 RATED still kills churn. Thresholds mirror the old 0.97/0.85 tiers
+    // expressed as SE (reliability 1−SE²): SE≤0.13 ⇒ rel≈0.98, SE≤0.20 ⇒ rel≈0.96.
     let isComplete = false;
     if (answeredCount >= 15) {
-      if (answeredCount >= 18 && newConfidence >= CONFIDENCE_THRESHOLD) isComplete = true;
-      else if (answeredCount >= 26 && newConfidence >= 0.85) isComplete = true;
-      else if (answeredCount >= 40) isComplete = true; // Hard cap
+      if (answeredCount >= 18 && SE <= 0.13) isComplete = true;
+      else if (answeredCount >= 26 && SE <= 0.20) isComplete = true;
+      else if (answeredCount >= 40) isComplete = true; // Hard cap on RATED items
     }
 
     let nextMovie = null;
     let finalMoviesResult = undefined;
 
     if (!isComplete) {
-      if (currentCount < 11) {
-        // Exploration phase: init + 11 = full 12-movie deterministic baseline —
-        // every genre bucket measured at least once, key buckets twice (see BASELINE_ORDER).
+      if (ratedCount < 11) {
+        // Exploration phase: 12 RATED baseline movies — every genre bucket measured
+        // at least once (see BASELINE_ORDER). Keyed on the RATED clock, not total
+        // screens, so a skipper still earns the full baseline before live drilling.
         let selected = pickBaselineMovie(payload.sessionId || '', askedMovieIds, locale);
         if (!selected) {
           const remaining = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
@@ -402,6 +495,7 @@ export async function POST(req: Request) {
         if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
         selected._niches = await getNichesForMovie(selected.id);
       warmPoster(selected.posterUrl);
+        noteServed(selected._genreIds);
         nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
       } else {
         // As confidence grows, we fetch from earlier pages (most popular) that match
@@ -415,25 +509,29 @@ export async function POST(req: Request) {
         const notSeenBefore = (m: MovieContext) =>
           !askedMovieIds.includes(m.id) && !askedTitleSet.has(m.title.trim().toLowerCase());
 
-        let availableMovies = await fetchMoviesFromTMDB(randomPage, userAffinities, locale);
+        let availableMovies = await fetchMoviesFromTMDB(randomPage, userAffinities, locale, false, genreStats);
         let filtered = availableMovies.filter(notSeenBefore);
 
         if (filtered.length === 0) {
           // Fallback to random page without strict filters if too narrow
-          availableMovies = await fetchMoviesFromTMDB(Math.floor(Math.random() * 50) + 1, {}, locale);
+          availableMovies = await fetchMoviesFromTMDB(Math.floor(Math.random() * 50) + 1, {}, locale, false, genreStats);
           filtered = availableMovies.filter(notSeenBefore);
         }
-        
+
         if (filtered.length === 0) filtered = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
-        if (filtered.length === 0) { 
-          isComplete = true; 
+        if (filtered.length === 0) {
+          isComplete = true;
         }
 
         if (!isComplete) {
-          const selected = filtered[Math.floor(Math.random() * filtered.length)];
+          // Drill by effective_EIG = EIG · P(seen) (TASTE-FORMULA.md §9): spend the
+          // question where taste is most uncertain AND the user is most likely to
+          // have actually seen the title — adaptive item selection, not blind random.
+          const selected = pickLiveCandidate(filtered, userAffinities, genreStats);
           if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
           selected._niches = await getNichesForMovie(selected.id);
       warmPoster(selected.posterUrl);
+          noteServed(selected._genreIds);
           nextMovie = { id: `q_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected };
         }
       }
@@ -551,7 +649,7 @@ export async function POST(req: Request) {
       const { signSessionState } = await import('@/lib/sessionToken');
       proofToken = signSessionState({
         sessionId: payload.sessionId || `session_${Date.now()}`,
-        totalAnswers: currentCount + 1,
+        totalAnswers: ratedCount, // real ratings only — NOT_SEEN is not an answer
         affinities: userAffinities,
         completedAt: Date.now()
       });
@@ -568,7 +666,9 @@ export async function POST(req: Request) {
       sessionId: payload.sessionId || `session_${Date.now()}`,
       isComplete, confidenceScore: isComplete ? 1.0 : newConfidence,
       progressPercent,
-      historyCount: currentCount + 1, askedMovieIds, userAffinities, 
+      // historyCount carries the RATED clock now (NOT_SEEN never advances it).
+      historyCount: ratedCount, ratedCount, infoSum, genreStats,
+      askedMovieIds, userAffinities,
       currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: isComplete ? [psychologicalMessage, ...topTasteAxes(userAffinities, locale)] : [psychologicalMessage] },
       currentQuestion: isComplete ? null : nextMovie,
       finalMovies: finalMoviesResult,

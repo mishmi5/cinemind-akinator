@@ -55,6 +55,13 @@ export interface SessionState {
   askedMovieIds: string[];
   /** Accumulated user taste affinities per genre/tag */
   userAffinities: Record<string, number>;
+  /** Per-genre exposure tally: n=times served, s=times skipped (NOT_SEEN). Drives
+   *  the Beta-Binomial serving weight w_g=(n−s+2)/(n+3) — see TASTE-FORMULA.md §8. */
+  genreStats?: Record<string, { n: number; s: number }>;
+  /** Count of REAL 1–5★ ratings only (NOT_SEEN never counts) — the completion clock. */
+  ratedCount?: number;
+  /** Accumulated Fisher information of the taste estimate; SE=1/√(1+infoSum). */
+  infoSum?: number;
 }
 
 export interface AnswerPayload {

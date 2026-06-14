@@ -39,22 +39,34 @@ function pickArchetype(affinities: Record<string, number>, contrarian: number, c
   if (values.length === 0) return 'The Basic Binge-Watcher';
   
   const maxScore = Math.max(...values);
-  const MIN_SIGNAL = 3; // Absolute floor: Requires at least one 5-star (+2) and 4-star (+1) combined
-  
+  // Floor lowered 3→2: a niche devotee who HATES everything else (e.g. a horror
+  // purist) tops out around +2 on their beloved genre yet has a crystal-clear #1.
+  // A true zero-signal fence-sitter still sits at ~0 and stays "Basic".
+  const MIN_SIGNAL = 2;
+
   if (maxScore < MIN_SIGNAL) return 'The Basic Binge-Watcher'; // If they liked nothing strongly, they are basic
 
+  // 0.85 leniency: the archetype is the user's STRONGEST taste, tolerant of a
+  // rider genre nudging the raw total. ORDER MATTERS — most-specific first:
+  //  • Action/Thriller/Crime is lifted ABOVE Animation/Family so a true action
+  //    lover (Action #1) isn't hijacked by a secondary Animation that merely
+  //    clears 85% (the "Army Vet" miss).
+  //  • Escapist (Sci-Fi/Fantasy/Adventure/Mystery) is the BROAD rider bucket and
+  //    stays BELOW the specific buckets, so Adventure/Fantasy tags piggybacking on
+  //    Pixar/animation films don't steal an animation lover's verdict (the
+  //    "Animation Student" miss — those movies carry Adventure+Fantasy secondaries
+  //    that out-accumulate the primary Animation axis).
   const hasStrongSignal = (genres: string[]) => {
-    return genres.some(g => (affinities[g] || 0) >= maxScore * 0.85 && (affinities[g] || 0) >= MIN_SIGNAL); 
+    return genres.some(g => (affinities[g] || 0) >= maxScore * 0.85 && (affinities[g] || 0) >= MIN_SIGNAL);
   };
 
-  // 1. Explicit Niche Signals
   if (hasStrongSignal(['Horror'])) return 'The Cinematic Edge-Lord';
   if (hasStrongSignal(['Romance'])) return 'The Hopeless Romantic';
+  if (hasStrongSignal(['Action', 'Thriller', 'Crime'])) return 'The Action Junkie';
   if (hasStrongSignal(['Animation', 'Family'])) return 'The Family & Animation Enthusiast';
   if (hasStrongSignal(['Sci-Fi', 'Fantasy', 'Adventure', 'Mystery'])) return 'The Escapist';
-  if (hasStrongSignal(['Action', 'Thriller', 'Crime'])) return 'The Action Junkie';
-  
-  // 2. Pretentious check (Drama, History, Documentary, or just highly contrarian)
+
+  // Pretentious check (Drama, History, Documentary, or just highly contrarian)
   if (hasStrongSignal(['History', 'Documentary', 'Drama']) || contrarian > 0.8) return 'The Pretentious Cinephile';
 
   return 'The Basic Binge-Watcher';
