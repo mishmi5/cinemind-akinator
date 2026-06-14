@@ -109,7 +109,7 @@ const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
   { term: 'zombie', titles: ['Dawn of the Dead', '28 Days Later'] },
   { term: 'creature feature', titles: ['Jaws (1975)', 'Tremors'] },
   { term: 'kaiju monster', titles: ['Godzilla', 'Pacific Rim'] },
-  { term: 'cosmic horror', titles: ['The Lighthouse', 'Annihilation'] },
+  { term: 'cosmic horror', titles: ['The Lighthouse', 'Color Out of Space'] },
   { term: 'found-footage horror', titles: ['The Blair Witch Project', 'Paranormal Activity'] },
   { term: 'psychological horror', titles: ['Hereditary', 'The Babadook'] },
   { term: 'supernatural horror', titles: ['The Conjuring', 'Insidious'] },

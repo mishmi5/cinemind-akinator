@@ -50,12 +50,12 @@ const WAVE1 = [
   { name: 'Musical Theater', taste: 'Loves big MUSICALS (La La Land, Les Misérables, The Greatest Showman). Dislikes horror and gritty crime. Neutral elsewhere.' },
 ];
 
-async function ollamaJSON(model, system, user, retries = 2) {
+async function ollamaJSON(model, system, user, retries = 2, temperature = 0.2) {
   for (let i = 0; i < retries; i++) {
     try {
       const r = await fetch(OLLAMA, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature: 0.2, stream: false, response_format: { type: 'json_object' } }),
+        body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature, stream: false, response_format: { type: 'json_object' } }),
       });
       const j = await r.json();
       let c = j.choices?.[0]?.message?.content || '';
@@ -71,7 +71,7 @@ async function ollamaJSON(model, system, user, retries = 2) {
 async function rateMovie(persona, movie) {
   const sys = `You ARE this exact moviegoer with a SPECIFIC, NARROW taste:\n${persona.taste}\n\nYou know this movie. First identify its PRECISE sub-genre, then rate 1-5 by how EXACTLY it hits the narrow bullseye of YOUR taste. BE DECISIVE and STRICT about the bullseye:\n- 5 = a BULLSEYE: it sits squarely in the EXACT narrow sub-genre you love. Reserve 5 for the core ONLY.\n- 4 = an ADJACENT sub-genre you enjoy but which is NOT your precise core (e.g. body-horror fan rating a splatter-comedy; neo-noir fan rating a 1940s classic noir; whodunit fan rating a cerebral spy thriller).\n- 3 = genuinely unrelated to both your loves and your dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nCRUCIAL: a NEIGHBOURING sub-genre NEVER gets 5 — only the exact bullseye gets 5. A film in a sub-genre you explicitly dislike must get 1. Output JSON {"rating": <1-5 integer>, "why": "<the precise sub-genre, 3 words>"}.`;
   const usr = `Movie: "${movie.title}"${movie.year ? ` (${movie.year})` : ''}, listed genres: ${(movie.genres || []).join(', ') || 'unknown'}.`;
-  const o = await ollamaJSON(SIM_MODEL, sys, usr);
+  const o = await ollamaJSON(SIM_MODEL, sys, usr); // temp 0.2 (greedy decode mis-rated overlap exemplars)
   let r = o && Number(o.rating);
   if (!Number.isFinite(r)) r = 3;
   return Math.max(1, Math.min(5, Math.round(r)));
