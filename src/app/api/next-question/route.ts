@@ -768,7 +768,8 @@ export async function POST(req: Request) {
         // Real per-movie match: normalized score mapped to 84-99 — honest
         // variance instead of a constant fake 99.
         matchScore: Math.round(84 + 15 * Math.max(0, Math.min(1, (p.s - sMin) / span))),
-        posterUrl: p.m.posterUrl, trailerId: p.m.trailerId, overview: p.m.overview
+        posterUrl: p.m.posterUrl, trailerId: p.m.trailerId, overview: p.m.overview,
+        _genreIds: p.m._genreIds, // exposed so QA can assert recs never include a hated genre
       }));
     }
 

@@ -107,7 +107,14 @@ export default function ScanMovieEvaluation() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     (window as any).__cinemind_session = session
-      ? { ratedCount: session.ratedCount ?? session.historyCount, historyCount: session.historyCount, isComplete: session.isComplete }
+      ? {
+          ratedCount: session.ratedCount ?? session.historyCount,
+          historyCount: session.historyCount,
+          isComplete: session.isComplete,
+          confidenceScore: session.confidenceScore,
+          progressPercent: session.progressPercent ?? 0,
+          genreObs: session.genreObs || {},
+        }
       : null;
   }, [session]);
 
