@@ -1,4 +1,4 @@
-import { generateObject } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { tasteModel } from './model';
 
@@ -26,28 +26,34 @@ const BrainResult = z.object({
   phase: z.enum(['ask', 'done']).describe('"ask" to pose another question, "done" when the taste is understood'),
   confidence: z.number().min(0).max(1).describe('How certain you are that you truly know this user — likes AND dislikes at sub-genre resolution. Be honest; contradictory or thin evidence means LOW confidence.'),
   tasteSummary: z.string().describe('One or two sentences describing the taste you have inferred so far, at sub-genre resolution (e.g. "loves self-aware/meta horror-comedy, dislikes earnest supernatural; prefers 90s practical-effects over modern CGI").'),
-  nextPickId: z.string().nullable().describe('When phase="ask": the id (from the provided candidate pool) of the movie that will MOST narrow/resolve the taste. Null when phase="done".'),
-  nextReason: z.string().nullable().describe('When phase="ask": short reason this movie best separates your live hypotheses. Null when done.'),
+  nextPickId: z.union([z.string(), z.number(), z.null()]).optional().describe('When phase="ask": the id (from the provided candidate pool) of the movie that will MOST narrow/resolve the taste. Null/omit when phase="done".'),
+  nextReason: z.union([z.string(), z.null()]).optional().describe('When phase="ask": short reason this movie best separates your live hypotheses.'),
   recommendations: z.array(z.object({
     title: z.string(),
-    year: z.string().nullable(),
+    year: z.union([z.string(), z.number(), z.null()]).optional(),
     reason: z.string().describe('Why this fits the demonstrated taste, referencing specific sub-genre evidence.'),
-  })).describe('When phase="done": exactly 3 movies the user likely has NOT seen but will love. Empty array when phase="ask".'),
+  })).default([]).describe('When phase="done": exactly 3 movies the user likely has NOT seen but will love. Empty array when phase="ask".'),
 });
 
+// Small local models are inconsistent about types (year as number, omitted nulls).
+// The schema accepts those; helpers normalize downstream so good REASONING isn't
+// rejected over output formatting.
 export type BrainResult = z.infer<typeof BrainResult>;
+export const asStr = (v: unknown): string | null => (v === null || v === undefined ? null : String(v));
 
 const SYSTEM = `You are CineMind, a world-class film-taste expert running an Akinator-style quiz.
 Your job: from a user's 1-5 star ratings, deduce their taste and recommend movies they'll love.
 
 CORE PRINCIPLES (follow exactly):
 1. SUB-GENRE RESOLUTION — this is the whole game. Loving ONE film of a genre does NOT
-   mean loving the genre. Liking "Scream" might mean liking SLASHERS, or META/self-aware
-   horror, not horror in general. Apply this to EVERY genre: comedy (satire vs slapstick
-   vs cringe vs rom-com), sci-fi (cyberpunk vs space-opera vs hard-SF vs dystopia),
-   action (martial-arts vs heist vs war vs superhero), drama (character study vs epic),
-   etc. Always push to the most specific pattern the evidence supports — sub-genre, mood,
-   era, pacing, tone, even director/franchise affinities.
+   mean loving the genre; find the SPECIFIC pattern. Examples of axes to resolve (do NOT
+   default to any one of these — infer from the actual ratings): horror (slasher vs
+   supernatural vs psychological vs body-horror vs comedy-horror), comedy (satire vs
+   slapstick vs cringe vs rom-com vs dark), sci-fi (cyberpunk vs space-opera vs hard-SF
+   vs dystopia), action (martial-arts vs heist vs war vs superhero), romance (sweeping
+   epic vs indie/bittersweet vs comedic), drama (character study vs sprawling epic vs
+   social realism). Also weigh mood, era, pacing, tone, and director/franchise
+   affinities. Build the read from THIS user's evidence — never force a favorite theory.
 2. RATINGS ARE LITERAL — 5 = loves it, 1 = actively dislikes that style, 3 = neutral.
    A low rating must steer you AWAY from that style; a high rating toward it.
 3. RESOLVE BY CONTRAST — pick the next movie that best SEPARATES your live hypotheses
@@ -82,8 +88,9 @@ export async function brainStep(opts: {
   minQuestions?: number;
   maxQuestions?: number;
   mock?: boolean;
+  forceDone?: boolean;
 }): Promise<BrainResult | null> {
-  const { history, pool, minQuestions = 6, maxQuestions = 30 } = opts;
+  const { history, pool, minQuestions = 6, maxQuestions = 30, forceDone = false } = opts;
 
   // Deterministic mock (BRAIN_MOCK=1 or opts.mock) — exercises the full pipeline (TMDB grounding,
   // history, response shape, rec resolution) WITHOUT an LLM backend, for offline
@@ -101,21 +108,77 @@ ${fmtHistory(history)}
 CANDIDATE POOL for the next question (pick nextPickId from these real movies):
 ${fmtPool(pool)}
 
-Pacing guidance: you have asked ${history.length} questions. Don't finish before ~${minQuestions} unless the taste is already crystal-clear and consistent; you may keep going up to ~${maxQuestions} if the taste is still ambiguous or contradictory. Decide phase honestly based on whether you truly understand this person's taste at sub-genre resolution.`;
+Pacing guidance: you have asked ${history.length} questions. Don't finish before ~${minQuestions} unless the taste is already crystal-clear and consistent; you may keep going up to ~${maxQuestions} if the taste is still ambiguous or contradictory. Decide phase honestly based on whether you truly understand this person's taste at sub-genre resolution.${forceDone ? `
 
-  try {
-    const { object } = await generateObject({
-      model,
-      schema: BrainResult,
-      system: SYSTEM,
-      prompt,
-      temperature: 0.4,
-    });
-    return object;
-  } catch (e) {
-    // A flaky/unstructured local model shouldn't crash the quiz — let the caller fall back.
-    return null;
+HARD STOP: you have reached the question limit. You MUST set phase="done" now and output exactly 3 recommendations based on everything you have learned. Do not ask another question.` : ''}`;
+
+  // Structured call with one retry — local models occasionally return a
+  // type-mismatched or truncated object; a single retry recovers most of those.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { object } = await generateObject({
+        model,
+        schema: BrainResult,
+        system: SYSTEM,
+        prompt,
+        temperature: 0.4,
+      });
+      return object;
+    } catch {
+      if (attempt === 0) continue; // retry once before the text fallback
+    }
+    // Fallback: free-form generation + JSON extraction + schema validation, so a
+    // capable-but-quirky local model still drives the quiz.
+    try {
+      const { text } = await generateText({
+        model,
+        system: SYSTEM + '\n\nRespond with ONLY a single JSON object, no markdown, no prose. Schema keys: phase("ask"|"done"), confidence(0-1), tasteSummary(string), nextPickId(string|null), nextReason(string|null), recommendations(array of {title, year, reason}).',
+        prompt,
+        temperature: 0.4,
+      });
+      const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, ''); // strip reasoning models
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      if (!m) return null;
+      return BrainResult.parse(JSON.parse(m[0]));
+    } catch {
+      return null; // caller falls back to the formula engine
+    }
   }
+  return null;
+}
+
+// Dedicated FINAL recommendation call — a clean, single-purpose prompt (no pool, no
+// "ask vs done" framing) so the model commits to 3 picks instead of trying to ask
+// another question. This is what reliably produces real recommendations.
+const RecResult = z.object({
+  tasteSummary: z.string(),
+  recommendations: z.array(z.object({
+    title: z.string(),
+    year: z.union([z.string(), z.number(), z.null()]).optional(),
+    reason: z.string(),
+  })).default([]),
+});
+export async function brainRecommend(history: BrainHistoryItem[], opts?: { mock?: boolean }): Promise<{ tasteSummary: string; recommendations: { title: string; year?: string | number | null; reason: string }[] } | null> {
+  if (opts?.mock || process.env.BRAIN_MOCK === '1') {
+    // mock: recommend by strongest-liked genre names (grounded later by the route via pool)
+    const liked: Record<string, number> = {};
+    for (const h of history) for (const g of h.genres) liked[g] = (liked[g] || 0) + (h.rating - 3);
+    const top = Object.entries(liked).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g]) => g);
+    return { tasteSummary: `(mock) likes ${top.join(', ')}`, recommendations: top.map(g => ({ title: g, year: null, reason: `(mock) liked ${g}` })) };
+  }
+  const model = tasteModel();
+  if (!model) return null;
+  const prompt = `A user rated these movies:
+${fmtHistory(history)}
+
+Decode their taste at SUB-GENRE resolution (e.g. "loves self-aware/meta horror, not earnest supernatural"; "prefers cerebral sci-fi over space-opera"), respecting that low ratings mean they DISLIKE that style. Then recommend EXACTLY 3 real, well-known movies they have most likely NOT already rated above but will love, each with its release year and a reason tied to specific evidence.`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { object } = await generateObject({ model, schema: RecResult, system: SYSTEM, prompt, temperature: 0.5 });
+      if (object.recommendations.length > 0) return object;
+    } catch { /* retry */ }
+  }
+  return null;
 }
 
 // ── Deterministic mock brain (offline pipeline validation; no LLM) ────────────

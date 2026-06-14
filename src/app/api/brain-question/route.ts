@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { brainStep, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
+import { brainStep, brainRecommend, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
 import { fetchCandidatePool, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
 
@@ -8,8 +8,9 @@ import { fetchCandidatePool, movieById, resolveByTitle, getTrailer, genreNames }
 // The brain reasons about taste at sub-genre resolution and decides each next
 // question + the final recommendations; TMDB grounds every movie (no hallucination).
 
-const MIN_Q = 6;
-const MAX_Q = 30;
+const MIN_Q = 8;        // never finish before this many ratings (enough taste coverage)
+const MAX_Q = 22;       // hard cap — forced recommendations beyond this
+const TARGET_CONF = 0.65; // the model's own confidence at which we stop and recommend
 
 function questionText(title: string, locale: string): string {
   const he = [
@@ -57,56 +58,87 @@ export async function POST(req: Request) {
     }
 
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds]));
-    const pool = await fetchCandidatePool(seen, locale, 25);
+    // Keep the pool tight (12) — a shorter prompt means a faster, more reliable
+    // structured response from a local model.
+    const pool = await fetchCandidatePool(seen, locale, 12);
 
-    // Ask the brain what to do next.
-    const result = await brainStep({ history, pool, minQuestions: MIN_Q, maxQuestions: MAX_Q, mock });
+    const sessionIdEarly = payload.sessionId || `brain_${Date.now()}`;
+
+    // OPENING question: with no ratings yet there's nothing for the brain to reason
+    // about — don't waste a model call (it would just say "done"). Pick a strong,
+    // recognizable opener straight from the real pool.
+    if (history.length === 0) {
+      const opener = pool[Math.floor(Math.random() * Math.min(5, pool.length))] || pool[0];
+      const movie = opener ? await movieById(opener.id, locale) : null;
+      if (movie) {
+        movie.trailerId = await getTrailer(movie.id);
+        return NextResponse.json({
+          sessionId: sessionIdEarly, isComplete: false, confidenceScore: 0.02, progressPercent: 2,
+          historyCount: 0, ratedCount: 0, askedMovieIds, userAffinities: {}, ratingHistory: history,
+          tasteSummary: '', engine: 'brain',
+          currentVectorState: { possibleMoviesRemaining: 50000, leadingMicroGenres: [locale === 'en' ? 'Booting taste brain…' : 'מפעיל את מוח-הטעם…'] },
+          currentQuestion: { id: `bq_${Date.now()}`, text: questionText(movie.title, locale), movie },
+          finalMovies: undefined,
+        }, { status: 200 });
+      }
+    }
+
+    // Ask the brain what to do next. At the hard cap, force a final recommendation.
+    const atCap = history.length >= MAX_Q;
+    const result = await brainStep({ history, pool, minQuestions: MIN_Q, maxQuestions: MAX_Q, mock, forceDone: atCap });
     if (!result) {
       return NextResponse.json({ error: `taste brain unavailable (backend=${backend}, mock=${usingMock})` }, { status: 503 });
     }
 
     const sessionId = payload.sessionId || `brain_${Date.now()}`;
+    let tasteSummary = result.tasteSummary;
     const baseState = {
-      sessionId,
-      historyCount: history.length,
-      ratedCount: history.length,
-      askedMovieIds,
-      userAffinities: {},
-      ratingHistory: history,
-      tasteSummary: result.tasteSummary,
-      engine: 'brain',
+      sessionId, historyCount: history.length, ratedCount: history.length,
+      askedMovieIds, userAffinities: {}, ratingHistory: history, engine: 'brain',
     };
 
-    if (result.phase === 'ask' && result.nextPickId) {
-      const picked = pool.find(c => c.id === result.nextPickId);
+    // Completion is driven by the model's OWN confidence (it knows the user) plus a
+    // floor — not by waiting for it to volunteer phase="done". This converges the
+    // quiz instead of letting it ramble.
+    const done = atCap || (history.length >= MIN_Q && result.confidence >= TARGET_CONF);
+
+    if (!done) {
+      // Serve the next question — always a real pool movie, even if the model omitted
+      // or mistyped the id (a missing id must NEVER be read as "quiz finished").
+      const pickId = result.nextPickId != null ? String(result.nextPickId) : '';
+      const picked = pool.find(c => c.id === pickId) || pool[Math.floor(Math.random() * pool.length)];
       const movie = picked ? await movieById(picked.id, locale) : null;
       if (movie) {
         movie.trailerId = await getTrailer(movie.id);
-        const progressPercent = Math.min(99, Math.round((result.confidence / 0.9) * 100));
+        const progressPercent = Math.min(99, Math.round((result.confidence / TARGET_CONF) * 100));
         return NextResponse.json({
-          ...baseState,
-          isComplete: false,
-          confidenceScore: result.confidence,
-          progressPercent,
-          currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - result.confidence))), leadingMicroGenres: [result.tasteSummary] },
+          ...baseState, tasteSummary,
+          isComplete: false, confidenceScore: result.confidence, progressPercent,
+          currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - result.confidence))), leadingMicroGenres: [tasteSummary] },
           currentQuestion: { id: `bq_${Date.now()}`, text: questionText(movie.title, locale), movie },
           finalMovies: undefined,
         }, { status: 200 });
       }
-      // brain picked an id outside the pool, or resolution failed → fall through to finish
     }
 
-    // phase === 'done' (or could not produce a question): ground the recommendations.
+    // DONE — generate the final picks with a DEDICATED recommendation call (clean
+    // single-purpose prompt), which reliably commits to 3 movies. Fall back to any
+    // recs the step already produced.
+    const recPass = await brainRecommend(history, { mock });
+    let recommendations = (recPass?.recommendations?.length ? recPass.recommendations : result.recommendations) || [];
+    if (recPass?.tasteSummary) tasteSummary = recPass.tasteSummary;
+
+    // Ground the recommendations against TMDB.
     // Each LLM-proposed title is validated against TMDB; if title search misses, fall
     // back to matching the live candidate pool by title so a real movie still surfaces.
-    const groundRec = async (r: { title: string; year: string | null }) => {
-      const byTitle = await resolveByTitle(r.title, r.year, locale);
+    const groundRec = async (r: { title: string; year?: string | number | null }) => {
+      const byTitle = await resolveByTitle(r.title, r.year != null ? String(r.year) : null, locale);
       if (byTitle) return byTitle;
       const poolHit = pool.find(c => c.title.trim().toLowerCase() === r.title.trim().toLowerCase());
       return poolHit ? movieById(poolHit.id, locale) : null;
     };
     const resolved = (await Promise.all(
-      (result.recommendations || []).map(groundRec)
+      recommendations.map(groundRec)
     )).filter((m): m is NonNullable<typeof m> => !!m && !askedMovieIds.includes(m.id));
 
     // De-dupe and enrich top 3 with trailers.
@@ -121,15 +153,15 @@ export async function POST(req: Request) {
       matchScore: Math.round(99 - i * 4),
       posterUrl: p.posterUrl, trailerId: p.trailerId, overview: p.overview,
       _genreIds: p._genreIds,
-      reason: result.recommendations?.[i]?.reason || '',
+      reason: recommendations[i]?.reason || '',
     }));
 
     return NextResponse.json({
-      ...baseState,
+      ...baseState, tasteSummary,
       isComplete: true,
       confidenceScore: 1.0,
       progressPercent: 100,
-      currentVectorState: { possibleMoviesRemaining: 1, leadingMicroGenres: [result.tasteSummary] },
+      currentVectorState: { possibleMoviesRemaining: 1, leadingMicroGenres: [tasteSummary] },
       currentQuestion: null,
       finalMovies,
     }, { status: 200 });
