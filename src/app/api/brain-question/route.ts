@@ -12,7 +12,7 @@ import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbe
 // name 3 real titles squarely inside the confirmed sub-genre. TMDB grounds everything.
 
 const MIN_Q = 5;        // never finish before this many ratings
-const MAX_Q = 40;       // hard cap — full sub-genre sweep + drill fits before forcing recs
+const MAX_Q = 58;       // hard cap — full sub-genre sweep (~47) + drill fits before forcing recs
 const HI = 4;           // a rating ≥ HI is a "strong hit" toward a sub-genre
 const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
 const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hits (iconic 5★)
@@ -46,23 +46,27 @@ function termOf(movieId: string, activeHint: string): string | null {
   return samplerProbeOf(movieId) || (activeHint || null);
 }
 
+const CONTENDER_AVG = 4.5; // a 5★-level love; close contenders at/above this drill-off
+
 function computeTaste(probe: ProbeScores) {
   const stats = Object.entries(probe).map(([t, { sum, n, hi, lo }]) => ({ t, n, hi, lo, avg: sum / n, hiRate: hi / n }));
   const disliked = stats.filter(s => s.lo >= 2 && s.hi === 0).map(s => s.t);
-  // The LEAD candidate after exploration: the explored sub-genre with the strongest
-  // signal — most strong hits, then highest average. The avg tiebreak is what separates
-  // a true love (Arrival/Ex Machina = 5) from a cross-genre stray hit (The Thing = 4).
+  // The LEAD candidate: strongest signal — most strong hits, then highest average. The
+  // avg tiebreak separates a true love (Arrival/Ex Machina = 5) from a cross-genre stray
+  // hit (The Thing = 4).
   const candidates = stats.filter(s => s.hi >= 1 && s.avg >= 3.5).sort((a, b) => b.hi - a.hi || b.avg - a.avg);
   const leader = candidates[0] || null;
-  const lockedLove = leader && leader.hi >= LOCK_HITS ? leader : null;
-  // A CLEAR love (avg ≥ 4.5 = sustained 5★ level) is worth drilling IMMEDIATELY, before
-  // the full sweep finishes — that's the fast path for an unambiguous taste. A merely-4
-  // cross-genre stray hit (e.g. a hard-SF fan rating "The Thing" a 4) does NOT clear this
-  // bar, so it can't hijack the quiz before the true love is explored.
-  const clearLeader = candidates.find(s => s.avg >= 4.5 && s.hi >= 1) || null;
+  // CONTENDERS — sub-genres in a close 5★ race with the leader. When several neighbours
+  // tie (a body-horror fan rating both "The Fly" and "Evil Dead" a 5), we must DRILL each
+  // (its 2nd exemplar + keyword pool) before locking, so hit-count + avg pick the real one
+  // instead of an arbitrary list-order tiebreak. This is the "drill-off".
+  const contenders = candidates.filter(s => s.avg >= CONTENDER_AVG);
+  // Lock ONLY when the leader is confirmed (LOCK_HITS strong hits) AND every close
+  // contender has already had its 2nd exemplar drilled (n ≥ 2) — i.e. the race is settled.
+  const lockedLove = (leader && leader.hi >= LOCK_HITS && contenders.every(s => s.n >= 2)) ? leader : null;
   // "loved", for the recommendation prompt — confirmed-ish sub-genres, lead first.
   const loved = candidates.filter(s => s.hi >= 2 || s === leader);
-  return { stats, candidates, leader, clearLeader, loved, disliked, lockedLove };
+  return { stats, candidates, leader, contenders, loved, disliked, lockedLove };
 }
 
 export async function POST(req: Request) {
@@ -105,7 +109,7 @@ export async function POST(req: Request) {
 
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds]));
     const seenSet = new Set(seen);
-    const { loved, leader, disliked, lockedLove } = computeTaste(probe);
+    const { loved, leader, contenders, disliked, lockedLove } = computeTaste(probe);
 
     // ── Decide the next move DETERMINISTICALLY: EXPLORE before EXPLOIT. ──
     // EXPLORE: walk EVERY distinct sub-genre once (iconic exemplar each) before committing
@@ -117,11 +121,14 @@ export async function POST(req: Request) {
     const uncovered = samplerAll
       .filter(c => { const t = samplerProbeOf(c.id); return t && !probe[t] && !disliked.includes(t); });
     const sweepDone = uncovered.length === 0;
-    // Drill target: ONLY after the full sweep, the best-scoring explored sub-genre. We do
-    // NOT drill early on a single 5★ — a near-neighbour stray hit (a body-horror fan rating
-    // "Hereditary" a 5 before "The Fly" is ever shown) would hijack the lock. Exploring
-    // every sub-genre first, then drilling the leader, is what makes the read surgical.
-    const drillTarget = !lockedLove && sweepDone ? leader : null;
+    // Drill target (post-sweep only): the DRILL-OFF. Drill the least-explored close
+    // contender first so every 5★ neighbour gets its 2nd exemplar before we lock; once all
+    // contenders are drilled, fall to the leader. This replaces an arbitrary list-order
+    // tiebreak with a data-driven one (the real love accrues more hits from its own keyword
+    // pool). We never drill mid-sweep — a stray hit must not hijack the lock before its
+    // true rival is explored.
+    const needDrill = contenders.filter(s => s.n < 2).sort((a, b) => a.n - b.n || b.avg - a.avg);
+    const drillTarget = !lockedLove && sweepDone ? (needDrill[0] || leader) : null;
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
     if (drillTarget) {

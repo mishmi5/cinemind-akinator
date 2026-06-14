@@ -102,49 +102,80 @@ export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 
 // broad taste rates the narrow exemplar low, so no tie occurs and the avg separates them.
 const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
   // Horror — visceral/distinctive first, atmospheric/default last.
+  { term: 'giallo', titles: ['Suspiria', 'Deep Red'] },
   { term: 'slasher', titles: ['Halloween', 'Scream'] },
+  { term: 'splatter horror comedy', titles: ['The Evil Dead', 'Re-Animator'] },
   { term: 'body horror', titles: ['The Fly', 'The Thing'] },
   { term: 'zombie', titles: ['Dawn of the Dead', '28 Days Later'] },
+  { term: 'creature feature', titles: ['Jaws', 'Tremors'] },
   { term: 'kaiju monster', titles: ['Godzilla', 'Pacific Rim'] },
   { term: 'cosmic horror', titles: ['The Lighthouse', 'Annihilation'] },
+  { term: 'found-footage horror', titles: ['The Blair Witch Project', 'Paranormal Activity'] },
   { term: 'psychological horror', titles: ['Hereditary', 'The Babadook'] },
   { term: 'supernatural horror', titles: ['The Conjuring', 'Insidious'] },
-  // Sci-fi — cerebral/narrow first, spectacle last.
+  // Sci-fi — order matters for 5★ ties: a hard-SF fan rates Arrival/Ex Machina higher
+  // (hi-count wins) so cosmic-first is safe, while a cosmic-epic fan ties on hits and
+  // needs cosmic listed first to claim the tie.
+  { term: 'cosmic sci-fi epic', titles: ['Interstellar', 'Dune'] },
   { term: 'hard science fiction', titles: ['Arrival', 'Ex Machina'] },
   { term: 'cyberpunk', titles: ['Blade Runner', 'The Matrix'] },
   { term: 'time travel', titles: ['Back to the Future', 'Looper'] },
   { term: 'space opera', titles: ['Star Wars', 'Guardians of the Galaxy'] },
-  // Action.
-  { term: 'martial arts', titles: ['Crouching Tiger, Hidden Dragon', 'Ip Man'] },
+  // Animation — by technique, distinctive first.
+  { term: 'stop-motion animation', titles: ['Coraline', 'Kubo and the Two Strings'] },
+  { term: 'mecha anime', titles: ['The End of Evangelion', "Mobile Suit Gundam: Char's Counterattack"] },
+  { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name'] },
+  // Action / adventure.
+  { term: 'wuxia', titles: ['Hero (2002)', 'House of Flying Daggers'] },
+  { term: 'martial arts', titles: ['The Raid', 'Ip Man'] },
   { term: 'heist', titles: ["Ocean's Eleven", 'Heat'] },
-  { term: 'spy thriller', titles: ['Skyfall', 'Mission: Impossible'] },
   { term: 'war epic', titles: ['Saving Private Ryan', '1917'] },
   { term: 'superhero', titles: ['The Avengers', 'The Dark Knight'] },
-  // Crime / mystery — puzzle-narrow first, tonal last.
+  { term: 'disaster', titles: ['Twister', 'The Day After Tomorrow'] },
+  { term: 'spaghetti western', titles: ['The Good, the Bad and the Ugly', 'Once Upon a Time in the West'] },
+  // Crime / mystery — narrow puzzle/era first, then the broader/cross-appealing ones.
+  // Spy-thrillers come AFTER whodunit & psych-thriller: their cerebral exemplars (Tinker
+  // Tailor) tempt a 5★ from whodunit/psych fans, so the narrower puzzle sub-genres must
+  // claim the tie first.
+  { term: 'classic film noir', titles: ['Double Indemnity', 'The Maltese Falcon'] },
+  { term: 'psychological thriller', titles: ['Se7en', 'Zodiac'] },
   { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express'] },
   { term: 'neo-noir', titles: ['Chinatown', 'Drive'] },
+  { term: 'cerebral spy thriller', titles: ['Tinker Tailor Soldier Spy', 'Bridge of Spies'] },
+  { term: 'action spy thriller', titles: ['Skyfall', 'Mission: Impossible'] },
+  { term: 'courtroom drama', titles: ['12 Angry Men', 'A Few Good Men'] },
+  { term: 'erotic thriller', titles: ['Basic Instinct', 'Fatal Attraction'] },
   // Comedy — distinctive first.
   { term: 'satire', titles: ['Dr. Strangelove', 'Thank You for Smoking'] },
+  { term: 'black comedy', titles: ['In Bruges', 'Fargo'] },
   { term: 'deadpan comedy', titles: ['The Grand Budapest Hotel', 'The Lobster'] },
   { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Naked Gun'] },
   { term: 'romantic comedy', titles: ['Notting Hill', 'When Harry Met Sally'] },
+  { term: 'holiday christmas', titles: ['Elf', 'Home Alone'] },
   // Drama / other.
+  { term: 'coming-of-age', titles: ['Lady Bird', 'Stand By Me'] },
   { term: 'period costume drama', titles: ['Pride & Prejudice', 'Atonement'] },
   { term: 'sports drama', titles: ['Rocky', 'Rudy'] },
+  { term: 'slow cinema arthouse', titles: ['Stalker', 'The Tree of Life'] },
   { term: 'musical', titles: ['La La Land', 'Les Misérables'] },
-  { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name'] },
-  { term: 'sword and sorcery fantasy', titles: ['The Lord of the Rings', 'Conan the Barbarian'] },
+  { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', 'The Hobbit: An Unexpected Journey'] },
+  { term: 'sword and sorcery fantasy', titles: ['Conan the Barbarian', 'Krull'] },
 ];
 let samplerCache: BrainCandidate[] | null = null;
 const samplerProbeMap = new Map<string, string>(); // movieId -> sub-genre probe term
 export function samplerProbeOf(movieId: string): string | undefined { return samplerProbeMap.get(movieId); }
 
 // Resolve a curated exemplar TITLE to a real TMDB candidate (search en-US for reliable
-// matching, then carry genre ids). Returns null if not found / no poster.
-async function candidateByTitle(title: string): Promise<BrainCandidate | null> {
+// matching, then carry genre ids). A trailing "(YYYY)" disambiguates common titles
+// (e.g. "Hero (2002)" — bare "Hero" mis-resolves to "Local Hero"). Returns null if not
+// found / no poster.
+async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
   if (!KEY) return null;
+  const ym = raw.match(/^(.*?)\s*\((\d{4})\)\s*$/);
+  const title = ym ? ym[1] : raw;
+  const yq = ym ? `&year=${ym[2]}` : '';
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}`, { next: { revalidate: 604800 } });
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}${yq}`, { next: { revalidate: 604800 } });
     if (!res.ok) return null;
     const d = await res.json();
     const hit = (d.results || []).find((m: any) => m.poster_path && m.overview) || (d.results || [])[0];
@@ -178,33 +209,53 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
 // pool. Every title is a defensible, central member of its sub-genre with minimal neighbour
 // bleed (e.g. slasher excludes supernatural "Nightmare on Elm St" and torture-porn "Saw").
 const SUBGENRE_RECS: Record<string, string[]> = {
+  'giallo': ['Suspiria', 'Deep Red', 'Tenebrae', 'Blood and Black Lace', 'The Bird with the Crystal Plumage', "Don't Torture a Duckling", 'Opera', 'A Bay of Blood'],
   'slasher': ['Halloween', 'Scream', 'Friday the 13th', 'Black Christmas', 'My Bloody Valentine', 'Prom Night', 'Happy Death Day', 'Sleepaway Camp'],
-  'supernatural horror': ['The Conjuring', 'Insidious', 'The Exorcist', 'Sinister', 'The Ring', 'Poltergeist', 'The Conjuring 2', 'Ouija'],
-  'psychological horror': ['Hereditary', 'The Witch', 'Midsommar', 'The Babadook', 'Black Swan', 'Repulsion', 'Saint Maud', 'Relic'],
-  'zombie': ['Dawn of the Dead', '28 Days Later', 'Shaun of the Dead', 'Train to Busan', 'Night of the Living Dead', 'World War Z', 'Zombieland', '28 Weeks Later'],
+  'splatter horror comedy': ['The Evil Dead', 'Evil Dead II', 'Re-Animator', 'Braindead', 'Bad Taste', 'The Return of the Living Dead', 'Tokyo Gore Police', 'Planet Terror'],
   'body horror': ['The Fly', 'The Thing', 'Videodrome', 'Possessor', 'Tetsuo: The Iron Man', 'Society', 'From Beyond', 'Titane'],
+  'zombie': ['Dawn of the Dead', '28 Days Later', 'Shaun of the Dead', 'Train to Busan', 'Night of the Living Dead', 'World War Z', 'Zombieland', '28 Weeks Later'],
+  'creature feature': ['Jaws', 'Tremors', 'The Descent', 'Crawl', 'Anaconda', 'The Shallows', 'Lake Placid', 'The Meg'],
+  'kaiju monster': ['Godzilla', 'Pacific Rim', 'King Kong', 'Cloverfield', 'Shin Godzilla', 'Kong: Skull Island', 'The Host', 'Rampage'],
   'cosmic horror': ['The Lighthouse', 'Annihilation', 'Color Out of Space', 'The Mist', 'In the Mouth of Madness', 'Event Horizon', 'The Void', 'Underwater'],
-  'hard science fiction': ['Arrival', 'Ex Machina', 'Primer', '2001: A Space Odyssey', 'Gattaca', 'Solaris', 'Coherence', 'Contact'],
-  'space opera': ['Star Wars', 'Guardians of the Galaxy', 'The Fifth Element', 'Flash Gordon', 'Valerian and the City of a Thousand Planets', 'Jupiter Ascending', 'John Carter', 'Star Wars: The Force Awakens'],
+  'found-footage horror': ['The Blair Witch Project', 'Paranormal Activity', 'REC', 'Cloverfield', 'Creep', 'As Above, So Below', 'Host', 'The Visit'],
+  'psychological horror': ['Hereditary', 'The Witch', 'Midsommar', 'The Babadook', 'Black Swan', 'Repulsion', 'Saint Maud', 'Relic'],
+  'supernatural horror': ['The Conjuring', 'Insidious', 'The Exorcist', 'Sinister', 'The Ring', 'Poltergeist', 'The Conjuring 2', 'Ouija'],
+  'hard science fiction': ['Arrival', 'Ex Machina', 'Primer', 'Gattaca', 'Moon', 'Coherence', 'Solaris', 'Predestination'],
+  'cosmic sci-fi epic': ['Interstellar', 'Dune', 'Contact', '2001: A Space Odyssey', 'Ad Astra', 'Sunshine', 'Gravity', 'Arrival'],
   'cyberpunk': ['Blade Runner', 'The Matrix', 'Ghost in the Shell', 'Akira', 'Blade Runner 2049', 'Strange Days', 'Upgrade', 'Johnny Mnemonic'],
   'time travel': ['Back to the Future', 'Looper', '12 Monkeys', 'Edge of Tomorrow', 'Predestination', 'Timecrimes', 'About Time', 'Primer'],
-  'heist': ["Ocean's Eleven", 'Heat', 'The Italian Job', 'Inside Man', 'The Town', 'Reservoir Dogs', 'Logan Lucky', 'Baby Driver'],
-  'spy thriller': ['Skyfall', 'Mission: Impossible', 'Tinker Tailor Soldier Spy', 'The Bourne Identity', 'Casino Royale', 'Bridge of Spies', 'Munich', 'Spy Game'],
-  'martial arts': ['Ip Man', 'Crouching Tiger, Hidden Dragon', 'The Raid', 'Enter the Dragon', 'Hero', 'Drunken Master', 'Ong-Bak', 'Kung Fu Hustle'],
-  'war epic': ['Saving Private Ryan', '1917', 'Apocalypse Now', 'Platoon', 'Dunkirk', 'Full Metal Jacket', 'Black Hawk Down', 'Hacksaw Ridge'],
-  'neo-noir': ['Chinatown', 'Drive', 'L.A. Confidential', 'Nightcrawler', 'Sin City', 'Brick', 'The Nice Guys', 'Mulholland Drive'],
-  'whodunit mystery': ['Knives Out', 'Murder on the Orient Express', 'Gone Girl', 'Zodiac', 'The Girl with the Dragon Tattoo', 'Death on the Nile', 'Glass Onion', 'Clue'],
-  'romantic comedy': ['Notting Hill', 'When Harry Met Sally', '10 Things I Hate About You', "Bridget Jones's Diary", 'Crazy Rich Asians', 'The Proposal', 'Pretty Woman', 'Love Actually'],
-  'period costume drama': ['Pride & Prejudice', 'Atonement', 'Little Women', 'Sense and Sensibility', 'Emma', 'The Age of Innocence', 'A Room with a View', 'Far from the Madding Crowd'],
-  'musical': ['La La Land', 'Les Misérables', 'The Greatest Showman', 'Chicago', 'Moulin Rouge!', 'West Side Story', 'Mamma Mia!', 'Hairspray'],
-  'satire': ['Dr. Strangelove', 'Thank You for Smoking', 'In the Loop', 'Wag the Dog', 'Network', 'Idiocracy', 'The Death of Stalin', 'Election'],
-  'slapstick comedy': ['Dumb and Dumber', 'The Naked Gun', 'Airplane!', 'Hot Shots!', 'The Pink Panther', 'Tommy Boy', 'Ace Ventura: Pet Detective', "Mr. Bean's Holiday"],
-  'superhero': ['The Dark Knight', 'Spider-Man', 'Iron Man', 'Logan', 'Black Panther', 'Wonder Woman', 'The Avengers', 'Spider-Man: Into the Spider-Verse'],
-  'sword and sorcery fantasy': ['The Lord of the Rings: The Fellowship of the Ring', 'Conan the Barbarian', 'The Hobbit: An Unexpected Journey', 'Willow', 'Excalibur', 'Dragonslayer', 'The Princess Bride', 'Krull'],
+  'space opera': ['Star Wars', 'Guardians of the Galaxy', 'The Fifth Element', 'Flash Gordon', 'Valerian and the City of a Thousand Planets', 'Jupiter Ascending', 'John Carter', 'Star Wars: The Force Awakens'],
+  'stop-motion animation': ['Coraline', 'Kubo and the Two Strings', 'Wallace & Gromit: The Curse of the Were-Rabbit', 'Fantastic Mr. Fox', 'ParaNorman', 'Isle of Dogs', 'The Nightmare Before Christmas', 'Chicken Run'],
+  'mecha anime': ['The End of Evangelion', "Mobile Suit Gundam: Char's Counterattack", 'Patlabor: The Movie', 'Evangelion: 1.0 You Are (Not) Alone', 'Gundam Wing: Endless Waltz', 'Macross: Do You Remember Love?', 'Neon Genesis Evangelion: Death & Rebirth', 'Mobile Suit Gundam I'],
   'hand-drawn anime': ['Spirited Away', 'Your Name', 'Princess Mononoke', 'My Neighbor Totoro', "Howl's Moving Castle", "Kiki's Delivery Service", 'Weathering with You', 'Castle in the Sky'],
+  'wuxia': ['Hero (2002)', 'House of Flying Daggers', 'Crouching Tiger, Hidden Dragon', 'The Grandmaster', 'Once Upon a Time in China', 'Ashes of Time', 'The Assassin', 'Reign of Assassins'],
+  'martial arts': ['The Raid', 'Ip Man', 'Enter the Dragon', 'Ong-Bak', 'Drunken Master', 'The Raid 2', 'Police Story', 'Kung Fu Hustle'],
+  'heist': ["Ocean's Eleven", 'Heat', 'The Italian Job', 'Inside Man', 'The Town', 'Reservoir Dogs', 'Logan Lucky', 'Baby Driver'],
+  'cerebral spy thriller': ['Tinker Tailor Soldier Spy', 'Bridge of Spies', 'The Spy Who Came in from the Cold', 'Munich', 'A Most Wanted Man', 'The Lives of Others', 'The Constant Gardener', 'Syriana'],
+  'action spy thriller': ['Skyfall', 'Mission: Impossible - Fallout', 'Casino Royale', 'The Bourne Identity', 'Kingsman: The Secret Service', 'GoldenEye', 'Mission: Impossible - Rogue Nation', 'Salt'],
+  'war epic': ['Saving Private Ryan', '1917', 'Apocalypse Now', 'Platoon', 'Dunkirk', 'Full Metal Jacket', 'Black Hawk Down', 'Hacksaw Ridge'],
+  'superhero': ['The Dark Knight', 'Spider-Man', 'Iron Man', 'Logan', 'Black Panther', 'Wonder Woman', 'The Avengers', 'Spider-Man: Into the Spider-Verse'],
+  'disaster': ['Twister', 'The Day After Tomorrow', '2012', 'San Andreas', "Dante's Peak", 'Deep Impact', 'The Towering Inferno', 'Geostorm'],
+  'spaghetti western': ['The Good, the Bad and the Ugly', 'Once Upon a Time in the West', 'A Fistful of Dollars', 'For a Few Dollars More', 'Django', 'The Great Silence', 'Day of Anger', 'My Name Is Nobody'],
+  'classic film noir': ['Double Indemnity', 'The Maltese Falcon', 'Out of the Past', 'The Big Sleep', 'Sunset Boulevard', 'Touch of Evil', 'The Third Man', 'Gilda'],
+  'neo-noir': ['Chinatown', 'Drive', 'L.A. Confidential', 'Nightcrawler', 'Sin City', 'Brick', 'The Nice Guys', 'Mulholland Drive'],
+  'psychological thriller': ['Se7en', 'Zodiac', 'Prisoners', 'Gone Girl', 'Shutter Island', 'The Silence of the Lambs', 'Memento', 'Nightcrawler'],
+  'whodunit mystery': ['Knives Out', 'Murder on the Orient Express', 'Death on the Nile', 'Glass Onion', 'Clue', 'Gosford Park', 'The Last of Sheila', 'Sleuth'],
+  'courtroom drama': ['12 Angry Men', 'A Few Good Men', 'The Verdict', 'A Time to Kill', 'Primal Fear', 'Witness for the Prosecution', 'Philadelphia', 'My Cousin Vinny'],
+  'erotic thriller': ['Basic Instinct', 'Fatal Attraction', 'Body Heat', 'Unfaithful', 'Wild Things', 'Indecent Proposal', 'Disclosure (1994)', 'Dressed to Kill'],
+  'satire': ['Dr. Strangelove', 'Thank You for Smoking', 'In the Loop', 'Wag the Dog', 'Network', 'Idiocracy', 'The Death of Stalin', 'Election'],
+  'black comedy': ['In Bruges', 'Fargo', 'Burn After Reading', 'Three Billboards Outside Ebbing, Missouri', 'Seven Psychopaths', 'Jojo Rabbit', 'The Death of Stalin', 'A Serious Man'],
+  'deadpan comedy': ['The Grand Budapest Hotel', 'The Lobster', 'Moonrise Kingdom', 'The Royal Tenenbaums', 'Napoleon Dynamite', 'The Favourite', 'Dogtooth', 'Rushmore'],
+  'slapstick comedy': ['Dumb and Dumber', 'The Naked Gun', 'Airplane!', 'Hot Shots!', 'The Pink Panther', 'Tommy Boy', 'Ace Ventura: Pet Detective', "Mr. Bean's Holiday"],
+  'romantic comedy': ['Notting Hill', 'When Harry Met Sally', '10 Things I Hate About You', "Bridget Jones's Diary", 'Crazy Rich Asians', 'The Proposal', 'Pretty Woman', 'Love Actually'],
+  'holiday christmas': ['Elf', 'Home Alone', 'The Holiday', 'Love Actually', 'The Santa Clause', 'Miracle on 34th Street', 'The Polar Express', "National Lampoon's Christmas Vacation"],
+  'coming-of-age': ['Lady Bird', 'Stand By Me', 'Boyhood', 'Call Me by Your Name', 'The Perks of Being a Wallflower', 'Eighth Grade', 'Moonlight', 'The Edge of Seventeen'],
+  'period costume drama': ['Pride & Prejudice', 'Atonement', 'Little Women', 'Sense and Sensibility', 'Emma', 'The Age of Innocence', 'A Room with a View', 'Far from the Madding Crowd'],
   'sports drama': ['Rocky', 'Rudy', 'Miracle', 'Warrior', 'Remember the Titans', 'Coach Carter', 'Creed', 'The Blind Side'],
-  'deadpan comedy': ['The Grand Budapest Hotel', 'The Lobster', 'Moonrise Kingdom', 'Fargo', 'The Royal Tenenbaums', 'Napoleon Dynamite', 'Fantastic Mr. Fox', 'The Favourite'],
-  'kaiju monster': ['Godzilla', 'Pacific Rim', 'King Kong', 'Cloverfield', 'Shin Godzilla', 'Kong: Skull Island', 'The Host', 'Rampage'],
+  'slow cinema arthouse': ['Stalker', 'The Tree of Life', 'Andrei Rublev', 'Jeanne Dielman', 'Uncle Boonmee Who Can Recall His Past Lives', 'The Turin Horse', 'Mirror', "Winter Sleep"],
+  'musical': ['La La Land', 'Les Misérables', 'The Greatest Showman', 'Chicago', 'Moulin Rouge!', 'West Side Story', 'Mamma Mia!', 'Hairspray'],
+  'epic high fantasy': ['The Lord of the Rings: The Fellowship of the Ring', 'The Hobbit: An Unexpected Journey', 'The Lord of the Rings: The Two Towers', 'Willow', 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'Stardust', 'Eragon', 'The Lord of the Rings: The Return of the King'],
+  'sword and sorcery fantasy': ['Conan the Barbarian', 'Krull', 'The Beastmaster', 'Dragonslayer', 'Red Sonja', 'Conan the Destroyer', 'The Sword and the Sorcerer', 'Hawk the Slayer'],
 };
 export function subGenreRecTitles(term: string): string[] { return SUBGENRE_RECS[term] || []; }
 

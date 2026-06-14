@@ -1,27 +1,32 @@
 /**
- * Adversarial QA swarm for the LLM taste BRAIN (/api/brain-question).
+ * PHYSICAL-CHROME adversarial QA for the taste brain.
  *
- * For each persona (a ground-truth sub-genre taste):
- *   1. PERSONA SIMULATOR (LLM) rates every movie the brain serves, 1-5, in character.
- *   2. The BRAIN runs the quiz and produces a taste summary + 3 grounded recs.
- *   3. A JUDGE (LLM) scores 0-100 how surgically the brain captured the taste at
- *      SUB-GENRE resolution, whether the recs fit, and whether hated styles leaked in.
+ * Per עידו: the 20-persona acceptance tests must run in REAL Google Chrome tabs against
+ * the live UI (/scan?brain=1) — clicking the star buttons in the actual frontend, not via
+ * direct API calls. This validates the WHOLE stack (UI → client round-trip → engine).
  *
- * PASS = judge score >= PASS_SCORE AND subGenreIdentified AND hatesAvoided.
- * Loop until every persona passes; then escalate to a harder wave.
+ * For each persona:
+ *   1. Open a Chrome tab on the live quiz.
+ *   2. Read the served movie from window.__cinemind_session, have the persona-sim (LLM)
+ *      rate it 1-5 in character, and CLICK the matching star button in the DOM.
+ *   3. At completion, read finalMovies + tasteSummary and judge surgically (median-of-3).
  *
- * Usage: node brain-swarm.js [personas.json]   (defaults to the built-in wave 1)
+ * Usage: node brain-chrome-swarm.js [personas.json]   (defaults to WAVE1 in brain-swarm.js)
+ *        HEADLESS=1 node brain-chrome-swarm.js ...      (hide the window; default is headed)
  */
 const fs = require('fs');
+const { chromium } = require('playwright');
 
-const APP = 'http://localhost:3000/api/brain-question';
 const OLLAMA = 'http://localhost:11434/v1/chat/completions';
 const JUDGE_MODEL = process.env.JUDGE_MODEL || 'qwen2.5:14b-instruct';
 const SIM_MODEL = process.env.SIM_MODEL || 'qwen2.5:14b-instruct';
+const BASE = process.env.BASE || 'http://localhost:3000/en/scan?brain=1';
 const PASS_SCORE = 90;
 const MAX_Q = 62;
 
-// ── Wave 1 personas: each loves a SPECIFIC sub-genre and dislikes adjacent ones ──
+const GENRE = { 28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy', 80: 'Crime', 99: 'Documentary', 18: 'Drama', 10751: 'Family', 14: 'Fantasy', 36: 'History', 27: 'Horror', 10402: 'Music', 9648: 'Mystery', 10749: 'Romance', 878: 'Sci-Fi', 53: 'Thriller', 10752: 'War', 37: 'Western' };
+
+// Built-in WAVE1 (kept in sync with brain-swarm.js).
 const WAVE1 = [
   { name: 'Slasher Devotee', taste: 'Loves 80s/90s SLASHER horror (Halloween, Scream, Friday the 13th, masked-killer body-count films). Dislikes supernatural/ghost horror and torture-porn. Neutral on everything non-horror.' },
   { name: 'Cerebral Hard-SF', taste: 'Loves cerebral, idea-driven HARD science fiction (Arrival, Ex Machina, Primer, 2001). Dislikes space-opera spectacle and superhero films. Neutral elsewhere.' },
@@ -62,8 +67,9 @@ async function ollamaJSON(model, system, user, retries = 2) {
   return null;
 }
 
+// Strict-bullseye persona sim — kept in sync with brain-swarm.js.
 async function rateMovie(persona, movie) {
-  const sys = `You ARE this exact moviegoer with a SPECIFIC, NARROW taste:\n${persona.taste}\n\nYou know this movie. First identify its PRECISE sub-genre, then rate 1-5 by how EXACTLY it hits the narrow bullseye of YOUR taste. BE DECISIVE and STRICT about the bullseye:\n- 5 = a BULLSEYE: it sits squarely in the EXACT narrow sub-genre you love. Reserve 5 for the core ONLY.\n- 4 = an ADJACENT sub-genre you enjoy but which is NOT your precise core. Examples: if you love BODY HORROR, a splatter-comedy like Evil Dead is at most a 4; if you love NEO-NOIR, a 1940s CLASSIC film noir is at most a 4; if you love WHODUNIT, a cerebral spy thriller is at most a 4; if you love SLOW arthouse, an atmospheric cyberpink film is at most a 4.\n- 3 = genuinely unrelated to both your loves and your dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nCRUCIAL: a NEIGHBOURING sub-genre NEVER gets 5 — only the exact bullseye gets 5. A film in a sub-genre you explicitly dislike must get 1. Output JSON {"rating": <1-5 integer>, "why": "<the precise sub-genre, 3 words>"}.`;
+  const sys = `You ARE this exact moviegoer with a SPECIFIC, NARROW taste:\n${persona.taste}\n\nYou know this movie. First identify its PRECISE sub-genre, then rate 1-5 by how EXACTLY it hits the narrow bullseye of YOUR taste. BE DECISIVE and STRICT about the bullseye:\n- 5 = a BULLSEYE: it sits squarely in the EXACT narrow sub-genre you love. Reserve 5 for the core ONLY.\n- 4 = an ADJACENT sub-genre you enjoy but which is NOT your precise core (e.g. body-horror fan rating a splatter-comedy; neo-noir fan rating a 1940s classic noir; whodunit fan rating a cerebral spy thriller).\n- 3 = genuinely unrelated to both your loves and your dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nCRUCIAL: a NEIGHBOURING sub-genre NEVER gets 5 — only the exact bullseye gets 5. A film in a sub-genre you explicitly dislike must get 1. Output JSON {"rating": <1-5 integer>, "why": "<the precise sub-genre, 3 words>"}.`;
   const usr = `Movie: "${movie.title}"${movie.year ? ` (${movie.year})` : ''}, listed genres: ${(movie.genres || []).join(', ') || 'unknown'}.`;
   const o = await ollamaJSON(SIM_MODEL, sys, usr);
   let r = o && Number(o.rating);
@@ -71,45 +77,14 @@ async function rateMovie(persona, movie) {
   return Math.max(1, Math.min(5, Math.round(r)));
 }
 
-async function runQuiz(persona) {
-  const post = async (b) => {
-    const r = await fetch(APP, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-locale': 'en' }, body: JSON.stringify(b) });
-    return r.ok ? r.json() : null;
-  };
-  let s = await post({ isInit: true, sessionId: `bsw_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` });
-  if (!s) return { error: 'init failed' };
-  let n = 0;
-  while (s && !s.isComplete && n < MAX_Q) {
-    const mv = s.currentQuestion && s.currentQuestion.movie;
-    if (!mv) break;
-    n++;
-    const yr = (mv.originalDetails || '').match(/(\d{4})/)?.[1];
-    const genres = (mv._genreIds || []).map(g => GENRE[g]).filter(Boolean);
-    const rating = await rateMovie(persona, { title: mv.title, year: yr, genres });
-    s = await post({ sessionId: s.sessionId, movieId: mv.id, answer: rating, genreIds: mv._genreIds || [], title: mv.title, year: yr, ratingHistory: s.ratingHistory || [], searchHint: s.searchHint || '', probeScores: s.probeScores || {} });
-    if (!s) return { error: 'step failed @' + n };
-  }
-  return { questions: n, tasteSummary: s.tasteSummary || '', recs: (s.finalMovies || []).map(m => m.title), complete: !!s.isComplete };
-}
-
-const GENRE = { 28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy', 80: 'Crime', 99: 'Documentary', 18: 'Drama', 10751: 'Family', 14: 'Fantasy', 36: 'History', 27: 'Horror', 10402: 'Music', 9648: 'Mystery', 10749: 'Romance', 878: 'Sci-Fi', 53: 'Thriller', 10752: 'War', 37: 'Western' };
-
 async function judgeOnce(persona, result) {
-  const sys = `You are a fair, consistent QA judge for a movie-taste AI. Given a person's TRUE taste and what the AI concluded + recommended, score how SURGICALLY the AI captured the taste at SUB-GENRE resolution. Output JSON: {"score": 0-100, "subGenreIdentified": bool, "hatesAvoided": bool, "verdict": "one sentence", "missed": "what it got wrong or empty"}.
-
-RUBRIC (apply exactly):
-- subGenreIdentified = true if the AI named the user's SPECIFIC sub-genre (e.g. "slasher", "hard science fiction"), not just the broad genre ("horror", "sci-fi"). A broad-genre read = false.
-- hatesAvoided = false ONLY if a recommendation clearly belongs to a sub-genre the user EXPLICITLY DISLIKES (per their stated dislikes). A canonical or classic example of the LOVED sub-genre is NEVER a hate violation — even if it is old, artistic, or slightly atypical. A film the user NAMES as a favorite is ALWAYS a correct recommendation.
-- score: reward correct sub-genre identification and recommendations that sit inside the loved sub-genre. Do NOT nitpick canonical/iconic members of the loved sub-genre or deduct for stylistic shades within it. Only deduct for a wrong sub-genre, a broad-genre read, or a rec from a disliked style.
-- If all 3 recs are inside the loved sub-genre and none are from a disliked style, score >= 90.`;
+  const sys = `You are a fair, consistent QA judge for a movie-taste AI. Score how SURGICALLY it captured the taste at SUB-GENRE resolution. Output JSON: {"score":0-100,"subGenreIdentified":bool,"hatesAvoided":bool,"verdict":"one sentence","missed":"what it got wrong or empty"}.\nRUBRIC:\n- subGenreIdentified = true if the AI named the SPECIFIC sub-genre (e.g. "slasher", "hard science fiction"), not just the broad genre. A broad-genre read = false.\n- hatesAvoided = false ONLY if a recommendation clearly belongs to a sub-genre the user EXPLICITLY DISLIKES. A canonical/classic example of the LOVED sub-genre is NEVER a hate violation. A film the user NAMES as a favorite is ALWAYS correct.\n- score: reward correct sub-genre + in-genre recs; do NOT nitpick canonical members of the loved sub-genre. If all 3 recs are inside the loved sub-genre and none disliked, score >= 90.`;
   const usr = `TRUE taste: ${persona.taste}\n\nAI taste summary: "${result.tasteSummary}"\nAI recommendations: ${result.recs.join(', ') || '(none)'}`;
   const o = await ollamaJSON(JUDGE_MODEL, sys, usr);
   if (!o) return null;
   o.score = Math.max(0, Math.min(100, Number(o.score) || 0));
   return o;
 }
-
-// Median-of-3 to damp judge variance (a single run can nitpick a canonical pick).
 async function judge(persona, result) {
   const runs = [];
   for (let i = 0; i < 3; i++) { const o = await judgeOnce(persona, result); if (o) runs.push(o); }
@@ -121,32 +96,77 @@ async function judge(persona, result) {
   return { score: med, subGenreIdentified: maj('subGenreIdentified'), hatesAvoided: maj('hatesAvoided'), verdict: rep.verdict, missed: rep.missed };
 }
 
+const sessionOf = (page) => page.evaluate(() => window.__cinemind_session || null);
+
+async function runPersonaInTab(context, persona) {
+  const page = await context.newPage();
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    // Wait for the quiz to boot (first real question).
+    await page.waitForFunction(() => {
+      const s = window.__cinemind_session;
+      return s && (s.isComplete || (s.currentQuestion && s.currentQuestion.movie));
+    }, null, { timeout: 60000 });
+
+    let n = 0, lastTitle = '';
+    while (n < MAX_Q) {
+      const s = await sessionOf(page);
+      if (!s) break;
+      if (s.isComplete) break;
+      const mv = s.currentQuestion && s.currentQuestion.movie;
+      if (!mv || !mv.title) break;
+      if (mv.title === lastTitle) { await page.waitForTimeout(300); continue; } // not advanced yet
+      lastTitle = mv.title; n++;
+      const yr = (mv.originalDetails || '').match(/(\d{4})/)?.[1];
+      const genres = (mv._genreIds || []).map(g => GENRE[g]).filter(Boolean);
+      const rating = await rateMovie(persona, { title: mv.title, year: yr, genres });
+      // CLICK the real star button (nth-child rating) in the live UI.
+      await page.locator('.stars-container button').nth(rating - 1).click();
+      // Wait until the UI advances (new title) or completes.
+      await page.waitForFunction((prev) => {
+        const w = window.__cinemind_session;
+        return w && (w.isComplete || (w.currentQuestion && w.currentQuestion.movie && w.currentQuestion.movie.title !== prev));
+      }, mv.title, { timeout: 40000 }).catch(() => {});
+    }
+    const s = await sessionOf(page);
+    return {
+      questions: n,
+      tasteSummary: (s && s.tasteSummary) || '',
+      recs: ((s && s.finalMovies) || []).map(m => m.title),
+      complete: !!(s && s.isComplete),
+    };
+  } catch (e) {
+    return { error: String(e && e.message || e), questions: 0, tasteSummary: '', recs: [], complete: false };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
 async function run() {
   const file = process.argv[2];
   const personas = file ? JSON.parse(fs.readFileSync(file, 'utf8')) : WAVE1;
-  console.log(`\n🧠 BRAIN adversarial swarm — ${personas.length} personas | pass>=${PASS_SCORE} | brain+sim+judge=14b\n`);
+  console.log(`\n🌐 BRAIN swarm in PHYSICAL CHROME — ${personas.length} personas | pass>=${PASS_SCORE} | ${BASE}\n`);
+  const browser = await chromium.launch({ channel: 'chrome', headless: process.env.HEADLESS === '1' });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const results = [];
   for (let i = 0; i < personas.length; i++) {
     const p = personas[i];
     process.stdout.write(`[${i + 1}/${personas.length}] ${p.name} … `);
     const t0 = Date.now();
-    const r = await runQuiz(p);
-    if (r.error) { console.log(`❌ quiz ${r.error}`); results.push({ persona: p.name, taste: p.taste, pass: false, score: 0, reason: 'quiz ' + r.error }); continue; }
+    const r = await runPersonaInTab(context, p);
+    if (r.error) { console.log(`❌ tab ${r.error}`); results.push({ persona: p.name, taste: p.taste, pass: false, score: 0, reason: 'tab ' + r.error }); continue; }
     const j = await judge(p, r);
     const pass = j.score >= PASS_SCORE && j.subGenreIdentified && j.hatesAvoided;
     console.log(`${pass ? '✅' : '❌'} ${j.score} | Q=${r.questions} | ${((Date.now() - t0) / 1000).toFixed(0)}s | ${j.verdict}`);
-    if (!pass) console.log(`     taste: ${r.tasteSummary.slice(0, 140)}`);
-    if (!pass) console.log(`     recs: ${r.recs.join(', ')} | missed: ${j.missed || ''}`);
+    if (!pass) { console.log(`     taste: ${r.tasteSummary.slice(0, 140)}`); console.log(`     recs: ${r.recs.join(', ')} | missed: ${j.missed || ''}`); }
     results.push({ persona: p.name, taste: p.taste, pass, score: j.score, subGenre: j.subGenreIdentified, hatesAvoided: j.hatesAvoided, verdict: j.verdict, missed: j.missed, tasteSummary: r.tasteSummary, recs: r.recs, questions: r.questions });
   }
+  await browser.close();
   const passed = results.filter(r => r.pass).length;
-  fs.writeFileSync('brain-swarm-results.json', JSON.stringify(results, null, 2));
-  console.log(`\n══════════════════════════════════════════`);
-  console.log(`📊 SURGICAL: ${passed}/${personas.length} | avg score ${Math.round(results.reduce((a, r) => a + r.score, 0) / results.length)}`);
-  console.log(`══════════════════════════════════════════`);
-  if (passed < personas.length) {
-    console.log('FAILURES:');
-    for (const r of results.filter(r => !r.pass)) console.log(`  ❌ ${r.persona} (${r.score}) — ${r.missed || r.reason || r.verdict}`);
-  }
+  fs.writeFileSync('brain-chrome-results.json', JSON.stringify(results, null, 2));
+  console.log(`\n══════════════════════`);
+  console.log(`📊 SURGICAL (in Chrome): ${passed}/${personas.length} | avg ${Math.round(results.reduce((a, r) => a + r.score, 0) / results.length)}`);
+  console.log(`══════════════════════`);
+  if (passed < personas.length) for (const r of results.filter(r => !r.pass)) console.log(`  ❌ ${r.persona} (${r.score}) — ${r.missed || r.reason || r.verdict}`);
 }
-run().catch(e => { console.error('SWARM FATAL:', e); process.exit(1); });
+run().catch(e => { console.error('CHROME SWARM FATAL:', e); process.exit(1); });
