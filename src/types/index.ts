@@ -62,6 +62,10 @@ export interface SessionState {
   ratedCount?: number;
   /** Accumulated Fisher information of the taste estimate; SE=1/√(1+infoSum). */
   infoSum?: number;
+  /** v12 raw per-genre observations {n,sum,sq} — basis for consistency confidence. */
+  genreObs?: Record<string, { n: number; sum: number; sq: number }>;
+  /** v12 raw per-niche (sub-genre) observations {n,sum,sq}. */
+  nicheObs?: Record<string, { n: number; sum: number; sq: number }>;
 }
 
 export interface AnswerPayload {

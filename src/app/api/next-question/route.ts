@@ -213,65 +213,123 @@ function movieSeenProb(stats: GenreStats, ids?: number[]): number {
   if (!ids || ids.length === 0) return 2 / 3;
   return Math.min(...ids.map(g => betaWeight(stats, g.toString())));
 }
-// Expected information gain of asking about a movie: highest where the user's
-// stance on its genres is still UNKNOWN (affinity near 0). tanh saturates as
-// evidence piles up, so a genre we've already pinned contributes ~0 — we stop
-// re-litigating settled axes and spend questions where uncertainty lives.
-function movieEIG(aff: Record<string, number>, ids?: number[]): number {
-  if (!ids || ids.length === 0) return 0.4;
-  let eig = 0;
-  ids.forEach((g, idx) => {
-    const a = aff[g.toString()] || 0;
-    const idf = GENRE_IDF[g.toString()] ?? 1;
-    eig += (1 - Math.abs(Math.tanh(a / 4))) * idf * (idx === 0 ? 1 : 0.5);
+// Confidence GAIN of asking about a movie (TASTE-FORMULA.md §10) — the akinator
+// move. Serving is driven by what most advances "knowing the user", in priority:
+//   • CONFIRM an axis measured exactly once (a single vote could be a fluke / just
+//     one sub-genre) — applies to likes AND dislikes (we must be SURE you hate
+//     horror, not just that one film, before we stop showing it).
+//   • RESOLVE a liked genre whose sub-genre is still unknown — serve a DIFFERENT
+//     niche of it (loved Scream → try a supernatural horror: slasher or horror?).
+//   • COVER a genre never measured.
+//   • De-prioritize axes already pinned, and CONFIRMED-hated genres (n≥2, disliked)
+//     are pushed right down — those are settled, stop spending questions on them.
+function nicheIsNew(nicheObs: ObsStore, niches?: string[]): boolean {
+  return (niches || []).some(nk => (nicheObs[nicheKey(nk)]?.n ?? 0) < CONFIRM_MIN_N);
+}
+function confidenceGain(m: MovieContext, genreObs: ObsStore, nicheObs: ObsStore): number {
+  let gain = 0;
+  let allConfirmedHate = (m._genreIds || []).length > 0;
+  (m._genreIds || []).forEach(g => {
+    const o = genreObs[g.toString()];
+    if (!o) { gain += 1.0; allConfirmedHate = false; return; }            // new axis
+    const m_ = axisMean(o);
+    const confirmedHate = o.n >= CONFIRM_MIN_N && m_ <= -MIN_OPINION;
+    if (!confirmedHate) allConfirmedHate = false;
+    if (o.n === 1) gain += 1.6;                                           // confirm a fluke
+    else if (axisPinned(o) >= 0.7) gain += 0.1;                          // already known
+    else gain += 0.7;                                                     // measured, not yet pinned
   });
-  return eig / Math.max(1, ids.length);
+  // Sub-genre resolution bonus when the movie carries a not-yet-confirmed niche.
+  if (nicheIsNew(nicheObs, m._niches)) gain += 0.5;
+  if (allConfirmedHate) gain *= 0.05;                                     // settled dislike — skip
+  return gain;
 }
-// Predicted enjoyment of a movie under the current taste vector — the same shape
-// as the recommendation score (primary genre full, secondaries half, IDF-weighted).
-// Positive = the user is likely to LOVE it, negative = likely to reject it. This is
-// the EXPLOITATION signal: serving must honor what the user already told us.
-function predictedLike(aff: Record<string, number>, ids?: number[]): number {
-  if (!ids || ids.length === 0) return 0;
-  let s = 0;
-  ids.forEach((g, idx) => {
-    s += (aff[g.toString()] || 0) * (idx === 0 ? 1 : 0.5) * (GENRE_IDF[g.toString()] ?? 1);
-  });
-  return s;
-}
-// A genre the user RATED into the negative is one they dislike — never serve more
-// of it. −2.5 catches a single decisive 1★ on a primary genre (−6) and an
-// accumulated secondary dislike alike. This is the front-line "respect the rating"
-// gate; the discover query's without_genres is only a coarse backstop.
-const DISLIKE_GATE = -2.5;
-function isHatedMovie(aff: Record<string, number>, ids?: number[]): boolean {
-  return (ids || []).some(g => (aff[g.toString()] || 0) <= DISLIKE_GATE);
-}
-// Live question selection = EXPLOIT (predicted enjoyment) + EXPLORE (EIG), gated by
-// exposure P(seen) and HARD-filtered against disliked genres. Strong opinions are
-// honored: a 1★'d style is dropped from the pool entirely, and among what remains
-// the user's liked genres are preferred while neutral axes still get explored for
-// signal. Pure-EIG (the old behavior) ignored the sign of the user's feeling — it
-// would keep serving a style the user just rejected because that axis still looked
-// "uncertain". That is the "I hate it but keep getting it" bug.
+// Pick the live question that most advances confidence; sample from the top few to
+// keep quizzes varied. P(seen) still gently down-weights titles the user likely
+// hasn't seen (Beta-Binomial §8).
 function pickLiveCandidate(
-  cands: MovieContext[], aff: Record<string, number>, stats: GenreStats
+  cands: MovieContext[], genreObs: ObsStore, nicheObs: ObsStore, stats: GenreStats
 ): MovieContext {
-  // 1. Respect explicit dislike: never serve a genre the user rated negative.
-  let pool = cands.filter(m => !isHatedMovie(aff, m._genreIds));
-  if (pool.length === 0) pool = cands; // never starve the quiz to a dead end
-  // 2. Rank by (exploit + explore) · P(seen). predictedLike (±, large when the user
-  //    has a strong opinion) dominates for decided axes; EIG (0..~1.2) drives the
-  //    choice only among genres the user is still neutral on.
-  const ranked = pool
-    .map(m => ({
-      m,
-      score: (predictedLike(aff, m._genreIds) * 0.7 + movieEIG(aff, m._genreIds) * 3)
-        * movieSeenProb(stats, m._genreIds),
-    }))
+  const ranked = cands
+    .map(m => ({ m, score: confidenceGain(m, genreObs, nicheObs) * (0.5 + 0.5 * movieSeenProb(stats, m._genreIds)) }))
     .sort((a, b) => b.score - a.score);
   const topK = ranked.slice(0, Math.min(4, ranked.length));
   return topK[Math.floor(Math.random() * topK.length)].m;
+}
+
+// ── v12 confidence model: consistency × decisiveness × coverage × resolution ──
+// Per-axis observation store. We record the RAW signed strength of every vote on
+// every genre/niche the movie carried — NOT the polarity-amplified affinity. Raw
+// values are what let us measure AGREEMENT: two +2 votes on Action agree (low
+// variance → confident); a +2 then a −2 contradict (high variance → the model
+// must NOT be confident yet and should ask again). userAffinities still drives
+// serving/recs; ObsStore drives ONLY how sure we are.
+type Obs = { n: number; sum: number; sq: number };
+type ObsStore = Record<string, Obs>;
+function recordObs(store: ObsStore, key: string, v: number) {
+  const e = store[key] || { n: 0, sum: 0, sq: 0 };
+  e.n += 1; e.sum += v; e.sq += v * v; store[key] = e;
+}
+function axisMean(o: Obs): number { return o.n ? o.sum / o.n : 0; }
+function axisSE(o: Obs): number {
+  if (o.n < 1) return 1;
+  const m = o.sum / o.n;
+  const variance = Math.max(0, o.sq / o.n - m * m);
+  return Math.sqrt(variance) / Math.sqrt(o.n); // standard error of the mean
+}
+
+// Tunables (TASTE-FORMULA.md §10). Deliberately demanding: the owner wants the
+// meter to mean "the system actually knows me", never "3 decisive clicks".
+const MIN_OPINION = 1.0;     // |mean| ≥ this counts as a real like/dislike axis
+const DECISIVE_REF = 2.0;    // |mean| at which decisiveness saturates (a clean 1★/5★)
+const COVERAGE_TARGET = 5;   // distinct strong axes (likes AND dislikes) for full coverage
+const CONFIRM_MIN_N = 2;     // an axis measured once is a fluke until re-confirmed
+const PINNED_NICHE_REF = 2;  // pinned sub-genres needed for full resolution credit
+
+// How sharply a single axis is "pinned": strong opinion (decisive) + repeated &
+// agreeing (consistent). A one-shot observation is hard-capped — loving ONE horror
+// movie cannot pin "loves horror" (it may be only the slasher sub-genre).
+function axisPinned(o: Obs): number {
+  const m = Math.abs(axisMean(o));
+  const decisive = Math.min(1, m / DECISIVE_REF);
+  if (o.n < CONFIRM_MIN_N) return 0.3 * decisive;          // unconfirmed → capped
+  const consistent = 1 / (1 + axisSE(o) * 1.5);            // low variance → →1
+  return decisive * consistent;
+}
+
+// Overall confidence the model "knows" the user — the % meter and the stop signal.
+// REQUIRES, all at once:
+//  • COVERAGE — opinions across several genres, likes AND dislikes (a 3-question
+//    one-genre profile scores low no matter how decisive — fixes "70% in 3 Q").
+//  • per-axis CONSISTENCY + DECISIVENESS (axisPinned).
+//  • RESOLUTION — loving a genre is only "known" once the sub-genre is identified;
+//    a profile whose niche layer is pinned (slasher, not just "horror") earns the
+//    full resolution multiplier, an un-resolved broad-genre-only profile is capped.
+function computeConfidence(genreObs: ObsStore, nicheObs: ObsStore): number {
+  // A "strong axis" is a real, re-confirmed opinion: |mean| past the opinion floor
+  // AND measured at least twice (one observation is a fluke — possibly just one
+  // sub-genre, not the whole genre).
+  const strong = Object.values(genreObs).filter(o => o.n >= CONFIRM_MIN_N && Math.abs(axisMean(o)) >= MIN_OPINION);
+  if (strong.length === 0) return 0.05;
+  // Coverage of the WHOLE map: the model must have CONFIRMED likes AND dislikes —
+  // knowing only what someone loves is half a taste. A likes-only profile is capped
+  // at ~0.55 coverage until at least a couple of dislikes are also confirmed (n≥2),
+  // which is what forces the quiz to re-test and pin the dislikes too.
+  const likes = strong.filter(o => axisMean(o) > 0).length;
+  const dislikes = strong.filter(o => axisMean(o) < 0).length;
+  const coverage = 0.55 * Math.min(1, likes / 3) + 0.45 * Math.min(1, dislikes / 2);
+  // Quality weighted by opinion STRENGTH — the axes the user feels most strongly
+  // about dominate; a barely-over-threshold noisy axis can't drag the meter around.
+  const wq = strong.reduce((s, o) => s + axisPinned(o) * Math.abs(axisMean(o)), 0);
+  const wsum = strong.reduce((s, o) => s + Math.abs(axisMean(o)), 0);
+  const meanQuality = wsum > 0 ? wq / wsum : 0;
+  // Sub-genre resolution: a profile whose sub-genres are pinned (we know it's
+  // "slasher", not vaguely "horror") is better understood than a broad-genre-only
+  // read. Soft multiplier — no pinned niche still allows ~0.78, two pinned reach
+  // full — so the genre layer alone can converge, niches just sharpen it.
+  const pinnedNiches = Object.values(nicheObs).filter(o => o.n >= CONFIRM_MIN_N && Math.abs(axisMean(o)) >= 1.2).length;
+  const resolution = 0.78 + 0.22 * Math.min(1, pinnedNiches / PINNED_NICHE_REF);
+  return Math.max(0.05, Math.min(0.99, coverage * meanQuality * resolution));
 }
 
 async function getTrailerForMovieId(tmdbId: string): Promise<string> {
@@ -287,7 +345,7 @@ async function getTrailerForMovieId(tmdbId: string): Promise<string> {
   }
 }
 
-async function fetchMoviesFromTMDB(page: number, affinities: Record<string, number>, locale: string = 'he', disableRandomYear: boolean = false, stats: GenreStats = {}): Promise<MovieContext[]> {
+async function fetchMoviesFromTMDB(page: number, affinities: Record<string, number>, locale: string = 'he', disableRandomYear: boolean = false, stats: GenreStats = {}, obs: ObsStore = {}): Promise<MovieContext[]> {
   const POOL = fullBaselinePool(locale);
   if (!TMDB_API_KEY) return POOL;
 
@@ -298,12 +356,15 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
   Object.entries(affinities).forEach(([genreId, score]) => {
     if (genreId !== 'General' && !genreId.startsWith('k:')) {
       if (score >= 2) likedGenres.push(genreId);
-      // −4 (was −5): a single decisive 1★ on a primary genre lands at −6 and two
-      // secondary-tag hates accumulate past −4, so a clearly rejected style is
-      // pruned from the discover stream fast — the live picker's −2.5 gate is the
-      // finer front-line, this is the coarse API-level backstop.
-      if (score <= -4) hatedSet.add(genreId);
     }
+  });
+  // Exclude only CONFIRMED dislikes (TASTE-FORMULA.md §10): a genre the user rated
+  // negative at least TWICE with an agreeing mean. A single 1★ is NOT enough to
+  // prune the genre from the stream — the engine deliberately serves it ONE more
+  // time to confirm (the owner's "loving Scream ≠ loving horror" principle, applied
+  // to dislikes: be sure before you decide). Once confirmed, it's gone for good.
+  Object.entries(obs).forEach(([g, o]) => {
+    if (o.n >= CONFIRM_MIN_N && (o.sum / o.n) <= -MIN_OPINION) hatedSet.add(g);
   });
   // Exposure-adjusted exclusion (TASTE-FORMULA.md §8): a genre the user keeps
   // SKIPPING is also worth pruning from the live stream — but CONTINUOUSLY, never
@@ -394,6 +455,10 @@ export async function POST(req: Request) {
     // Fisher information of the taste estimate (SE = 1/√(1+infoSum)) — adaptive
     // stopping driver (TASTE-FORMULA.md §9). Seeded from legacy confidence if absent.
     let infoSum = parseFloat(req.headers.get('x-info') ?? '0');
+    // v12 observation stores — raw signed votes per genre / niche, the basis for the
+    // consistency-based confidence (TASTE-FORMULA.md §10).
+    let genreObs: ObsStore = JSON.parse(req.headers.get('x-genre-obs') || '{}');
+    let nicheObs: ObsStore = JSON.parse(req.headers.get('x-niche-obs') || '{}');
     // Per-genre exposure tally for the Beta-Binomial serving weight (§8).
     let genreStats: Record<string, { n: number; s: number }> =
       JSON.parse(req.headers.get('x-genre-stats') || '{}');
@@ -426,7 +491,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         sessionId: payload.sessionId || `session_${Date.now()}`,
         isComplete: false, confidenceScore: 0.01, historyCount: 0,
-        ratedCount: 0, infoSum: 0, genreStats,
+        ratedCount: 0, infoSum: 0, genreStats, genreObs, nicheObs,
         askedMovieIds, userAffinities: {},
         currentVectorState: { possibleMoviesRemaining: 85432, leadingMicroGenres: [locale === 'en' ? 'Initializing global scan...' : 'מאתחל סריקה גלובלית...'] },
         currentQuestion: { id: `init_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected }
@@ -447,6 +512,26 @@ export async function POST(req: Request) {
       } else if (typeof payload.answer === 'number') {
         const base = (payload.answer - 3); // -2..+2
         ratedCount++; // ← the completion clock only ticks on real ratings
+
+        // v12 raw observations (TASTE-FORMULA.md §10) — the basis for consistency.
+        // Log the FULL signed vote (−2..+2) for EVERY genre/niche the movie carried,
+        // with NO primary/secondary half-weighting. Position-weighting belongs in
+        // userAffinities (serving); here it only manufactures false variance — the
+        // same genre seen once as primary (+2) and once as secondary (+1) would look
+        // "inconsistent" even though the user clearly loves it. With full-base
+        // recording, a genre that is CONSISTENTLY present in liked movies pins
+        // (low variance), while an incidental co-genre gets mixed votes across movies
+        // (high variance) and correctly stays unpinned — the model self-discovers
+        // which axis truly drives the taste.
+        // Record the FULL signed vote (−2..+2) for EVERY genre the movie carries —
+        // NO position half-weighting (that manufactured false variance: the same
+        // genre as primary +2 vs secondary +1 looked "inconsistent"). Every genre is
+        // measured (coverage), and a genre only the user truly cares about stays
+        // low-variance and pins; an incidental co-genre gets contradictory votes
+        // across movies (e.g. Drama: +2 in an action-drama, 0 in a pure drama, −2 in
+        // a romance-drama) → high variance → correctly never pins. Niches recorded full.
+        (payload.genreIds || []).forEach(g => recordObs(genreObs, g.toString(), base));
+        (payload.niches || []).slice(0, 4).forEach(nk => recordObs(nicheObs, nicheKey(nk), base));
 
         // Fisher information of this item: 0 for a fence-sitting 3★, 1 for a 2/4★,
         // 4 for a decisive 1/5★ — scaled by the primary genre's IDF (a rare genre
@@ -508,17 +593,24 @@ export async function POST(req: Request) {
     // the RATED clock: NOT_SEEN never moves it, so a heavy skipper is never rushed
     // to a premature, low-confidence read.
     const answeredCount = ratedCount;
-    const SE = 1 / Math.sqrt(1 + infoSum);
-    let newConfidence = Math.max(0.01, Math.min(0.99, 1 - SE));
-    // Floor of 15 RATED guarantees the full 12-movie baseline plus live refinement;
-    // cap of 40 RATED still kills churn. Thresholds mirror the old 0.97/0.85 tiers
-    // expressed as SE (reliability 1−SE²): SE≤0.13 ⇒ rel≈0.98, SE≤0.20 ⇒ rel≈0.96.
+    // v12 confidence (TASTE-FORMULA.md §10): the meter reflects whether the model
+    // genuinely KNOWS the user — coverage of the taste map (likes AND dislikes),
+    // per-axis consistency (repeat votes that agree), decisiveness, and sub-genre
+    // resolution. It is NOT a count: 3 decisive clicks on one genre score low
+    // because coverage is thin and nothing is re-confirmed. A contradiction (5★
+    // then 1★ on the same axis) raises that axis's variance and pulls the meter
+    // back down, asking for another measurement.
+    let newConfidence = computeConfidence(genreObs, nicheObs);
+    // Fully adaptive length: there is NO fixed question count. Stop only when the
+    // model is genuinely confident. A small floor (enough screens for real coverage)
+    // guards against an early lucky-looking read; a high safety cap prevents an
+    // endless quiz for a self-contradicting user.
+    const MIN_SCREENS = 12;       // never "done" before the baseline's full coverage
+    const TARGET_CONFIDENCE = 0.9;
+    const SAFETY_CAP = 60;
     let isComplete = false;
-    if (answeredCount >= 15) {
-      if (answeredCount >= 18 && SE <= 0.13) isComplete = true;
-      else if (answeredCount >= 26 && SE <= 0.20) isComplete = true;
-      else if (answeredCount >= 40) isComplete = true; // Hard cap on RATED items
-    }
+    if (answeredCount >= MIN_SCREENS && newConfidence >= TARGET_CONFIDENCE) isComplete = true;
+    else if (answeredCount >= SAFETY_CAP) isComplete = true;
 
     let nextMovie = null;
     let finalMoviesResult = undefined;
@@ -550,12 +642,18 @@ export async function POST(req: Request) {
         const notSeenBefore = (m: MovieContext) =>
           !askedMovieIds.includes(m.id) && !askedTitleSet.has(m.title.trim().toLowerCase());
 
-        let availableMovies = await fetchMoviesFromTMDB(randomPage, userAffinities, locale, false, genreStats);
+        // BROAD pool during the quiz (no with_genres narrowing): the obs-driven
+        // picker needs unconfirmed axes available — disliked genres to CONFIRM and
+        // un-measured genres to COVER, not just the user's already-liked ones. We
+        // still pass genreObs so CONFIRMED dislikes are pruned. Narrowing to liked
+        // genres is for the FINAL recommendations only. (Bonus: a broad stream makes
+        // every quiz feel different instead of hammering the same liked genre.)
+        let availableMovies = await fetchMoviesFromTMDB(randomPage, {}, locale, false, genreStats, genreObs);
         let filtered = availableMovies.filter(notSeenBefore);
 
         if (filtered.length === 0) {
           // Fallback to random page without strict filters if too narrow
-          availableMovies = await fetchMoviesFromTMDB(Math.floor(Math.random() * 50) + 1, {}, locale, false, genreStats);
+          availableMovies = await fetchMoviesFromTMDB(Math.floor(Math.random() * 50) + 1, {}, locale, false, genreStats, genreObs);
           filtered = availableMovies.filter(notSeenBefore);
         }
 
@@ -568,7 +666,7 @@ export async function POST(req: Request) {
           // Drill by effective_EIG = EIG · P(seen) (TASTE-FORMULA.md §9): spend the
           // question where taste is most uncertain AND the user is most likely to
           // have actually seen the title — adaptive item selection, not blind random.
-          const selected = pickLiveCandidate(filtered, userAffinities, genreStats);
+          const selected = pickLiveCandidate(filtered, genreObs, nicheObs, genreStats);
           if (!selected.trailerId) selected.trailerId = await getTrailerForMovieId(selected.id);
           selected._niches = await getNichesForMovie(selected.id);
       warmPoster(selected.posterUrl);
@@ -580,7 +678,7 @@ export async function POST(req: Request) {
     
     if (isComplete) {
       // 👑 Fetch the absolute best matches based on highly liked genres (without year constraints)
-      let bestMovies = await fetchMoviesFromTMDB(1, userAffinities, locale, true);
+      let bestMovies = await fetchMoviesFromTMDB(1, userAffinities, locale, true, genreStats, genreObs);
       let availableResults = bestMovies.filter(m => !askedMovieIds.includes(m.id));
       if (availableResults.length === 0) availableResults = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id)).slice(0, 8); 
       
@@ -631,7 +729,7 @@ export async function POST(req: Request) {
       // than 3 recommendations — widen to an unfiltered popular pool and keep
       // the best non-gated survivors.
       if (scored.length < 3) {
-        const wide = (await fetchMoviesFromTMDB(1, {}, locale, true))
+        const wide = (await fetchMoviesFromTMDB(1, {}, locale, true, genreStats, genreObs))
           .filter(m => !askedMovieIds.includes(m.id) && !pool.some(p => p.id === m.id))
           .slice(0, 14);
         for (const m of wide) m._niches = await getNichesForMovie(m.id);
@@ -696,19 +794,20 @@ export async function POST(req: Request) {
       });
     }
 
-    // Display progress (TASTE-FORMULA / UX): the bar must climb smoothly to
-    // 100 exactly at completion — never snap 60→100. Two honest racers:
-    // confidence path (decisive users) and question-count path (neutral users).
+    // Display progress = honest fraction of the confidence target (TASTE-FORMULA
+    // §10). It tracks how well the model knows the user, NOT how many questions were
+    // asked — so it will sit low after 3 decisive-but-narrow answers and only
+    // approach 100 as coverage + consistency + resolution actually build.
     const progressPercent = isComplete
       ? 100
-      : Math.min(99, Math.round(100 * Math.max(newConfidence / 0.97, answeredCount / 40)));
+      : Math.min(99, Math.round(100 * (newConfidence / TARGET_CONFIDENCE)));
 
     return NextResponse.json({
       sessionId: payload.sessionId || `session_${Date.now()}`,
       isComplete, confidenceScore: isComplete ? 1.0 : newConfidence,
       progressPercent,
       // historyCount carries the RATED clock now (NOT_SEEN never advances it).
-      historyCount: ratedCount, ratedCount, infoSum, genreStats,
+      historyCount: ratedCount, ratedCount, infoSum, genreStats, genreObs, nicheObs,
       askedMovieIds, userAffinities,
       currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: isComplete ? [psychologicalMessage, ...topTasteAxes(userAffinities, locale)] : [psychologicalMessage] },
       currentQuestion: isComplete ? null : nextMovie,

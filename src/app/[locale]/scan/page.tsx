@@ -214,6 +214,8 @@ export default function ScanMovieEvaluation() {
           // server's stateless taste estimate (NOT_SEEN never advances the clock).
           'x-rated-count': (session!.ratedCount ?? session!.historyCount).toString(),
           'x-info': (session!.infoSum ?? 0).toString(),
+          'x-genre-obs': JSON.stringify(session!.genreObs || {}),
+          'x-niche-obs': JSON.stringify(session!.nicheObs || {}),
           'x-genre-stats': JSON.stringify(session!.genreStats || {}),
           'x-asked-ids': JSON.stringify(session!.askedMovieIds),
           'x-affinities': JSON.stringify(session!.userAffinities || {}),
