@@ -448,6 +448,11 @@ export async function POST(req: Request) {
     const locale = req.headers.get('x-locale') || 'he';
     let askedMovieIds: string[] = JSON.parse(req.headers.get('x-asked-ids') || '[]');
     let userAffinities: Record<string, number> = JSON.parse(req.headers.get('x-affinities') || '{}');
+    // Cross-quiz variety (TASTE-FORMULA.md §11): a rolling list of movies served in
+    // RECENT quizzes (client localStorage). Excluded from selection only — never
+    // returned — so consecutive quizzes feel like fresh experiences, not reruns.
+    let recentIds: string[] = JSON.parse(req.headers.get('x-recent-ids') || '[]');
+    const freshIds = (extra: string[] = []) => Array.from(new Set([...askedMovieIds, ...recentIds, ...extra]));
     // RATED clock — only real 1–5★ answers advance completion. A NOT_SEEN is an
     // omitted item (MCAR): zero taste signal, must NEVER raise count/confidence.
     // Back-compat: fall back to total history when the rated header is absent.
@@ -473,7 +478,7 @@ export async function POST(req: Request) {
       // Start with iconic baseline movies to hook the user and establish initial strong signals.
       // Deterministic coverage order — see BASELINE_ORDER rationale.
       const sessionId = payload.sessionId || `session_${Date.now()}`;
-      let selected = pickBaselineMovie(sessionId, askedMovieIds, locale, userAffinities);
+      let selected = pickBaselineMovie(sessionId, freshIds(), locale, userAffinities);
       if (!selected) {
         const pool = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
         selected = pool.length > 0 ? pool[0] : fullBaselinePool(locale)[0];
@@ -620,7 +625,7 @@ export async function POST(req: Request) {
         // Exploration phase: 12 RATED baseline movies — every genre bucket measured
         // at least once (see BASELINE_ORDER). Keyed on the RATED clock, not total
         // screens, so a skipper still earns the full baseline before live drilling.
-        let selected = pickBaselineMovie(payload.sessionId || '', askedMovieIds, locale, userAffinities);
+        let selected = pickBaselineMovie(payload.sessionId || '', freshIds(), locale, userAffinities);
         if (!selected) {
           const remaining = fullBaselinePool(locale).filter(m => !askedMovieIds.includes(m.id));
           selected = remaining.length > 0 ? remaining[0] : fullBaselinePool(locale)[0];
@@ -639,8 +644,9 @@ export async function POST(req: Request) {
         // Same-title repeats (remakes, re-releases, sequels sharing a name) read
         // as duplicates to the user even when the TMDB ids differ — block both.
         const askedTitleSet = new Set((payload.askedTitles || []).map(t => t.trim().toLowerCase()));
+        const recentSet = new Set(recentIds);
         const notSeenBefore = (m: MovieContext) =>
-          !askedMovieIds.includes(m.id) && !askedTitleSet.has(m.title.trim().toLowerCase());
+          !askedMovieIds.includes(m.id) && !recentSet.has(m.id) && !askedTitleSet.has(m.title.trim().toLowerCase());
 
         // BROAD pool during the quiz (no with_genres narrowing): the obs-driven
         // picker needs unconfirmed axes available — disliked genres to CONFIRM and

@@ -96,6 +96,9 @@ export default function ScanMovieEvaluation() {
   // Titles shown this session — sent to the server so same-title movies
   // (remakes, re-releases) are never served twice in one quiz.
   const seenTitlesRef = useRef<string[]>([]);
+  // Rolling window of movie ids served across recent quizzes — sent to the server so
+  // a new quiz doesn't repeat the last one's movies (cross-quiz variety).
+  const recentRef = useRef<string[]>([]);
   const maxProgressRef = useRef(0);
 
   // E2E probe: mirror the live rated clock to window so the persona swarm can
@@ -116,14 +119,18 @@ export default function ScanMovieEvaluation() {
     });
 
     const localAsked = JSON.parse(localStorage.getItem('cinemind_asked_movies') || '[]');
+    // Cross-quiz variety: movies shown in recent quizzes, excluded so each new quiz
+    // feels fresh (TASTE-FORMULA.md §11). Rolling window in localStorage.
+    recentRef.current = JSON.parse(localStorage.getItem('cinemind_recent_movies') || '[]');
 
     const initSession = async () => {
       try {
         const res = await fetch('/api/next-question', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
+          headers: {
+            'Content-Type': 'application/json',
             'x-asked-ids': JSON.stringify(localAsked),
+            'x-recent-ids': JSON.stringify(recentRef.current),
             'x-locale': locale
           },
           body: JSON.stringify({ sessionId: `session_${Date.now()}`, isInit: true })
@@ -202,6 +209,12 @@ export default function ScanMovieEvaluation() {
     if (currentTitle && !seenTitlesRef.current.includes(currentTitle)) {
       seenTitlesRef.current.push(currentTitle);
     }
+    // Record the answered movie into the cross-quiz recent window (rolling, cap 150).
+    const answeredId = session!.currentQuestion?.movie?.id;
+    if (answeredId && !recentRef.current.includes(answeredId)) {
+      recentRef.current = [...recentRef.current, answeredId].slice(-150);
+      try { localStorage.setItem('cinemind_recent_movies', JSON.stringify(recentRef.current)); } catch {}
+    }
 
     try {
       const doFetch = () => fetch('/api/next-question', {
@@ -216,6 +229,7 @@ export default function ScanMovieEvaluation() {
           'x-info': (session!.infoSum ?? 0).toString(),
           'x-genre-obs': JSON.stringify(session!.genreObs || {}),
           'x-niche-obs': JSON.stringify(session!.nicheObs || {}),
+          'x-recent-ids': JSON.stringify(recentRef.current),
           'x-genre-stats': JSON.stringify(session!.genreStats || {}),
           'x-asked-ids': JSON.stringify(session!.askedMovieIds),
           'x-affinities': JSON.stringify(session!.userAffinities || {}),
