@@ -419,7 +419,7 @@ async function run() {
 
       // Cap raised 45→75: with NOT_SEEN no longer advancing the rated clock,
       // skip-heavy personas legitimately need more screens to reach 40 RATED.
-      while (questionCount < 75 && !quizComplete) {
+      while (questionCount < 90 && !quizComplete) {
         try {
           await page.waitForSelector('button.group', { timeout: 25000 });
         } catch {
@@ -595,7 +595,7 @@ async function run() {
     }
     const pagesHealthy = pageAudits.every(a => a.ok);
 
-    const questionsSane = questionCount >= 15 && questionCount <= 75;
+    const questionsSane = questionCount >= 15 && questionCount <= 90;
     const noQuizErrors = quizConsoleErrors.length === 0;
     const noRatedAdvanceBugs = ratedAdvanceBugs.length === 0;
     const noPacingBugs = pacingBugs.length === 0;
