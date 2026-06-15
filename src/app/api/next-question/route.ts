@@ -335,11 +335,18 @@ function computeConfidence(genreObs: ObsStore, nicheObs: ObsStore): number {
 async function getTrailerForMovieId(tmdbId: string): Promise<string> {
   if (!TMDB_API_KEY || tmdbId.startsWith('fb')) return '';
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/videos?api_key=${TMDB_API_KEY}&language=en-US`, { next: { revalidate: 3600 } });
+    // No language filter — `language=en-US` silently dropped anime/foreign titles that
+    // have no en-US video, leaving the card without a trailer. Degrade Trailer→Teaser→any.
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/videos?api_key=${TMDB_API_KEY}`, { next: { revalidate: 3600 } });
     if (!res.ok) return '';
     const data = await res.json();
-    const trailer = data.results?.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
-    return trailer ? trailer.key : '';
+    const yt = (data.results || []).filter((v: any) => v.site === 'YouTube');
+    if (!yt.length) return '';
+    const pick = (type: string) =>
+      yt.find((v: any) => v.type === type && (v.iso_639_1 === 'en' || !v.iso_639_1)) ||
+      yt.find((v: any) => v.type === type);
+    const chosen = pick('Trailer') || pick('Teaser') || yt[0];
+    return chosen ? chosen.key : '';
   } catch(e) {
     return '';
   }

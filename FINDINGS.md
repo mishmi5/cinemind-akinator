@@ -45,6 +45,31 @@ Persisted technical findings so we never rediscover them.
 - Residual flaky personas in Chrome (Kaiju, slow-cinema) = sim noise on broad/pacing categories, not
   engine defects (engine is correct: API 40/40 + Chrome trace proved Heist locks perfectly).
 
+## Auto-boot mechanism (auto-start AI when site comes up)
+- `src/instrumentation.ts` `register()` (Next 16 hook, nodejs runtime only) → `ensureModel()`:
+  ensures Ollama up (spawns `ollama serve` detached if down), warms gemma2:9b (keep_alive 30m).
+  Fire-and-forget; `booted` guard. Engine works even if it fails (deterministic core).
+- QA: `boot-swarm.js` — 5 adversarial scenarios: health probe, model-responds,
+  warm-latency (<4000ms), graceful-no-LLM (3/3 recs in mock), recovery (reload after unload).
+  **All 5 robust.**
+- **FINDING (harness, fixed):** answering 5★ to EVERYTHING = the all-lover path; the engine
+  sweeps every family before locking and legitimately needs **~32 questions**. Any harness
+  walking the mock quiz must cap turns **≥~40** (boot-swarm graceful was 30 → false 0/3;
+  raised to 60). Not an engine defect — engine returns 3/3 (Suspiria/Deep Red/Tenebrae).
+
+## Trailers (regression fixed 2026-06-15)
+- **Bug:** `getTrailer` (tmdb.ts) + `getTrailerForMovieId` (next-question.ts) queried TMDB
+  `/videos?language=en-US` and accepted only `type==='Trailer'`. Anime/foreign/older titles
+  with no en-US video (e.g. Neon Genesis Evangelion id 18491) returned '' → the "▶ צפה
+  בטריילר" button vanished for that card. Found in physical Chrome: 29/30 deep cards had it,
+  Evangelion dropped. NOT rate-limiting — deterministic per-title gap.
+- **Fix:** drop the language filter (query ALL videos), then degrade **Trailer → Teaser →
+  any YouTube**, preferring English/untagged within each tier. Evangelion now resolves to a
+  Teaser. Verified physical Chrome: 0/30 missing. Poster/title/trailer all derive from the
+  SAME `movieById(id)` → synced by construction (assert in personas, don't trust visually).
+- Repro harness: `trailer-repro.js` (headed Chrome, flags any card with empty trailerId /
+  hidden button). Keep as a regression guard in the swarm.
+
 ## 24/7 (local now → cloud at 50+ users)
 - scripts/ollama-keepalive.ps1 (+ installer): health-check, auto-restart, model warm, 3090 tuning.
 - ⚠️ The security agent removed the sessionToken fallback secret — production CRASHES without

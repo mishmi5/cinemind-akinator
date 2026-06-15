@@ -60,6 +60,24 @@ expose gaps).
    plain steps so the LLM works on the site automatically, always on, without re-defining
    it each time.
 
+6. **Trailers must ALWAYS show + poster/title/trailer must be synced.** Every quiz card
+   shows a working "▶ Watch Trailer" button, and the poster, title, and trailer all belong
+   to the SAME movie. `getTrailer` degrades Trailer→Teaser→any YouTube (no en-US-only
+   filter) so anime/foreign/older titles still get a clip. Personas must guard this every
+   run (a missing trailer = a harness gap). ✅ fixed 2026-06-15 (see FINDINGS.md).
+
+7. **Contradiction lowers the confidence meter.** If the user answers a question that
+   CONTRADICTS the current taste hypothesis (e.g. rates another exemplar of an already-loved
+   sub-genre LOW, or flips on a confirmed family), the progress/confidence meter must go
+   **DOWN** accordingly and the lock is withheld until the term is re-confirmed. This
+   deliberately lengthens the quiz in exchange for the most accurate final recommendation.
+
+8. **No two questionnaires alike (variety).** The sweep order and shown exemplars vary
+   per session (seeded by sessionId), so repeat users never see the same sequence — WITHOUT
+   breaking correctness (full sweep still covers all; drill-off still uses both exemplars).
+   Variety spans ALL world/Hollywood tastes (rom-com, heist, kaiju, western, noir, musical,
+   anime, slow-cinema…), never just slashers. Personas must assert order-uniqueness.
+
 ## Acceptance (the loop)
 
 - Build a wave of 20 adversarial personas (distinct/niche/fine-split tastes).

@@ -335,10 +335,20 @@ export async function resolveByTitle(title: string, year: string | null, locale 
 export async function getTrailer(id: string): Promise<string> {
   if (!KEY || !/^\d+$/.test(id)) return '';
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/videos?api_key=${KEY}&language=en-US`, { next: { revalidate: 3600 } });
+    // No language filter: the old `language=en-US` silently dropped anime/foreign/older
+    // titles that have no en-US video (e.g. Evangelion), leaving the card with NO trailer
+    // button. Query ALL videos, then degrade gracefully so almost every film gets a clip.
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/videos?api_key=${KEY}`, { next: { revalidate: 3600 } });
     if (!res.ok) return '';
     const data = await res.json();
-    const t = (data.results || []).find((v: any) => v.type === 'Trailer' && v.site === 'YouTube');
-    return t ? t.key : '';
+    const yt = (data.results || []).filter((v: any) => v.site === 'YouTube');
+    if (!yt.length) return '';
+    // Prefer an official Trailer, then a Teaser, then any YouTube clip — preferring
+    // English (or language-agnostic) entries within each tier when available.
+    const pick = (type: string) =>
+      yt.find((v: any) => v.type === type && (v.iso_639_1 === 'en' || !v.iso_639_1)) ||
+      yt.find((v: any) => v.type === type);
+    const chosen = pick('Trailer') || pick('Teaser') || yt[0];
+    return chosen ? chosen.key : '';
   } catch { return ''; }
 }

@@ -21,7 +21,11 @@ const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hi
 // "slasher" keyword also returns art-horror) yields a few low ratings that would sink an
 // average below threshold even when the user clearly loves the genre. Counting ≥4 hits is
 // robust to that dilution — three confirmed Halloween/Friday-13th 5★ lock it regardless.
-type ProbeScores = Record<string, { sum: number; n: number; hi: number; lo: number }>;
+// `contra` counts CONTRADICTIONS for this sub-genre: a rating that reverses an already-
+// established signal (a loved sub-genre suddenly rated low, or a rejected one rated high).
+// Each contradiction lowers confidence and withholds the lock until the term is re-confirmed
+// — the meter deliberately drops so the quiz lengthens in exchange for a more accurate result.
+type ProbeScores = Record<string, { sum: number; n: number; hi: number; lo: number; contra?: number }>;
 
 // Cross-over family adjacency for the early-stop (e.g. cosmic-horror ↔ hard-SF, thrillers
 // span crime/action). A leader can only early-lock once its family AND these neighbours are
@@ -57,8 +61,19 @@ function termOf(movieId: string, activeHint: string): string | null {
 
 const CONTENDER_AVG = 4.5; // a 5★-level love; close contenders at/above this drill-off
 
+// Stable per-session pseudo-random rank (FNV-1a). Seeds the EXPLORE sweep ORDER off the
+// sessionId so two users never get the same opening sequence — variety — while a single
+// session's order stays consistent across its turns (sessionId round-trips in the body).
+// Order is correctness-neutral: the full sweep still covers every sub-genre.
+function seededRank(seed: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0) / 0xffffffff;
+}
+
 function computeTaste(probe: ProbeScores) {
-  const stats = Object.entries(probe).map(([t, { sum, n, hi, lo }]) => ({ t, n, hi, lo, avg: sum / n, hiRate: hi / n }));
+  const stats = Object.entries(probe).map(([t, { sum, n, hi, lo, contra }]) => ({ t, n, hi, lo, contra: contra || 0, avg: sum / n, hiRate: hi / n }));
+  const totalContra = stats.reduce((a, s) => a + s.contra, 0);
   const disliked = stats.filter(s => s.lo >= 2 && s.hi === 0).map(s => s.t);
   // The LEAD candidate: strongest signal — most strong hits, then highest average. The
   // avg tiebreak separates a true love (Arrival/Ex Machina = 5) from a cross-genre stray
@@ -70,12 +85,15 @@ function computeTaste(probe: ProbeScores) {
   // (its 2nd exemplar + keyword pool) before locking, so hit-count + avg pick the real one
   // instead of an arbitrary list-order tiebreak. This is the "drill-off".
   const contenders = candidates.filter(s => s.avg >= CONTENDER_AVG);
-  // Lock ONLY when the leader is confirmed (LOCK_HITS strong hits) AND every close
-  // contender has already had its 2nd exemplar drilled (n ≥ 2) — i.e. the race is settled.
-  const lockedLove = (leader && leader.hi >= LOCK_HITS && contenders.every(s => s.n >= 2)) ? leader : null;
+  // Lock ONLY when the leader is confirmed AND every close contender has had its 2nd
+  // exemplar drilled (n ≥ 2) — i.e. the race is settled. A CONTRADICTION on the leader
+  // raises the bar: each one demands an extra confirming strong hit, so a user who flip-
+  // flopped on their "loved" sub-genre must re-prove it before we lock.
+  const lockHitsNeeded = LOCK_HITS + (leader?.contra || 0);
+  const lockedLove = (leader && leader.hi >= lockHitsNeeded && contenders.every(s => s.n >= 2)) ? leader : null;
   // "loved", for the recommendation prompt — confirmed-ish sub-genres, lead first.
   const loved = candidates.filter(s => s.hi >= 2 || s === leader);
-  return { stats, candidates, leader, contenders, loved, disliked, lockedLove };
+  return { stats, candidates, leader, contenders, loved, disliked, lockedLove, totalContra };
 }
 
 export async function POST(req: Request) {
@@ -92,6 +110,8 @@ export async function POST(req: Request) {
 
     const backend = brainBackend();
     const mock = req.headers.get('x-brain-mock') === '1' || process.env.BRAIN_MOCK === '1';
+    // Derived early so it can seed the per-session sweep order (variety) below.
+    const sessionId = payload.sessionId || `brain_${Date.now()}`;
 
     // ── Record the just-answered movie (rated answers only; NOT_SEEN is an omitted
     //    item — it never enters taste reasoning). Also score its sub-genre probe. ──
@@ -105,11 +125,25 @@ export async function POST(req: Request) {
       }];
       const term = termOf(String(payload.movieId), activeHint);
       if (term) {
-        const cur = probe[term] || { sum: 0, n: 0, hi: 0, lo: 0 };
+        const cur = probe[term] || { sum: 0, n: 0, hi: 0, lo: 0, contra: 0 };
+        // CONTRADICTION: this rating reverses an established signal for the same sub-genre.
+        // If the term was already LOVED (a strong hit, avg ≥ HI) and the user now rates a
+        // fresh exemplar a MISS (≤ LO) — or the term was REJECTED and is now a strong hit —
+        // the taste hypothesis just wavered. Count it: confidence will drop and the lock is
+        // withheld until re-confirmed (a deliberately slower, more accurate quiz).
+        let contra = cur.contra || 0;
+        if (cur.n >= 1) {
+          const priorAvg = cur.sum / cur.n;
+          const wasLoved = cur.hi >= 1 && priorAvg >= HI;
+          const wasRejected = cur.lo >= 2 && cur.hi === 0;
+          if (wasLoved && payload.answer <= LO) contra += 1;
+          if (wasRejected && payload.answer >= HI) contra += 1;
+        }
         probe[term] = {
           sum: cur.sum + payload.answer, n: cur.n + 1,
           hi: cur.hi + (payload.answer >= HI ? 1 : 0),
           lo: cur.lo + (payload.answer <= LO ? 1 : 0),
+          contra,
         };
       }
     } else if (!payload.isInit && payload.movieId && !askedMovieIds.includes(payload.movieId)) {
@@ -118,7 +152,7 @@ export async function POST(req: Request) {
 
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds]));
     const seenSet = new Set(seen);
-    const { loved, leader, contenders, disliked, lockedLove } = computeTaste(probe);
+    const { loved, leader, contenders, disliked, lockedLove, totalContra } = computeTaste(probe);
 
     // ── Decide the next move DETERMINISTICALLY: EXPLORE before EXPLOIT. ──
     // EXPLORE: walk EVERY distinct sub-genre once (iconic exemplar each) before committing
@@ -164,15 +198,18 @@ export async function POST(req: Request) {
       pool = drilled.length ? drilled : samplerAll;
       nextHint = drillTarget.t;
     } else if (!sweepDone) {
-      // EXPLORE — deterministic ordered walk: serve the first not-yet-probed sub-genre.
-      pool = [uncovered[0]];
+      // EXPLORE — serve a not-yet-probed sub-genre, but in a per-session SHUFFLED order
+      // (seeded by sessionId) so no two questionnaires open with the same sequence. Order
+      // is correctness-neutral — the full sweep still covers every sub-genre before exploit.
+      const nextUp = [...uncovered].sort((a, b) =>
+        seededRank(sessionId + (samplerProbeOf(a.id) || a.id)) - seededRank(sessionId + (samplerProbeOf(b.id) || b.id)));
+      pool = [nextUp[0]];
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
     } else {
       pool = samplerAll.length ? samplerAll : await fetchCandidatePool(seen, locale, 8);
     }
     if (!pool || pool.length === 0) pool = await fetchCandidatePool(seen, locale, 12);
 
-    const sessionId = payload.sessionId || `brain_${Date.now()}`;
     const baseState = {
       sessionId, historyCount: history.length, ratedCount: history.length,
       askedMovieIds, userAffinities: {}, ratingHistory: history, probeScores: probe, engine: 'brain',
@@ -184,7 +221,11 @@ export async function POST(req: Request) {
     // real understanding, not click count.
     const lockProgress = lockedLove ? 1 : (leader ? Math.min(1, leader.hi / LOCK_HITS) : 0);
     const sweepProgress = Math.min(1, Object.keys(probe).length / 12);
-    const confidence = Math.min(0.98, 0.35 * sweepProgress + 0.63 * lockProgress);
+    // Each unresolved contradiction PULLS THE METER DOWN (0.15 apiece, capped) — the user
+    // sees the percentage drop after a taste-reversing answer, signalling the engine is
+    // re-checking rather than racing to a guess. Floored so it never reads as total reset.
+    const contraPenalty = Math.min(0.5, (totalContra || 0) * 0.15);
+    const confidence = Math.max(0.05, Math.min(0.98, 0.35 * sweepProgress + 0.63 * lockProgress) - contraPenalty);
 
     // ── Completion: the lead sub-genre is confirmed (LOCK_HITS strong hits), or hard cap.
     //    A lock is only reachable by drilling, which means real confirmation. ──
