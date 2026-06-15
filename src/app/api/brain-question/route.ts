@@ -92,7 +92,12 @@ function computeTaste(probe: ProbeScores) {
   // raises the bar: each one demands an extra confirming strong hit, so a user who flip-
   // flopped on their "loved" sub-genre must re-prove it before we lock.
   const lockHitsNeeded = LOCK_HITS + (leader?.contra || 0);
-  const lockedLove = (leader && leader.hi >= lockHitsNeeded && contenders.every(s => s.n >= 2)) ? leader : null;
+  // Lock when the leader is confirmed AND every CLOSE RIVAL (a contender within 1 strong hit
+  // of the leader) has been drilled. We no longer require EVERY tied contender to be drilled —
+  // that made a broad taste (e.g. a fan of all 11 horror sub-genres) drag on; a clearly
+  // dominant leader now locks once its genuine near-rivals are settled.
+  const rivals = leader ? contenders.filter(s => s.t !== leader.t && s.hi >= leader.hi - 1) : [];
+  const lockedLove = (leader && leader.hi >= lockHitsNeeded && rivals.every(s => s.n >= 2)) ? leader : null;
   // "loved", for the recommendation prompt — confirmed-ish sub-genres, lead first.
   const loved = candidates.filter(s => s.hi >= 2 || s === leader);
   return { stats, candidates, leader, contenders, loved, disliked, lockedLove, totalContra };
@@ -170,8 +175,20 @@ export async function POST(req: Request) {
     // EXPLOIT: only once the full sweep is done, DRILL the strongest explored sub-genre
     // to confirm it (LOCK_HITS strong hits). Recommend only from the confirmed sub-genre.
     const samplerAll = (await fetchSubGenreSampler(locale)).filter(c => !seenSet.has(c.id));
+    // ADAPTIVE NARROWING (dynamic direction): once the opening breadth (~12 questions) has
+    // revealed a clearly leading FAMILY (≥2 strong hits), stop wandering across unrelated
+    // families and focus the remaining questions on that family + its adjacent ones — so each
+    // answer steers the quiz toward the user's taste and it converges surgically instead of
+    // sweeping all ~25 sub-genres and running to the cap.
+    const leaderFamNow = (leader && leader.hi >= 2 && history.length >= 12) ? subGenreFamily(leader.t) : undefined;
+    const focusFams = leaderFamNow ? new Set([leaderFamNow, ...(FAMILY_ADJ[leaderFamNow] || [])]) : null;
     const uncovered = samplerAll
-      .filter(c => { const t = samplerProbeOf(c.id); return t && !probe[t] && !disliked.includes(t); });
+      .filter(c => {
+        const t = samplerProbeOf(c.id);
+        if (!t || probe[t] || disliked.includes(t)) return false;
+        if (focusFams && !focusFams.has(subGenreFamily(t) || '')) return false;
+        return true;
+      });
     const sweepDone = uncovered.length === 0;
     // EARLY-STOP (adaptive length): if the leader is a PERFECT 5★ love AND its whole family
     // has been explored — so every close neighbour was compared and the drill-off settled —
@@ -268,7 +285,12 @@ export async function POST(req: Request) {
     // round-trips via the x-current-confidence header. Completion is gated on the SHOWN meter
     // (below), so the final step to 100 is also ≤4.
     const prevShown = Math.round((parseFloat(req.headers.get('x-current-confidence') || '0') || 0) * 100);
-    const target = Math.round(Math.min(0.99, confidence) * 100);
+    // A gentle FLOW FLOOR that rises with question count to ~0.96 by ~Q30. It guarantees the
+    // meter keeps climbing toward completion so a hard cap (MAX_Q / shown-cap) is hit only when
+    // the meter is already ≥96 — never a 64→100 jump. Real completion still needs a confirmed
+    // lock; the floor only governs the DISPLAY, eased ≤4%/step below.
+    const flowFloor = Math.min(0.96, (history.length / 30) * 0.96);
+    const target = Math.round(Math.min(0.99, Math.max(confidence, flowFloor)) * 100);
     let shown: number;
     if (prevShown <= 0) shown = Math.min(target, 5);                          // first question: gentle start
     else if (target > prevShown) shown = Math.min(target, prevShown + 4);     // rise ≤ 4
