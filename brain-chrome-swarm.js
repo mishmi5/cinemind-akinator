@@ -58,7 +58,7 @@ async function ollamaJSON(model, system, user, retries = 2, temperature = 0.2) {
     try {
       const r = await fetch(OLLAMA, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, think: false, stream: false, format: 'json', options: { temperature }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+        body: JSON.stringify({ model, think: false, reasoning_effort: 'low', stream: false, format: 'json', options: { temperature }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
       });
       const j = await r.json();
       let c = (j.message && j.message.content) || '';
