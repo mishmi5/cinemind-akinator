@@ -263,6 +263,18 @@ export async function POST(req: Request) {
     const creep = Math.min(1, history.length / 50);
     const confidence = Math.max(0.05, Math.min(0.99, 0.22 * sweepProgress + 0.18 * ratedProgress + 0.52 * leaderStrength + 0.08 * creep) - contraPenalty);
 
+    // DISPLAY METER: ease the SHOWN percent toward the true confidence by at most 4 points per
+    // answer (owner wants smooth 1-4% steps, never a 5→42 jump). The previous shown value
+    // round-trips via the x-current-confidence header. Completion is gated on the SHOWN meter
+    // (below), so the final step to 100 is also ≤4.
+    const prevShown = Math.round((parseFloat(req.headers.get('x-current-confidence') || '0') || 0) * 100);
+    const target = Math.round(Math.min(0.99, confidence) * 100);
+    let shown: number;
+    if (prevShown <= 0) shown = Math.min(target, 5);                          // first question: gentle start
+    else if (target > prevShown) shown = Math.min(target, prevShown + 4);     // rise ≤ 4
+    else if (target < prevShown) shown = Math.max(target, prevShown - 4);     // fall ≤ 4 (contradictions)
+    else shown = prevShown;
+
     // ── Completion: the lead sub-genre is confirmed (LOCK_HITS strong hits), or hard cap.
     //    A lock is only reachable by drilling, which means real confirmation. ──
     // Two caps: MAX_Q on RATED answers, and a TOTAL-SHOWN cap on movies presented (incl.
@@ -274,7 +286,7 @@ export async function POST(req: Request) {
     // Finish only once the meter has genuinely ramped into the 90s — completing at ~75% felt
     // like a jump. With the lock confirmed we serve a few on-taste confirmation questions
     // until confidence ≥ 0.9, so the user watches it climb 90→95→100 right before the recs.
-    const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove && confidence >= 0.90);
+    const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove && shown >= 96);
 
     if (!done) {
       // Serve the next question — always a real pool movie.
@@ -285,8 +297,8 @@ export async function POST(req: Request) {
         const tasteSummary = lockedLove ? `Confirming: ${lockedLove.t}` : leader ? `Closing in on: ${leader.t}` : 'Mapping your taste…';
         return NextResponse.json({
           ...baseState, tasteSummary, searchHint: nextHint,
-          isComplete: false, confidenceScore: confidence, progressPercent: Math.min(99, Math.round(confidence * 100)),
-          currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - confidence))), leadingMicroGenres: [tasteSummary] },
+          isComplete: false, confidenceScore: shown / 100, progressPercent: Math.min(99, shown),
+          currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - shown / 100))), leadingMicroGenres: [tasteSummary] },
           currentQuestion: { id: `bq_${Date.now()}`, text: questionText(movie.title, locale), movie },
           finalMovies: undefined,
         }, { status: 200 });
