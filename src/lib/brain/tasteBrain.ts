@@ -10,6 +10,7 @@ import { tasteModel } from './model';
 // pool, and recommendations are grounded against TMDB by the caller.
 
 export interface BrainHistoryItem {
+  id?: string;      // TMDB id of the rated movie (for excluding disliked films from recs)
   title: string;
   year?: string;
   genres: string[]; // human-readable genre names

@@ -125,6 +125,7 @@ export async function POST(req: Request) {
     if (!payload.isInit && payload.movieId && typeof payload.answer === 'number') {
       if (!askedMovieIds.includes(payload.movieId)) askedMovieIds.push(payload.movieId);
       history = [...history, {
+        id: String(payload.movieId),
         title: payload.title || 'Unknown',
         year: payload.year || undefined,
         genres: genreNames(payload.genreIds || []),
@@ -297,37 +298,52 @@ export async function POST(req: Request) {
     //    keyword noise). The LLM is used only to write the natural-language REASONS over
     //    the already-chosen films, so it can't contaminate the selection. ──
     const confirmedTerm = (lockedLove?.t || leader?.t || loved[0]?.t || '');
-    let resolved: NonNullable<Awaited<ReturnType<typeof movieById>>>[] = [];
+    type Rec = NonNullable<Awaited<ReturnType<typeof movieById>>>;
+    const resolved: Rec[] = [];
+
+    // ── DISLIKE GUARD: never recommend a film the user rated low, nor a film whose genre
+    //    profile is one they clearly rejected (e.g. a 1★ on Star Wars → no space-opera/sci-fi
+    //    pick, and never that film itself). A genre that was BOTH liked and disliked is
+    //    ambiguous, so it's allowed — only purely-rejected genres are filtered out.
+    const lovedGenres = new Set<string>();
+    const hatedGenres = new Set<string>();
+    const hatedIds = new Set<string>();
+    for (const h of history) {
+      if (h.rating >= HI) h.genres.forEach(g => lovedGenres.add(g));
+      if (h.rating <= LO) { if (h.id) hatedIds.add(h.id); h.genres.forEach(g => hatedGenres.add(g)); }
+    }
+    for (const g of lovedGenres) hatedGenres.delete(g);
+    const isBad = (m: Rec) => {
+      if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
+      const names = genreNames(m._genreIds || []);
+      return names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n));
+    };
+    const add = (m: Rec | null) => { if (m && !resolved.some(x => x.id === m.id) && !isBad(m)) resolved.push(m); };
+
+    // 1) curated canonical seeds for the confirmed loved sub-genre.
     if (confirmedTerm) {
-      resolved = await recommendBySubGenre(confirmedTerm, askedMovieIds, locale, 3);
+      for (const m of await recommendBySubGenre(confirmedTerm, askedMovieIds, locale, 8)) { if (resolved.length >= 3) break; add(m); }
     }
-    // Fallbacks if curated seeds were exhausted/unresolved: keyword pool, then the LLM.
+    // 2) keyword pool on the loved term.
     if (resolved.length < 3 && confirmedTerm) {
-      const fill = await fetchPoolByHint(confirmedTerm, seen, locale, 12);
-      for (const c of fill) {
-        if (resolved.length >= 3) break;
-        if (resolved.some(m => m.id === c.id) || askedMovieIds.includes(c.id)) continue;
-        const m = await movieById(c.id, locale);
-        if (m) resolved.push(m);
-      }
+      for (const c of await fetchPoolByHint(confirmedTerm, seen, locale, 16)) { if (resolved.length >= 3) break; add(await movieById(c.id, locale)); }
     }
+    // 3) LLM proposal, grounded + dislike-filtered.
     if (resolved.length < 3) {
       const recPass = await brainRecommend(history, { mock, loved: loved.map(s => s.t), disliked });
-      for (const r of recPass?.recommendations || []) {
-        if (resolved.length >= 3) break;
-        const m = await resolveByTitle(r.title, r.year != null ? String(r.year) : null, locale);
-        if (m && !resolved.some(x => x.id === m.id) && !askedMovieIds.includes(m.id)) resolved.push(m);
-      }
+      for (const r of recPass?.recommendations || []) { if (resolved.length >= 3) break; add(await resolveByTitle(r.title, r.year != null ? String(r.year) : null, locale)); }
     }
-    // Last-resort guarantee: a customer must NEVER see fewer than 3 recs (the frozen/empty-
-    // recs bug). If signal was too thin to confirm a sub-genre, fill from the popular pool.
+    // 4) popular pool — STILL dislike-filtered, so a rejected style never leaks in.
     if (resolved.length < 3) {
-      const pop = await fetchCandidatePool(seen, locale, 20);
-      for (const c of pop) {
+      for (const c of await fetchCandidatePool(seen, locale, 30)) { if (resolved.length >= 3) break; add(await movieById(c.id, locale)); }
+    }
+    // 5) absolute last resort to guarantee 3 recs: relax the genre filter but NEVER re-surface
+    //    a film the user actually rated low (or already saw).
+    if (resolved.length < 3) {
+      for (const c of await fetchCandidatePool(seen, locale, 30)) {
         if (resolved.length >= 3) break;
-        if (resolved.some(m => m.id === c.id) || askedMovieIds.includes(c.id)) continue;
         const m = await movieById(c.id, locale);
-        if (m) resolved.push(m);
+        if (m && !resolved.some(x => x.id === m.id) && !askedMovieIds.includes(m.id) && !hatedIds.has(m.id)) resolved.push(m);
       }
     }
 
