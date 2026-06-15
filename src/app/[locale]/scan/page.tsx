@@ -171,6 +171,17 @@ export default function ScanMovieEvaluation() {
     initSession();
   }, []);
 
+  // Keep the local AI (gemma2:9b) loaded the whole time the user is on the quiz: ping the
+  // warm endpoint on mount and every 4 min so the model stays resident in VRAM (keep_alive:-1)
+  // — the AI taste-director + reasons are then instant. Brain engine only; fire-and-forget.
+  useEffect(() => {
+    if (getEngine().url !== '/api/brain-question') return;
+    const warm = () => { fetch('/api/brain-warm').catch(() => {}); };
+    warm();
+    const id = setInterval(warm, 4 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const loadLocalFallback = (localAsked: string[]) => {
     let availableStarts = STARTING_POOL.filter(m => !localAsked.includes(m.id));
     if (availableStarts.length === 0) availableStarts = STARTING_POOL; 

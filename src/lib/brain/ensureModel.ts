@@ -39,12 +39,13 @@ export async function ensureModel(): Promise<{ ok: boolean; started: boolean; wa
     return { ok: false, started, warmed: false };
   }
 
-  // Warm the model into VRAM (keep_alive 30m) so the first customer request is instant.
+  // Warm the model into VRAM with keep_alive:-1 (NEVER auto-unload) so it stays resident the
+  // whole time the site is up — the scan page also re-asserts this on visit (see brain-warm).
   let warmed = false;
   try {
     const r = await fetch(`${BASE}/api/generate`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, prompt: 'ok', stream: false, keep_alive: '30m' }),
+      body: JSON.stringify({ model: MODEL, prompt: 'ok', stream: false, keep_alive: -1 }),
       signal: AbortSignal.timeout(120000),
     });
     warmed = r.ok;
