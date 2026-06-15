@@ -11,7 +11,10 @@
 # the LLM is only used for recommendation reasons — so customers never hit a hard break.)
 
 $ErrorActionPreference = 'SilentlyContinue'
-$Model   = $env:OLLAMA_MODEL; if (-not $Model) { $Model = 'gemma2:27b' }  # engine model — clean Hebrew
+$Model   = $env:OLLAMA_MODEL; if (-not $Model) { $Model = 'gemma2:9b' }  # engine model — clean Hebrew, fast on RTX 3090
+# RTX 3090 (24GB) tuning: Flash Attention speeds the prefill; q8 KV-cache halves context VRAM.
+$env:OLLAMA_FLASH_ATTENTION = '1'
+$env:OLLAMA_KV_CACHE_TYPE   = 'q8_0'
 $Base    = 'http://localhost:11434'
 $LogFile = Join-Path $PSScriptRoot 'ollama-keepalive.log'
 function Log($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $LogFile -Append -Encoding utf8 }
