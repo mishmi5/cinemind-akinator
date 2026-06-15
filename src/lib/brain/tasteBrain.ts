@@ -216,6 +216,27 @@ sub-genre. tasteSummary must name the precise loved sub-genre.`;
   return null;
 }
 
+// Natural-language recommendation REASON, written by the local model (default gemma2:27b —
+// the only locally-available model that produces clean Hebrew without code-switching; qwen
+// models drift into Chinese/French mid-sentence). The model writes ONLY the prose reason
+// over an already-chosen film — it never picks the film, so it can't break the surgical
+// selection. Falls back to a clean template if the model is unavailable.
+export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean }): Promise<string> {
+  const { title, year, term, locale, mock } = opts;
+  const fallback = locale === 'he' ? `בחירה קלאסית ומדויקת בסגנון ${term}` : `A canonical ${term} pick`;
+  if (mock) return fallback;
+  const model = tasteModel();
+  if (!model) return fallback;
+  const prompt = locale === 'he'
+    ? `המשתמש אוהב סרטי ${term}. כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה הוא יאהב את הסרט "${title}"${year ? ` (${year})` : ''}. החזר רק את המשפט עצמו, בלי הקדמה.`
+    : `The user loves ${term} films. In ONE short, natural sentence, explain why they'll love "${title}"${year ? ` (${year})` : ''}. Return just the sentence.`;
+  try {
+    const { text } = await generateText({ model, prompt, temperature: 0.6 });
+    const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
+    return clean.slice(0, 240) || fallback;
+  } catch { return fallback; }
+}
+
 // ── Deterministic mock brain (offline pipeline validation; no LLM) ────────────
 function mockBrainStep(history: BrainHistoryItem[], pool: BrainCandidate[], minQ: number, maxQ: number): BrainResult {
   const liked: Record<string, number> = {};

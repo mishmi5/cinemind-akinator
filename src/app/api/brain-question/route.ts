@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { brainRecommend, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
+import { brainRecommend, recReason, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
 import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, subGenreFamily, recommendBySubGenre, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
 
@@ -244,12 +244,19 @@ export async function POST(req: Request) {
     const picks = uniq.slice(0, 3);
     for (const p of picks) p.trailerId = await getTrailer(p.id);
 
+    // The local model (gemma2) writes the natural-language reason in the user's language —
+    // this is the customer-facing "answer" the LLM provides. Generated in parallel over the
+    // already-chosen films, so it cannot affect the surgical selection.
+    const yearOf = (p: typeof picks[number]) => (p.originalDetails || '').match(/(\d{4})/)?.[1];
+    const reasons = await Promise.all(picks.map(p =>
+      recReason({ title: p.title, year: yearOf(p), term: confirmedTerm || 'this style', locale, mock })));
+
     const finalMovies = picks.map((p, i) => ({
       id: `res_${p.id}`, title: p.title,
       matchScore: Math.round(99 - i * 4),
       posterUrl: p.posterUrl, trailerId: p.trailerId, overview: p.overview,
       _genreIds: p._genreIds,
-      reason: confirmedTerm ? `A canonical ${confirmedTerm} pick` : '',
+      reason: reasons[i] || (confirmedTerm ? `A canonical ${confirmedTerm} pick` : ''),
     }));
 
     return NextResponse.json({
