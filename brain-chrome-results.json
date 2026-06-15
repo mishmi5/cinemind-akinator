@@ -6,48 +6,49 @@
     "score": 95,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI correctly identified the user's love for hard science fiction and provided relevant recommendations.",
+    "verdict": "Perfectly captured the specific sub-genre and avoided dislikes with canonical examples.",
     "missed": "",
     "tasteSummary": "Loves hard science fiction",
     "recs": [
-      "Primer",
       "Gattaca",
-      "First Moon"
+      "Primer",
+      "Solaris"
     ],
-    "questions": 27
+    "questions": 28
   },
   {
     "persona": "Heist Caper Fan",
     "taste": "Loves clever HEIST / caper thrillers (Ocean's Eleven, Inside Man, Heat). Dislikes war films and superhero action. Neutral elsewhere.",
     "pass": true,
-    "score": 100,
+    "score": 95,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI perfectly identified the user's love for clever heist/caper thrillers and provided excellent recommendations within this sub-genre without any disliked film suggestions.",
-    "missed": "",
+    "verdict": "Perfectly captured the specific sub-genre with canonical examples, avoided dislikes.",
+    "missed": "None - all recommendations are classic heist/caper films within the user's love list.",
     "tasteSummary": "Loves heist",
     "recs": [
+      "Inside Man",
       "The Italian Job",
-      "The Town",
-      "Inside Man"
+      "The Town"
     ],
-    "questions": 47
+    "questions": 34
   },
   {
     "persona": "Deadpan Whimsy",
     "taste": "Loves quirky, symmetrical DEADPAN comedy-drama (Wes Anderson, Yorgos Lanthimos). Dislikes crude/gross-out comedy. Neutral elsewhere.",
     "pass": false,
-    "score": 20,
+    "score": 80,
     "subGenre": false,
     "hatesAvoided": true,
-    "verdict": "The AI failed to identify the specific sub-genre of quirky, symmetrical deadpan comedy-drama and provided generic romantic comedies.",
-    "missed": "Crazy Rich Asians is a mainstream romantic comedy with no elements of the user's preferred style. The Proposal similarly misses the mark as it does not align with the user's taste for quirky, symmetrical deadpan comedy-drama.",
-    "tasteSummary": "Eclectic taste",
+    "verdict": "Recommended correct sub-genre but failed to name it specifically",
+    "missed": "Did not identify 'quirky, symmetrical deadpan comedy-drama' as the sub-genre; instead, used broad term 'deadpan comedy' which is insufficient for sub-genre identification.",
+    "tasteSummary": "Loves deadpan comedy",
     "recs": [
-      "Crazy Rich Asians",
-      "The Proposal"
+      "The Royal Tenenbaums",
+      "Napoleon Dynamite",
+      "Moonrise Kingdom"
     ],
-    "questions": 58
+    "questions": 19
   },
   {
     "persona": "Kaiju Monster Fan",
@@ -56,29 +57,30 @@
     "score": 0,
     "subGenre": false,
     "hatesAvoided": false,
-    "verdict": "The AI failed to identify the user's love for giant monster films and instead recommended quiet human dramas which the user dislikes.",
-    "missed": "The AI missed the specific sub-genre of kaiju/giant monster films and did not provide any recommendations within this preferred genre.",
+    "verdict": "Completely missed the sub-genre and recommended hated genres",
+    "missed": "AI failed to identify the specific sub-genre (kaiju/giant monster) and instead recommended psychological thrillers (Memento, Shutter Island, Prisoners), which are in the disliked genres (dramas/thrillers) and not the loved kaiju sub-genre.",
     "tasteSummary": "Eclectic taste",
     "recs": [
-      "The Witch",
-      "Midsommar"
+      "Memento",
+      "Shutter Island",
+      "Prisoners"
     ],
-    "questions": 1
+    "questions": 21
   },
   {
     "persona": "Slow Cinema Arthouse",
     "taste": "Loves SLOW arthouse cinema (Tarkovsky's Stalker, Bela Tarr, contemplative long takes). Dislikes fast blockbusters and comedy. Neutral elsewhere.",
-    "pass": true,
-    "score": 95,
-    "subGenre": true,
-    "hatesAvoided": true,
-    "verdict": "The AI accurately identified and recommended films within the slow arthouse cinema sub-genre.",
-    "missed": "",
+    "pass": false,
+    "score": 0,
+    "subGenre": false,
+    "hatesAvoided": false,
+    "verdict": "AI failed to identify the specific sub-genre and recommended mainstream films that don't align with the user's love for slow arthouse cinema.",
+    "missed": "The AI did not identify the specific sub-genre (slow arthouse cinema) and recommended mainstream films (A Single Man, The Secret Life of Walter Mitty, Before Sunrise) that are not contemplative slow cinema but rather more conventional romantic dramas with faster pacing.",
     "tasteSummary": "Eclectic taste",
     "recs": [
-      "Aguirre, the Wrath of God",
-      "The Lives of Others",
-      "Tokyo Story"
+      "A Single Man",
+      "The Secret Life of Walter Mitty",
+      "Before Sunrise"
     ],
     "questions": 58
   }

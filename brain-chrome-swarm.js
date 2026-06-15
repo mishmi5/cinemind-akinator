@@ -17,9 +17,12 @@
 const fs = require('fs');
 const { chromium } = require('playwright');
 
-const OLLAMA = 'http://localhost:11434/v1/chat/completions';
-const JUDGE_MODEL = process.env.JUDGE_MODEL || 'qwen2.5:14b-instruct';
-const SIM_MODEL = process.env.SIM_MODEL || 'qwen2.5:14b-instruct';
+const OLLAMA = 'http://localhost:11434/api/chat'; // native API → supports think:false for qwen3
+// Default sim = qwen3:30b-a3b (MoE) with thinking OFF: 30B-level film knowledge at ~0.8s/call
+// (only 3B params active), far more accurate on sub-genres than 14B, without the slowdown of
+// dense-32B or qwen3's reasoning mode. Override with SIM_MODEL env.
+const JUDGE_MODEL = process.env.JUDGE_MODEL || 'qwen3:30b-a3b';
+const SIM_MODEL = process.env.SIM_MODEL || 'qwen3:30b-a3b';
 const BASE = process.env.BASE || 'http://localhost:3000/en/scan?brain=1';
 const PASS_SCORE = 90;
 const MAX_Q = 62;
@@ -55,10 +58,10 @@ async function ollamaJSON(model, system, user, retries = 2, temperature = 0.2) {
     try {
       const r = await fetch(OLLAMA, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], temperature, stream: false, response_format: { type: 'json_object' } }),
+        body: JSON.stringify({ model, think: false, stream: false, format: 'json', options: { temperature }, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
       });
       const j = await r.json();
-      let c = j.choices?.[0]?.message?.content || '';
+      let c = (j.message && j.message.content) || '';
       c = c.replace(/<think>[\s\S]*?<\/think>/g, '');
       const m = c.match(/\{[\s\S]*\}/);
       if (m) return JSON.parse(m[0]);
@@ -71,8 +74,9 @@ async function ollamaJSON(model, system, user, retries = 2, temperature = 0.2) {
 // 14B model hesitate and under-rate true bullseyes, stalling the quiz). A single call with
 // a few retries matches the API harness behaviour that passes 40/40.
 async function rateMovie(persona, movie) {
-  const sys = `You ARE this exact moviegoer: ${persona.taste}\n\nIdentify the movie's PRECISE sub-genre, then rate 1-5 by how exactly it hits YOUR narrow taste. Be DECISIVE:\n- 5 = the EXACT sub-genre you love (the bullseye).\n- 4 = an adjacent sub-genre you enjoy but not your precise core.\n- 3 = unrelated to your loves and dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nOutput JSON {"rating": <1-5 integer>, "why": "<the sub-genre, 3 words>"}.`;
-  const usr = `Movie: "${movie.title}"${movie.year ? ` (${movie.year})` : ''}, genres: ${(movie.genres || []).join(', ') || 'unknown'}.`;
+  const sys = `You ARE this exact moviegoer: ${persona.taste}\n\nUse the PLOT to pin the movie's PRECISE sub-genre (broad genres like "Comedy/Drama" are not enough), then rate 1-5 by how exactly it hits YOUR narrow taste. Be DECISIVE — favour 5 or 1 over a wishy-washy 3-4:\n- 5 = the EXACT sub-genre you love (the bullseye).\n- 4 = an adjacent sub-genre you enjoy but not your precise core.\n- 3 = unrelated to your loves and dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nOutput JSON {"rating": <1-5 integer>, "why": "<the sub-genre, 3 words>"}.`;
+  const plot = movie.overview ? ` Plot: ${String(movie.overview).slice(0, 300)}` : '';
+  const usr = `Movie: "${movie.title}"${movie.year ? ` (${movie.year})` : ''}, genres: ${(movie.genres || []).join(', ') || 'unknown'}.${plot}`;
   const o = await ollamaJSON(SIM_MODEL, sys, usr, 3);
   const r = o && Number(o.rating);
   return Number.isFinite(r) ? Math.max(1, Math.min(5, Math.round(r))) : 3;
@@ -120,7 +124,7 @@ async function runPersonaInTab(context, persona) {
       lastTitle = mv.title; n++;
       const yr = (mv.originalDetails || '').match(/(\d{4})/)?.[1];
       const genres = (mv._genreIds || []).map(g => GENRE[g]).filter(Boolean);
-      const rating = await rateMovie(persona, { title: mv.title, year: yr, genres });
+      const rating = await rateMovie(persona, { title: mv.title, year: yr, genres, overview: mv.overview });
       // CLICK the real star button (nth-child rating) in the live UI.
       await page.locator('.stars-container button').nth(rating - 1).click();
       // Wait until the UI advances (new title) or completes.
