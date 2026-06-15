@@ -391,11 +391,11 @@ export default function ScanMovieEvaluation() {
     );
   }
 
-  // Honest meter: server's progressPercent (confidence-vs-questions racer),
-  // kept monotonic — a progress bar must never move backwards.
-  const rawProgress = session.progressPercent ?? Math.round(session.confidenceScore * 100);
-  if (rawProgress > maxProgressRef.current) maxProgressRef.current = rawProgress;
-  const confidencePercentage = Math.max(1, maxProgressRef.current);
+  // Honest meter: follow the server's progressPercent DIRECTLY (it is already eased to ≤4%
+  // per answer and is intentionally bidirectional — it rises on confirming answers and dips
+  // on uncertain/contradicting ones). No monotonic max: a forced "never go back" would hide
+  // those dips and also cause the jump-to-100.
+  const confidencePercentage = Math.max(1, session.progressPercent ?? Math.round(session.confidenceScore * 100));
   const dynamicPhrase = getDynamicPhrase(session.historyCount);
   return (
     <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">

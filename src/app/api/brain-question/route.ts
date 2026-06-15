@@ -308,7 +308,10 @@ export async function POST(req: Request) {
     else if (target < prevShown) shown = Math.max(target, prevShown - 4);  // fall ≤ 4 (uncertainty)
     else shown = prevShown;
 
-    const done = wantFinish && shown >= 96;
+    // Complete only once the ALREADY-DISPLAYED meter (prevShown) has reached 96 — so the final
+    // visible step is 96→100 (≤4), never e.g. 92→100. The meter shows 96 on one question, then
+    // the next response is the recommendations at 100.
+    const done = wantFinish && prevShown >= 96;
 
     if (!done) {
       // Serve the next question — always a real pool movie.
