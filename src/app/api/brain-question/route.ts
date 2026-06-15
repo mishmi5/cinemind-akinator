@@ -278,37 +278,37 @@ export async function POST(req: Request) {
     // A slow monotonic "creep" so the meter never sits perfectly flat during a long drill-off
     // (a broad taste with many tied contenders) — it keeps inching up as the user answers.
     const creep = Math.min(1, history.length / 50);
-    const confidence = Math.max(0.05, Math.min(0.99, 0.22 * sweepProgress + 0.18 * ratedProgress + 0.52 * leaderStrength + 0.08 * creep) - contraPenalty);
+    // Small creep weight so it gives gentle forward motion WITHOUT masking a real DROP when an
+    // answer adds uncertainty (a leader contradiction lowers leaderStrength + contraPenalty).
+    const confidence = Math.max(0.05, Math.min(0.99, 0.24 * sweepProgress + 0.18 * ratedProgress + 0.55 * leaderStrength + 0.03 * creep) - contraPenalty);
 
     // DISPLAY METER: ease the SHOWN percent toward the true confidence by at most 4 points per
     // answer (owner wants smooth 1-4% steps, never a 5→42 jump). The previous shown value
     // round-trips via the x-current-confidence header. Completion is gated on the SHOWN meter
     // (below), so the final step to 100 is also ≤4.
     const prevShown = Math.round((parseFloat(req.headers.get('x-current-confidence') || '0') || 0) * 100);
-    // A gentle FLOW FLOOR that rises with question count to ~0.96 by ~Q30. It guarantees the
-    // meter keeps climbing toward completion so a hard cap (MAX_Q / shown-cap) is hit only when
-    // the meter is already ≥96 — never a 64→100 jump. Real completion still needs a confirmed
-    // lock; the floor only governs the DISPLAY, eased ≤4%/step below.
-    const flowFloor = Math.min(0.96, (history.length / 30) * 0.96);
-    const target = Math.round(Math.min(0.99, Math.max(confidence, flowFloor)) * 100);
-    let shown: number;
-    if (prevShown <= 0) shown = Math.min(target, 5);                          // first question: gentle start
-    else if (target > prevShown) shown = Math.min(target, prevShown + 4);     // rise ≤ 4
-    else if (target < prevShown) shown = Math.max(target, prevShown - 4);     // fall ≤ 4 (contradictions)
-    else shown = prevShown;
 
-    // ── Completion: the lead sub-genre is confirmed (LOCK_HITS strong hits), or hard cap.
-    //    A lock is only reachable by drilling, which means real confirmation. ──
-    // Two caps: MAX_Q on RATED answers, and a TOTAL-SHOWN cap on movies presented (incl.
-    // "didn't see"). The latter guarantees the quiz ALWAYS terminates — without it a user who
-    // hasn't seen many films could be shown 100+ cards and never reach recs (the frozen-meter
-    // bug). At the shown cap we finish with the best signal gathered so far.
+    // ── Completion intent: the engine WANTS to finish once the taste is locked (after MIN_Q),
+    //    or a hard cap is reached. Two caps: MAX_Q on RATED answers, and a TOTAL-SHOWN cap on
+    //    movies presented (incl. "didn't see") so the quiz ALWAYS terminates. ──
     const atCap = history.length >= MAX_Q;
     const atShownCap = (history.length + notSeen) >= SHOWN_CAP; // session-scoped, not cross-quiz
-    // Finish only once the meter has genuinely ramped into the 90s — completing at ~75% felt
-    // like a jump. With the lock confirmed we serve a few on-taste confirmation questions
-    // until confidence ≥ 0.9, so the user watches it climb 90→95→100 right before the recs.
-    const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove && shown >= 96);
+    const wantFinish = atShownCap || (history.length >= MIN_Q && (atCap || !!lockedLove));
+
+    // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
+    // freely UP *and DOWN* (≤4 points per answer) — a taste-reversing / uncertain answer drops
+    // it 1–4%, a confirming one lifts it 1–4%. Only when the engine wants to FINISH do we raise
+    // the target to ~99, so the meter eases up the last stretch and we complete ONLY once it has
+    // reached 96 — the final step to 100 is then ≤4, never a jump. prevShown round-trips via the
+    // x-current-confidence header.
+    const target = Math.round(Math.min(0.99, wantFinish ? Math.max(confidence, 0.99) : confidence) * 100);
+    let shown: number;
+    if (prevShown <= 0) shown = Math.min(target, 5);                       // first question: gentle start
+    else if (target > prevShown) shown = Math.min(target, prevShown + 4);  // rise ≤ 4
+    else if (target < prevShown) shown = Math.max(target, prevShown - 4);  // fall ≤ 4 (uncertainty)
+    else shown = prevShown;
+
+    const done = wantFinish && shown >= 96;
 
     if (!done) {
       // Serve the next question — always a real pool movie.
