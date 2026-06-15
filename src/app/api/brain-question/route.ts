@@ -109,6 +109,11 @@ export async function POST(req: Request) {
     const probe: ProbeScores = (payload.probeScores && typeof payload.probeScores === 'object') ? payload.probeScores : {};
     // The hint that produced the movie just answered (round-tripped from the prior response).
     const activeHint = typeof payload.searchHint === 'string' ? payload.searchHint.trim() : '';
+    // SESSION-scoped count of "didn't see" answers (round-trips in the body). The completion
+    // cap must be based on movies shown THIS quiz — NOT the cross-quiz `x-asked-ids` list
+    // (which carries variety/dedup history from prior quizzes and would otherwise trip the
+    // cap instantly for a returning user → quiz jumps straight to recommendations).
+    let notSeen = typeof payload.notSeen === 'number' ? payload.notSeen : 0;
 
     const backend = brainBackend();
     const mock = req.headers.get('x-brain-mock') === '1' || process.env.BRAIN_MOCK === '1';
@@ -148,8 +153,9 @@ export async function POST(req: Request) {
           contra,
         };
       }
-    } else if (!payload.isInit && payload.movieId && !askedMovieIds.includes(payload.movieId)) {
-      askedMovieIds.push(payload.movieId); // NOT_SEEN: mark shown, no taste signal
+    } else if (!payload.isInit && payload.movieId && typeof payload.answer !== 'number') {
+      if (!askedMovieIds.includes(payload.movieId)) askedMovieIds.push(payload.movieId);
+      notSeen += 1; // NOT_SEEN: no taste signal, but it IS a movie shown this session
     }
 
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds]));
@@ -222,6 +228,7 @@ export async function POST(req: Request) {
     const baseState = {
       sessionId, historyCount: history.length, ratedCount: history.length,
       askedMovieIds, userAffinities: {}, ratingHistory: history, probeScores: probe, engine: 'brain',
+      notSeen, // session-scoped "didn't see" count, round-trips so the shown-cap stays per-quiz
     };
 
     // ── Honest progress: confidence reflects genuine sub-genre understanding, not click
@@ -248,7 +255,7 @@ export async function POST(req: Request) {
     // hasn't seen many films could be shown 100+ cards and never reach recs (the frozen-meter
     // bug). At the shown cap we finish with the best signal gathered so far.
     const atCap = history.length >= MAX_Q;
-    const atShownCap = askedMovieIds.length >= SHOWN_CAP;
+    const atShownCap = (history.length + notSeen) >= SHOWN_CAP; // session-scoped, not cross-quiz
     const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove);
 
     if (!done) {

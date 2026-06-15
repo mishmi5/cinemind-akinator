@@ -270,6 +270,7 @@ export default function ScanMovieEvaluation() {
           ratingHistory: session!.ratingHistory || [],
           searchHint: (session as any)!.searchHint || '',
           probeScores: (session as any)!.probeScores || {},
+          notSeen: (session as any)!.notSeen || 0, // session-scoped shown-cap counter (round-trips)
           title: session!.currentQuestion!.movie?.title,
           year: yearMatch ? yearMatch[1] : undefined,
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the
