@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { brainRecommend, recReason, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
+import { recReason, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
-import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
+import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, genreNames } from '@/lib/brain/tmdb';
 
 // Taste-brain quiz endpoint (Akinator-style). DETERMINISTIC sub-genre navigation:
 // the route — not the LLM — decides what to ask. Why: a 14B local model is unreliable
@@ -320,27 +320,49 @@ export async function POST(req: Request) {
     };
     const add = (m: Rec | null) => { if (m && !resolved.some(x => x.id === m.id) && !isBad(m)) resolved.push(m); };
 
-    // 1) curated canonical seeds for the confirmed loved sub-genre.
-    if (confirmedTerm) {
-      for (const m of await recommendBySubGenre(confirmedTerm, askedMovieIds, locale, 8)) { if (resolved.length >= 3) break; add(m); }
+    // Build the LOVED candidate pool: curated seeds from the confirmed term + any OTHER loved
+    // sub-genre (never a disliked term, never a generic popular pool — that's what leaked a
+    // hated style like Guardians before). Every candidate is a real, on-taste film.
+    const dislikedSet = new Set(disliked);
+    const lovedTerms = [confirmedTerm, ...loved.map(s => s.t)]
+      .filter((t, i, a) => !!t && !dislikedSet.has(t) && a.indexOf(t) === i);
+    const candPool: Rec[] = [];
+    for (const term of lovedTerms) {
+      if (candPool.length >= 12) break;
+      for (const m of await recommendBySubGenre(term, askedMovieIds, locale, 6)) {
+        if (candPool.length >= 12) break;
+        if (!candPool.some(x => x.id === m.id) && !isBad(m)) candPool.push(m);
+      }
     }
-    // 2) keyword pool on the loved term.
+    // AI TASTE DIRECTOR (gemma2): picks the final 3 FROM the real candidate pool, steered by
+    // the user's actual loved/hated FILMS — so it rejects a hated franchise/studio/style the
+    // coarse genre filter can't (e.g. "hated Marvel/DC → never Guardians of the Galaxy").
+    // Grounded (chooses only from the supplied list, no hallucination); null → deterministic.
+    const lovedTitles = history.filter(h => h.rating >= HI).map(h => h.title);
+    const hatedTitles = history.filter(h => h.rating <= LO).map(h => h.title);
+    const byTitle = new Map(candPool.map(m => [m.title, m] as const));
+    const directed = await directRecs({ candidates: candPool.map(m => m.title), lovedTitles, hatedTitles, term: confirmedTerm || 'this taste', mock });
+    if (directed) for (const t of directed) { if (resolved.length >= 3) break; add(byTitle.get(t) || null); }
+    // deterministic order of the same safe pool if the director under-filled.
+    for (const m of candPool) { if (resolved.length >= 3) break; add(m); }
+    // keyword pool on the confirmed term (still squarely on-taste).
     if (resolved.length < 3 && confirmedTerm) {
       for (const c of await fetchPoolByHint(confirmedTerm, seen, locale, 16)) { if (resolved.length >= 3) break; add(await movieById(c.id, locale)); }
     }
-    // 3) LLM proposal, grounded + dislike-filtered.
+    // Guarantee 3 recs WITHOUT ever leaking a rejected style: a popular film must share a
+    // LOVED genre (and pass the dislike filter). Only if the taste was too thin to have any
+    // loved genre do we allow any non-hated popular film.
     if (resolved.length < 3) {
-      const recPass = await brainRecommend(history, { mock, loved: loved.map(s => s.t), disliked });
-      for (const r of recPass?.recommendations || []) { if (resolved.length >= 3) break; add(await resolveByTitle(r.title, r.year != null ? String(r.year) : null, locale)); }
+      for (const c of await fetchCandidatePool(seen, locale, 40)) {
+        if (resolved.length >= 3) break;
+        const m = await movieById(c.id, locale);
+        if (!m || resolved.some(x => x.id === m.id) || isBad(m)) continue;
+        const names = genreNames(m._genreIds || []);
+        if (lovedGenres.size === 0 || names.some(n => lovedGenres.has(n))) resolved.push(m);
+      }
     }
-    // 4) popular pool — STILL dislike-filtered, so a rejected style never leaks in.
     if (resolved.length < 3) {
-      for (const c of await fetchCandidatePool(seen, locale, 30)) { if (resolved.length >= 3) break; add(await movieById(c.id, locale)); }
-    }
-    // 5) absolute last resort to guarantee 3 recs: relax the genre filter but NEVER re-surface
-    //    a film the user actually rated low (or already saw).
-    if (resolved.length < 3) {
-      for (const c of await fetchCandidatePool(seen, locale, 30)) {
+      for (const c of await fetchCandidatePool(seen, locale, 40)) {
         if (resolved.length >= 3) break;
         const m = await movieById(c.id, locale);
         if (m && !resolved.some(x => x.id === m.id) && !askedMovieIds.includes(m.id) && !hatedIds.has(m.id)) resolved.push(m);

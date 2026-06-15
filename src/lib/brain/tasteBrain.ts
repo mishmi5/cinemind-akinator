@@ -238,6 +238,36 @@ export async function recReason(opts: { title: string; year?: string; term: stri
   } catch { return fallback; }
 }
 
+// AI TASTE DIRECTOR: choose the final picks FROM A GIVEN LIST of real candidate films (so it
+// can never hallucinate), steered by the user's actual loved/hated films. This is where the
+// model reasons about franchise/studio/style the deterministic genre filter can't capture —
+// e.g. "the user hated Marvel/DC, so never pick Guardians of the Galaxy even though Comedy is
+// a genre they like." Returns chosen titles (a subset of `candidates`), or null to fall back.
+export async function directRecs(opts: {
+  candidates: string[]; lovedTitles: string[]; hatedTitles: string[]; term: string; n?: number; mock?: boolean;
+}): Promise<string[] | null> {
+  const { candidates, lovedTitles, hatedTitles, term, n = 3, mock } = opts;
+  if (mock || candidates.length === 0) return null;
+  const model = tasteModel();
+  if (!model) return null;
+  const prompt = `You are a film taste director. Choose EXACTLY ${n} movies FROM THIS LIST ONLY (copy each chosen title verbatim):
+${candidates.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+The user's confirmed taste is "${term}".
+LOVED: ${lovedTitles.length ? lovedTitles.join(', ') : '(see taste above)'}.
+HATED: ${hatedTitles.length ? hatedTitles.join(', ') : '(none stated)'}.
+
+Pick the ${n} that BEST match what they loved. NEVER pick anything that resembles — in
+franchise, studio, or overall style — what they hated (e.g. if they hated Marvel/DC superhero
+films, never pick a Marvel or superhero film, even one on the list). Return ONLY the chosen
+titles, copied exactly from the list.`;
+  try {
+    const { object } = await generateObject({ model, schema: z.object({ picks: z.array(z.string()) }), prompt, temperature: 0.3 });
+    const picks = object.picks.filter(p => candidates.includes(p)).slice(0, n);
+    return picks.length ? picks : null;
+  } catch { return null; }
+}
+
 // ── Deterministic mock brain (offline pipeline validation; no LLM) ────────────
 function mockBrainStep(history: BrainHistoryItem[], pool: BrainCandidate[], minQ: number, maxQ: number): BrainResult {
   const liked: Record<string, number> = {};
