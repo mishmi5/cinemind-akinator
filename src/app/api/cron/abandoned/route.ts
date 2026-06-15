@@ -3,12 +3,13 @@ import { sendTelegramAlert } from '@/lib/telegram';
 import { resend, isResendConfigured } from '@/lib/resend';
 
 export async function GET(req: Request) {
-  // Protect cron endpoint in production
-  // if (req.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  // }
-
   try {
+    // Protect cron endpoint in production
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+
     // Simulated mock users who abandoned the paywall
     const mockAbandonedUsers = [
       { email: 'test@example.com', name: 'User' }
