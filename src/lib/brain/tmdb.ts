@@ -190,31 +190,31 @@ export function subGenreFamily(term: string): string | undefined { return FAMILY
 // DIFFERENT order. Rich opening variety, never the same questionnaire twice, yet always
 // recognizable (near-zero "didn't see").
 const POPULAR_OPENERS: { term: string; titles: string[] }[] = [
-  { term: 'superhero', titles: ['The Dark Knight', 'The Avengers', 'Iron Man', 'Spider-Man', 'Black Panther'] },
-  { term: 'space opera', titles: ['Star Wars', 'Guardians of the Galaxy', 'Star Wars: The Force Awakens'] },
-  { term: 'cosmic sci-fi epic', titles: ['Interstellar', 'Avatar', 'Gravity'] },
-  { term: 'cyberpunk', titles: ['The Matrix', 'Blade Runner 2049'] },
-  { term: 'time travel', titles: ['Back to the Future', 'Edge of Tomorrow'] },
-  { term: 'slasher', titles: ['Scream', 'Halloween'] },
-  { term: 'creature feature', titles: ['Jaws (1975)', 'Jurassic Park', 'Anaconda'] },
-  { term: 'supernatural horror', titles: ['The Conjuring', 'Insidious', 'It'] },
-  { term: 'zombie', titles: ['World War Z', 'Zombieland', 'Train to Busan'] },
-  { term: 'heist', titles: ["Ocean's Eleven", 'The Italian Job', 'Now You See Me'] },
-  { term: 'action spy thriller', titles: ['Skyfall', 'Mission: Impossible - Fallout', 'The Bourne Identity', 'Casino Royale'] },
-  { term: 'war epic', titles: ['Saving Private Ryan', 'Dunkirk', '1917'] },
-  { term: 'martial arts', titles: ['Enter the Dragon', 'Ip Man'] },
-  { term: 'spaghetti western', titles: ['The Good, the Bad and the Ugly', 'Django Unchained'] },
-  { term: 'psychological thriller', titles: ['Se7en', 'Shutter Island', 'Gone Girl', 'The Silence of the Lambs'] },
-  { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express', 'Glass Onion'] },
-  { term: 'disaster', titles: ['Twister', '2012', 'San Andreas', 'The Day After Tomorrow'] },
-  { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', "Harry Potter and the Philosopher's Stone", 'The Hobbit: An Unexpected Journey'] },
-  { term: 'romantic comedy', titles: ['When Harry Met Sally', 'Notting Hill', 'Pretty Woman', 'Crazy Rich Asians'] },
-  { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Hangover', 'Ace Ventura: Pet Detective'] },
-  { term: 'holiday christmas', titles: ['Home Alone', 'Elf'] },
-  { term: 'coming-of-age', titles: ['Stand By Me', 'The Breakfast Club', 'Lady Bird'] },
-  { term: 'sports drama', titles: ['Rocky', 'The Blind Side', 'Creed'] },
-  { term: 'musical', titles: ['La La Land', 'The Greatest Showman', 'Mamma Mia!'] },
-  { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name', 'Princess Mononoke'] },
+  { term: 'superhero', titles: ['The Dark Knight', 'The Avengers', 'Iron Man', 'Spider-Man', 'Black Panther', 'Wonder Woman', 'Deadpool', 'Captain America: The Winter Soldier', 'Thor: Ragnarok', 'The Batman'] },
+  { term: 'space opera', titles: ['Star Wars', 'The Empire Strikes Back', 'Return of the Jedi', 'Star Wars: The Force Awakens', 'Guardians of the Galaxy', 'Rogue One: A Star Wars Story', 'The Fifth Element', 'Star Trek'] },
+  { term: 'cosmic sci-fi epic', titles: ['Interstellar', 'Avatar', 'Gravity', 'The Martian', 'Contact', 'Ad Astra', 'Avatar: The Way of Water', 'Prometheus'] },
+  { term: 'cyberpunk', titles: ['The Matrix', 'Blade Runner 2049', 'Blade Runner', 'Ready Player One', 'Ghost in the Shell', 'Tron: Legacy', 'Total Recall', 'The Matrix Reloaded'] },
+  { term: 'time travel', titles: ['Back to the Future', 'Back to the Future Part II', 'Edge of Tomorrow', 'Looper', 'Terminator 2: Judgment Day', 'The Terminator', 'X-Men: Days of Future Past', 'Tenet'] },
+  { term: 'slasher', titles: ['Scream', 'Halloween', 'A Nightmare on Elm Street', 'Friday the 13th', 'The Texas Chain Saw Massacre', "Child's Play", 'I Know What You Did Last Summer', 'Happy Death Day'] },
+  { term: 'creature feature', titles: ['Jaws (1975)', 'Jurassic Park', 'Jurassic World', 'King Kong', 'Anaconda', 'The Meg', 'Tremors', 'Crawl'] },
+  { term: 'supernatural horror', titles: ['The Conjuring', 'Insidious', 'The Exorcist', 'It', 'The Ring', 'Sinister', 'Annabelle', 'Poltergeist'] },
+  { term: 'zombie', titles: ['World War Z', 'Zombieland', 'Train to Busan', 'Shaun of the Dead', '28 Days Later', 'I Am Legend', 'Resident Evil', 'Dawn of the Dead'] },
+  { term: 'heist', titles: ["Ocean's Eleven", 'The Italian Job', 'Now You See Me', 'Baby Driver', "Ocean's 8", 'The Town', 'Den of Thieves', 'Logan Lucky'] },
+  { term: 'action spy thriller', titles: ['Skyfall', 'Mission: Impossible - Fallout', 'Casino Royale', 'The Bourne Identity', 'Kingsman: The Secret Service', 'GoldenEye', 'Spectre', 'Quantum of Solace'] },
+  { term: 'war epic', titles: ['Saving Private Ryan', 'Dunkirk', '1917', 'Black Hawk Down', 'Hacksaw Ridge', 'Fury', 'American Sniper', 'Platoon'] },
+  { term: 'martial arts', titles: ['Enter the Dragon', 'Ip Man', 'Kung Fu Hustle', 'The Raid', 'Ong-Bak', 'Rush Hour', 'Drunken Master', 'Police Story'] },
+  { term: 'spaghetti western', titles: ['The Good, the Bad and the Ugly', 'A Fistful of Dollars', 'For a Few Dollars More', 'Once Upon a Time in the West', 'Django Unchained', 'The Magnificent Seven', 'True Grit', 'Tombstone'] },
+  { term: 'psychological thriller', titles: ['Se7en', 'Shutter Island', 'Gone Girl', 'The Silence of the Lambs', 'Prisoners', 'Memento', 'Fight Club', 'Joker'] },
+  { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express', 'Glass Onion', 'Death on the Nile', 'Clue', 'Sherlock Holmes', 'The Girl with the Dragon Tattoo', 'Gosford Park'] },
+  { term: 'disaster', titles: ['Twister', '2012', 'San Andreas', 'The Day After Tomorrow', 'Deep Impact', 'Armageddon', 'Geostorm', 'Greenland'] },
+  { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', 'The Lord of the Rings: The Two Towers', 'The Lord of the Rings: The Return of the King', "Harry Potter and the Philosopher's Stone", 'The Hobbit: An Unexpected Journey', 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'Stardust', 'Willow'] },
+  { term: 'romantic comedy', titles: ['When Harry Met Sally', 'Notting Hill', 'Pretty Woman', 'Crazy Rich Asians', "Bridget Jones's Diary", '10 Things I Hate About You', 'The Proposal', 'Love Actually'] },
+  { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Hangover', 'Ace Ventura: Pet Detective', 'Anchorman: The Legend of Ron Burgundy', 'Step Brothers', 'Superbad', '21 Jump Street', "We're the Millers"] },
+  { term: 'holiday christmas', titles: ['Home Alone', 'Elf', 'The Polar Express', 'How the Grinch Stole Christmas', 'Home Alone 2: Lost in New York', 'The Santa Clause', 'A Christmas Carol', 'Klaus'] },
+  { term: 'coming-of-age', titles: ['Stand By Me', 'The Breakfast Club', 'Lady Bird', 'Boyhood', 'Dead Poets Society', 'The Perks of Being a Wallflower', 'Juno', 'Call Me by Your Name'] },
+  { term: 'sports drama', titles: ['Rocky', 'The Blind Side', 'Creed', 'Remember the Titans', 'Moneyball', 'Rush', 'Million Dollar Baby', 'Ford v Ferrari'] },
+  { term: 'musical', titles: ['La La Land', 'The Greatest Showman', 'Mamma Mia!', 'Les Misérables', 'Chicago', 'Grease', 'Moulin Rouge!', 'A Star Is Born'] },
+  { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name', 'Princess Mononoke', 'My Neighbor Totoro', "Howl's Moving Castle", 'Demon Slayer: Kimetsu no Yaiba the Movie: Mugen Train', 'Akira', 'Weathering with You'] },
 ];
 
 let samplerCache: BrainCandidate[] | null = null;
@@ -249,20 +249,21 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
 export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandidate[]> {
   if (samplerCache) return samplerCache;
   if (!KEY) return [];
-  // Resolve the tier-1 popular openers AND the tier-2 niche exemplars. Openers are listed
-  // first so that when a film is BOTH (e.g. Star Wars is also the space-opera exemplar) it
-  // keeps the tier-1 tag and surfaces in the opening.
-  const openerResolved = await Promise.all(
-    POPULAR_OPENERS.flatMap(({ term, titles }) =>
-      titles.map(async title => ({ term, tier: 1 as const, cand: await candidateByTitle(title) }))),
-  );
-  const exemplarResolved = await Promise.all(
-    SUBGENRE_EXEMPLARS.flatMap(({ term, titles }) =>
-      titles.map(async t => ({ term, tier: 2 as const, cand: await candidateByTitle(t) }))),
-  );
+  // Flatten every title to resolve (tier-1 openers FIRST so a film that is both keeps its
+  // tier-1 tag and opens). ~290 titles → resolve in batches to avoid TMDB rate-limiting
+  // (429s would silently drop openers). Cached after the first build (candidateByTitle is
+  // revalidate-cached too), so this cost is paid once.
+  const jobs: { term: string; tier: 1 | 2; title: string }[] = [
+    ...POPULAR_OPENERS.flatMap(({ term, titles }) => titles.map(title => ({ term, tier: 1 as const, title }))),
+    ...SUBGENRE_EXEMPLARS.flatMap(({ term, titles }) => titles.map(title => ({ term, tier: 2 as const, title }))),
+  ];
   const byId = new Map<string, BrainCandidate>();
-  for (const { term, tier, cand } of [...openerResolved, ...exemplarResolved]) {
-    if (cand && !byId.has(cand.id)) { byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); samplerTierMap.set(cand.id, tier); }
+  for (let i = 0; i < jobs.length; i += 30) {
+    const batch = jobs.slice(i, i + 30);
+    const resolved = await Promise.all(batch.map(async j => ({ ...j, cand: await candidateByTitle(j.title) })));
+    for (const { term, tier, cand } of resolved) {
+      if (cand && !byId.has(cand.id)) { byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); samplerTierMap.set(cand.id, tier); }
+    }
   }
   samplerCache = Array.from(byId.values());
   return samplerCache;
