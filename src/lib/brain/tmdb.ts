@@ -184,32 +184,37 @@ export function subGenreFamily(term: string): string | undefined { return FAMILY
 // reliable early signal is what lets the engine calibrate before it deepens into the niche
 // tier-2 exemplars for surgical sub-genre resolution. Every `term` exists in the engine, so
 // rating an opener scores that sub-genre's probe directly (no wasted question).
-const POPULAR_OPENERS: { term: string; title: string }[] = [
-  { term: 'superhero', title: 'The Dark Knight' },
-  { term: 'space opera', title: 'Star Wars' },
-  { term: 'cosmic sci-fi epic', title: 'Interstellar' },
-  { term: 'cyberpunk', title: 'The Matrix' },
-  { term: 'time travel', title: 'Back to the Future' },
-  { term: 'slasher', title: 'Scream' },
-  { term: 'creature feature', title: 'Jaws (1975)' },
-  { term: 'supernatural horror', title: 'The Conjuring' },
-  { term: 'zombie', title: 'World War Z' },
-  { term: 'heist', title: "Ocean's Eleven" },
-  { term: 'action spy thriller', title: 'Skyfall' },
-  { term: 'war epic', title: 'Saving Private Ryan' },
-  { term: 'martial arts', title: 'Enter the Dragon' },
-  { term: 'spaghetti western', title: 'The Good, the Bad and the Ugly' },
-  { term: 'psychological thriller', title: 'Se7en' },
-  { term: 'whodunit mystery', title: 'Knives Out' },
-  { term: 'disaster', title: 'Twister' },
-  { term: 'epic high fantasy', title: 'The Lord of the Rings: The Fellowship of the Ring' },
-  { term: 'romantic comedy', title: 'When Harry Met Sally' },
-  { term: 'slapstick comedy', title: 'Dumb and Dumber' },
-  { term: 'holiday christmas', title: 'Home Alone' },
-  { term: 'coming-of-age', title: 'Stand By Me' },
-  { term: 'sports drama', title: 'Rocky' },
-  { term: 'musical', title: 'La La Land' },
-  { term: 'hand-drawn anime', title: 'Spirited Away' },
+// Each broad family carries SEVERAL household-name blockbusters. The opening sweep serves
+// ONE per family (the rest are skipped once that family is probed), and WHICH one is picked
+// is seeded by sessionId — so every quiz opens with a DIFFERENT set of popular films in a
+// DIFFERENT order. Rich opening variety, never the same questionnaire twice, yet always
+// recognizable (near-zero "didn't see").
+const POPULAR_OPENERS: { term: string; titles: string[] }[] = [
+  { term: 'superhero', titles: ['The Dark Knight', 'The Avengers', 'Iron Man', 'Spider-Man', 'Black Panther'] },
+  { term: 'space opera', titles: ['Star Wars', 'Guardians of the Galaxy', 'Star Wars: The Force Awakens'] },
+  { term: 'cosmic sci-fi epic', titles: ['Interstellar', 'Avatar', 'Gravity'] },
+  { term: 'cyberpunk', titles: ['The Matrix', 'Blade Runner 2049'] },
+  { term: 'time travel', titles: ['Back to the Future', 'Edge of Tomorrow'] },
+  { term: 'slasher', titles: ['Scream', 'Halloween'] },
+  { term: 'creature feature', titles: ['Jaws (1975)', 'Jurassic Park', 'Anaconda'] },
+  { term: 'supernatural horror', titles: ['The Conjuring', 'Insidious', 'It'] },
+  { term: 'zombie', titles: ['World War Z', 'Zombieland', 'Train to Busan'] },
+  { term: 'heist', titles: ["Ocean's Eleven", 'The Italian Job', 'Now You See Me'] },
+  { term: 'action spy thriller', titles: ['Skyfall', 'Mission: Impossible - Fallout', 'The Bourne Identity', 'Casino Royale'] },
+  { term: 'war epic', titles: ['Saving Private Ryan', 'Dunkirk', '1917'] },
+  { term: 'martial arts', titles: ['Enter the Dragon', 'Ip Man'] },
+  { term: 'spaghetti western', titles: ['The Good, the Bad and the Ugly', 'Django Unchained'] },
+  { term: 'psychological thriller', titles: ['Se7en', 'Shutter Island', 'Gone Girl', 'The Silence of the Lambs'] },
+  { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express', 'Glass Onion'] },
+  { term: 'disaster', titles: ['Twister', '2012', 'San Andreas', 'The Day After Tomorrow'] },
+  { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', "Harry Potter and the Philosopher's Stone", 'The Hobbit: An Unexpected Journey'] },
+  { term: 'romantic comedy', titles: ['When Harry Met Sally', 'Notting Hill', 'Pretty Woman', 'Crazy Rich Asians'] },
+  { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Hangover', 'Ace Ventura: Pet Detective'] },
+  { term: 'holiday christmas', titles: ['Home Alone', 'Elf'] },
+  { term: 'coming-of-age', titles: ['Stand By Me', 'The Breakfast Club', 'Lady Bird'] },
+  { term: 'sports drama', titles: ['Rocky', 'The Blind Side', 'Creed'] },
+  { term: 'musical', titles: ['La La Land', 'The Greatest Showman', 'Mamma Mia!'] },
+  { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name', 'Princess Mononoke'] },
 ];
 
 let samplerCache: BrainCandidate[] | null = null;
@@ -248,7 +253,8 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
   // first so that when a film is BOTH (e.g. Star Wars is also the space-opera exemplar) it
   // keeps the tier-1 tag and surfaces in the opening.
   const openerResolved = await Promise.all(
-    POPULAR_OPENERS.map(async ({ term, title }) => ({ term, tier: 1 as const, cand: await candidateByTitle(title) })),
+    POPULAR_OPENERS.flatMap(({ term, titles }) =>
+      titles.map(async title => ({ term, tier: 1 as const, cand: await candidateByTitle(title) }))),
   );
   const exemplarResolved = await Promise.all(
     SUBGENRE_EXEMPLARS.flatMap(({ term, titles }) =>

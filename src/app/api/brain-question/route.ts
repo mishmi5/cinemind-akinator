@@ -205,9 +205,13 @@ export async function POST(req: Request) {
       // real early signal, almost no "didn't see"), THEN tier-2 niche exemplars deepen toward
       // surgical resolution. Within a tier the order is per-session SHUFFLED (seeded by
       // sessionId) so no two questionnaires open the same. Order is correctness-neutral.
+      // Seed by MOVIE id (not term): families with several popular openers thus surface a
+      // DIFFERENT film per session (and in a different order). Once a family is probed its
+      // other openers drop from `uncovered`, so each session still asks ~one per family —
+      // but a fresh, reshuffled set every time. Rich opening variety, never the same quiz.
       const nextUp = [...uncovered].sort((a, b) =>
         (samplerTier(a.id) - samplerTier(b.id)) ||
-        (seededRank(sessionId + (samplerProbeOf(a.id) || a.id)) - seededRank(sessionId + (samplerProbeOf(b.id) || b.id))));
+        (seededRank(sessionId + a.id) - seededRank(sessionId + b.id)));
       pool = [nextUp[0]];
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
     } else {
