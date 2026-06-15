@@ -193,7 +193,10 @@ export async function POST(req: Request) {
     // tiebreak (the real love accrues more hits from its own keyword pool) instead of list
     // order. Never drill mid-sweep unless early-stop conditions hold.
     const needDrill = contenders.filter(s => s.n < 2).sort((a, b) => a.n - b.n || b.avg - a.avg);
-    const drillTarget = !lockedLove && exploitNow ? (needDrill[0] || leader) : null;
+    // Pre-lock: drill the least-explored close contender. Post-lock: keep drilling the LEADER
+    // so the final confirmation questions (served while the meter ramps the last bit to 100%)
+    // stay squarely on the user's confirmed taste — never random filler.
+    const drillTarget = exploitNow ? (lockedLove ? leader : (needDrill[0] || leader)) : null;
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
     if (drillTarget) {
@@ -240,13 +243,24 @@ export async function POST(req: Request) {
     // as the user answers, (c) leader strength as a CONTINUOUS value (hits + how far the avg
     // sits above neutral), not a binary lock. A real lock pins it to ~1.
     const sweepProgress = Math.min(1, Object.keys(probe).length / 12);
-    const ratedProgress = Math.min(1, history.length / 28);
-    const leaderStrength = lockedLove ? 1 : (leader ? Math.min(1, (leader.hi + Math.max(0, leader.avg - 3) / 2) / 3) : 0);
+    const ratedProgress = Math.min(1, history.length / 24);
+    // CONTINUOUS lock-proximity so the meter RAMPS smoothly toward 100 instead of completing
+    // at ~75% and jumping. It blends: how many of the needed confirming hits the leader has,
+    // how many close contenders are already drilled (the drill-off progress), and how
+    // decisive the leader's average is. Reaches ~0.97 just as the lock conditions are met,
+    // so the final step to a locked 100% is small and natural.
+    const need = LOCK_HITS + (leader?.contra || 0);
+    const hitProg = leader ? Math.min(1, leader.hi / need) : 0;
+    const drillProg = contenders.length ? contenders.filter(s => s.n >= 2).length / contenders.length : 1;
+    const leaderStrength = lockedLove ? 1 : (leader ? Math.min(0.97, 0.5 * hitProg + 0.3 * drillProg + 0.2 * (Math.max(0, leader.avg - 3) / 2)) : 0);
     // Each unresolved contradiction PULLS THE METER DOWN (0.15 apiece, capped) — the user
     // sees the percentage drop after a taste-reversing answer, signalling the engine is
     // re-checking rather than racing to a guess. Floored so it never reads as total reset.
     const contraPenalty = Math.min(0.5, (totalContra || 0) * 0.15);
-    const confidence = Math.max(0.05, Math.min(0.98, 0.30 * sweepProgress + 0.22 * ratedProgress + 0.48 * leaderStrength) - contraPenalty);
+    // A slow monotonic "creep" so the meter never sits perfectly flat during a long drill-off
+    // (a broad taste with many tied contenders) — it keeps inching up as the user answers.
+    const creep = Math.min(1, history.length / 50);
+    const confidence = Math.max(0.05, Math.min(0.99, 0.22 * sweepProgress + 0.18 * ratedProgress + 0.52 * leaderStrength + 0.08 * creep) - contraPenalty);
 
     // ── Completion: the lead sub-genre is confirmed (LOCK_HITS strong hits), or hard cap.
     //    A lock is only reachable by drilling, which means real confirmation. ──
@@ -256,7 +270,10 @@ export async function POST(req: Request) {
     // bug). At the shown cap we finish with the best signal gathered so far.
     const atCap = history.length >= MAX_Q;
     const atShownCap = (history.length + notSeen) >= SHOWN_CAP; // session-scoped, not cross-quiz
-    const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove);
+    // Finish only once the meter has genuinely ramped into the 90s — completing at ~75% felt
+    // like a jump. With the lock confirmed we serve a few on-taste confirmation questions
+    // until confidence ≥ 0.9, so the user watches it climb 90→95→100 right before the recs.
+    const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove && confidence >= 0.90);
 
     if (!done) {
       // Serve the next question — always a real pool movie.
