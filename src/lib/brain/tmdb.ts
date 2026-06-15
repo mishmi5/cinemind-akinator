@@ -179,9 +179,44 @@ const FAMILY_OF: Record<string, string> = {
 };
 export function subGenreFamily(term: string): string | undefined { return FAMILY_OF[term]; }
 
+// TIER-1 POPULAR OPENERS — one household-name blockbuster per broad taste. These are served
+// FIRST (the opening ~25 questions) so the user almost never answers "didn't see" early; that
+// reliable early signal is what lets the engine calibrate before it deepens into the niche
+// tier-2 exemplars for surgical sub-genre resolution. Every `term` exists in the engine, so
+// rating an opener scores that sub-genre's probe directly (no wasted question).
+const POPULAR_OPENERS: { term: string; title: string }[] = [
+  { term: 'superhero', title: 'The Dark Knight' },
+  { term: 'space opera', title: 'Star Wars' },
+  { term: 'cosmic sci-fi epic', title: 'Interstellar' },
+  { term: 'cyberpunk', title: 'The Matrix' },
+  { term: 'time travel', title: 'Back to the Future' },
+  { term: 'slasher', title: 'Scream' },
+  { term: 'creature feature', title: 'Jaws (1975)' },
+  { term: 'supernatural horror', title: 'The Conjuring' },
+  { term: 'zombie', title: 'World War Z' },
+  { term: 'heist', title: "Ocean's Eleven" },
+  { term: 'action spy thriller', title: 'Skyfall' },
+  { term: 'war epic', title: 'Saving Private Ryan' },
+  { term: 'martial arts', title: 'Enter the Dragon' },
+  { term: 'spaghetti western', title: 'The Good, the Bad and the Ugly' },
+  { term: 'psychological thriller', title: 'Se7en' },
+  { term: 'whodunit mystery', title: 'Knives Out' },
+  { term: 'disaster', title: 'Twister' },
+  { term: 'epic high fantasy', title: 'The Lord of the Rings: The Fellowship of the Ring' },
+  { term: 'romantic comedy', title: 'When Harry Met Sally' },
+  { term: 'slapstick comedy', title: 'Dumb and Dumber' },
+  { term: 'holiday christmas', title: 'Home Alone' },
+  { term: 'coming-of-age', title: 'Stand By Me' },
+  { term: 'sports drama', title: 'Rocky' },
+  { term: 'musical', title: 'La La Land' },
+  { term: 'hand-drawn anime', title: 'Spirited Away' },
+];
+
 let samplerCache: BrainCandidate[] | null = null;
 const samplerProbeMap = new Map<string, string>(); // movieId -> sub-genre probe term
+const samplerTierMap = new Map<string, 1 | 2>(); // movieId -> 1 (popular opener) | 2 (niche exemplar)
 export function samplerProbeOf(movieId: string): string | undefined { return samplerProbeMap.get(movieId); }
+export function samplerTier(movieId: string): 1 | 2 { return samplerTierMap.get(movieId) || 2; }
 
 // Resolve a curated exemplar TITLE to a real TMDB candidate (search en-US for reliable
 // matching, then carry genre ids). A trailing "(YYYY)" disambiguates common titles
@@ -209,13 +244,19 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
 export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandidate[]> {
   if (samplerCache) return samplerCache;
   if (!KEY) return [];
-  const resolved = await Promise.all(
+  // Resolve the tier-1 popular openers AND the tier-2 niche exemplars. Openers are listed
+  // first so that when a film is BOTH (e.g. Star Wars is also the space-opera exemplar) it
+  // keeps the tier-1 tag and surfaces in the opening.
+  const openerResolved = await Promise.all(
+    POPULAR_OPENERS.map(async ({ term, title }) => ({ term, tier: 1 as const, cand: await candidateByTitle(title) })),
+  );
+  const exemplarResolved = await Promise.all(
     SUBGENRE_EXEMPLARS.flatMap(({ term, titles }) =>
-      titles.map(async t => ({ term, cand: await candidateByTitle(t) }))),
+      titles.map(async t => ({ term, tier: 2 as const, cand: await candidateByTitle(t) }))),
   );
   const byId = new Map<string, BrainCandidate>();
-  for (const { term, cand } of resolved) {
-    if (cand && !byId.has(cand.id)) { byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); }
+  for (const { term, tier, cand } of [...openerResolved, ...exemplarResolved]) {
+    if (cand && !byId.has(cand.id)) { byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); samplerTierMap.set(cand.id, tier); }
   }
   samplerCache = Array.from(byId.values());
   return samplerCache;

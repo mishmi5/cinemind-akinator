@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { brainRecommend, recReason, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
-import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, subGenreFamily, recommendBySubGenre, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
+import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, resolveByTitle, getTrailer, genreNames } from '@/lib/brain/tmdb';
 
 // Taste-brain quiz endpoint (Akinator-style). DETERMINISTIC sub-genre navigation:
 // the route — not the LLM — decides what to ask. Why: a 14B local model is unreliable
@@ -12,7 +12,9 @@ import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbe
 // name 3 real titles squarely inside the confirmed sub-genre. TMDB grounds everything.
 
 const MIN_Q = 5;        // never finish before this many ratings
-const MAX_Q = 58;       // hard cap — full sub-genre sweep (~47) + drill fits before forcing recs
+const MAX_Q = 58;       // hard cap on RATED answers — full sub-genre sweep (~47) + drill
+const SHOWN_CAP = 75;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
+                        // quiz always terminates even for a user who's seen few films
 const HI = 4;           // a rating ≥ HI is a "strong hit" toward a sub-genre
 const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
 const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hits (iconic 5★)
@@ -198,11 +200,14 @@ export async function POST(req: Request) {
       pool = drilled.length ? drilled : samplerAll;
       nextHint = drillTarget.t;
     } else if (!sweepDone) {
-      // EXPLORE — serve a not-yet-probed sub-genre, but in a per-session SHUFFLED order
-      // (seeded by sessionId) so no two questionnaires open with the same sequence. Order
-      // is correctness-neutral — the full sweep still covers every sub-genre before exploit.
+      // EXPLORE — serve a not-yet-probed sub-genre. TIER-1 popular openers go FIRST (so the
+      // opening ~25 questions are household-name blockbusters the user has actually seen —
+      // real early signal, almost no "didn't see"), THEN tier-2 niche exemplars deepen toward
+      // surgical resolution. Within a tier the order is per-session SHUFFLED (seeded by
+      // sessionId) so no two questionnaires open the same. Order is correctness-neutral.
       const nextUp = [...uncovered].sort((a, b) =>
-        seededRank(sessionId + (samplerProbeOf(a.id) || a.id)) - seededRank(sessionId + (samplerProbeOf(b.id) || b.id)));
+        (samplerTier(a.id) - samplerTier(b.id)) ||
+        (seededRank(sessionId + (samplerProbeOf(a.id) || a.id)) - seededRank(sessionId + (samplerProbeOf(b.id) || b.id))));
       pool = [nextUp[0]];
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
     } else {
@@ -219,18 +224,28 @@ export async function POST(req: Request) {
     //    count. It climbs only as a loved sub-genre accumulates confirming ratings. ──
     // Honest progress blends sweep coverage with lock confirmation, so the meter reflects
     // real understanding, not click count.
-    const lockProgress = lockedLove ? 1 : (leader ? Math.min(1, leader.hi / LOCK_HITS) : 0);
+    // Smooth, honest meter: three continuous components so it climbs GRADUALLY (no long
+    // plateau then a jump). (a) sweep coverage, (b) rated-count progress — keeps inching up
+    // as the user answers, (c) leader strength as a CONTINUOUS value (hits + how far the avg
+    // sits above neutral), not a binary lock. A real lock pins it to ~1.
     const sweepProgress = Math.min(1, Object.keys(probe).length / 12);
+    const ratedProgress = Math.min(1, history.length / 28);
+    const leaderStrength = lockedLove ? 1 : (leader ? Math.min(1, (leader.hi + Math.max(0, leader.avg - 3) / 2) / 3) : 0);
     // Each unresolved contradiction PULLS THE METER DOWN (0.15 apiece, capped) — the user
     // sees the percentage drop after a taste-reversing answer, signalling the engine is
     // re-checking rather than racing to a guess. Floored so it never reads as total reset.
     const contraPenalty = Math.min(0.5, (totalContra || 0) * 0.15);
-    const confidence = Math.max(0.05, Math.min(0.98, 0.35 * sweepProgress + 0.63 * lockProgress) - contraPenalty);
+    const confidence = Math.max(0.05, Math.min(0.98, 0.30 * sweepProgress + 0.22 * ratedProgress + 0.48 * leaderStrength) - contraPenalty);
 
     // ── Completion: the lead sub-genre is confirmed (LOCK_HITS strong hits), or hard cap.
     //    A lock is only reachable by drilling, which means real confirmation. ──
+    // Two caps: MAX_Q on RATED answers, and a TOTAL-SHOWN cap on movies presented (incl.
+    // "didn't see"). The latter guarantees the quiz ALWAYS terminates — without it a user who
+    // hasn't seen many films could be shown 100+ cards and never reach recs (the frozen-meter
+    // bug). At the shown cap we finish with the best signal gathered so far.
     const atCap = history.length >= MAX_Q;
-    const done = atCap || (history.length >= MIN_Q && !!lockedLove);
+    const atShownCap = askedMovieIds.length >= SHOWN_CAP;
+    const done = atCap || atShownCap || (history.length >= MIN_Q && !!lockedLove);
 
     if (!done) {
       // Serve the next question — always a real pool movie.
@@ -274,6 +289,17 @@ export async function POST(req: Request) {
         if (resolved.length >= 3) break;
         const m = await resolveByTitle(r.title, r.year != null ? String(r.year) : null, locale);
         if (m && !resolved.some(x => x.id === m.id) && !askedMovieIds.includes(m.id)) resolved.push(m);
+      }
+    }
+    // Last-resort guarantee: a customer must NEVER see fewer than 3 recs (the frozen/empty-
+    // recs bug). If signal was too thin to confirm a sub-genre, fill from the popular pool.
+    if (resolved.length < 3) {
+      const pop = await fetchCandidatePool(seen, locale, 20);
+      for (const c of pop) {
+        if (resolved.length >= 3) break;
+        if (resolved.some(m => m.id === c.id) || askedMovieIds.includes(c.id)) continue;
+        const m = await movieById(c.id, locale);
+        if (m) resolved.push(m);
       }
     }
 
