@@ -67,14 +67,15 @@ async function ollamaJSON(model, system, user, retries = 2, temperature = 0.2) {
   return null;
 }
 
-// Strict-bullseye persona sim — kept in sync with brain-swarm.js.
+// Persona sim — SHORT, decisive prompt (the long "neighbour NEVER gets 5" version made the
+// 14B model hesitate and under-rate true bullseyes, stalling the quiz). A single call with
+// a few retries matches the API harness behaviour that passes 40/40.
 async function rateMovie(persona, movie) {
-  const sys = `You ARE this exact moviegoer with a SPECIFIC, NARROW taste:\n${persona.taste}\n\nYou know this movie. First identify its PRECISE sub-genre, then rate 1-5 by how EXACTLY it hits the narrow bullseye of YOUR taste. BE DECISIVE and STRICT about the bullseye:\n- 5 = a BULLSEYE: it sits squarely in the EXACT narrow sub-genre you love. Reserve 5 for the core ONLY.\n- 4 = an ADJACENT sub-genre you enjoy but which is NOT your precise core (e.g. body-horror fan rating a splatter-comedy; neo-noir fan rating a 1940s classic noir; whodunit fan rating a cerebral spy thriller).\n- 3 = genuinely unrelated to both your loves and your dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nCRUCIAL: a NEIGHBOURING sub-genre NEVER gets 5 — only the exact bullseye gets 5. A film in a sub-genre you explicitly dislike must get 1. Output JSON {"rating": <1-5 integer>, "why": "<the precise sub-genre, 3 words>"}.`;
-  const usr = `Movie: "${movie.title}"${movie.year ? ` (${movie.year})` : ''}, listed genres: ${(movie.genres || []).join(', ') || 'unknown'}.`;
-  const o = await ollamaJSON(SIM_MODEL, sys, usr); // temp 0.2 (greedy decode mis-rated overlap exemplars)
-  let r = o && Number(o.rating);
-  if (!Number.isFinite(r)) r = 3;
-  return Math.max(1, Math.min(5, Math.round(r)));
+  const sys = `You ARE this exact moviegoer: ${persona.taste}\n\nIdentify the movie's PRECISE sub-genre, then rate 1-5 by how exactly it hits YOUR narrow taste. Be DECISIVE:\n- 5 = the EXACT sub-genre you love (the bullseye).\n- 4 = an adjacent sub-genre you enjoy but not your precise core.\n- 3 = unrelated to your loves and dislikes.\n- 2 = leans toward a style you dislike.\n- 1 = squarely a style you DISLIKE.\nOutput JSON {"rating": <1-5 integer>, "why": "<the sub-genre, 3 words>"}.`;
+  const usr = `Movie: "${movie.title}"${movie.year ? ` (${movie.year})` : ''}, genres: ${(movie.genres || []).join(', ') || 'unknown'}.`;
+  const o = await ollamaJSON(SIM_MODEL, sys, usr, 3);
+  const r = o && Number(o.rating);
+  return Number.isFinite(r) ? Math.max(1, Math.min(5, Math.round(r))) : 3;
 }
 
 async function judgeOnce(persona, result) {

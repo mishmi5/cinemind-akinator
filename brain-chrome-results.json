@@ -1,19 +1,85 @@
 [
   {
-    "persona": "Slasher Devotee",
-    "taste": "Loves 80s/90s SLASHER horror (Halloween, Scream, Friday the 13th, masked-killer body-count films). Dislikes supernatural/ghost horror and torture-porn. Neutral on everything non-horror.",
+    "persona": "Cerebral Hard-SF",
+    "taste": "Loves cerebral, idea-driven HARD science fiction (Arrival, Ex Machina, Primer, 2001). Dislikes space-opera spectacle and superhero films. Neutral elsewhere.",
     "pass": true,
     "score": 95,
     "subGenre": true,
     "hatesAvoided": true,
-    "verdict": "The AI accurately identified and recommended classic slasher films.",
+    "verdict": "The AI correctly identified the user's love for hard science fiction and provided relevant recommendations.",
     "missed": "",
-    "tasteSummary": "Loves slasher",
+    "tasteSummary": "Loves hard science fiction",
     "recs": [
-      "Friday the 13th",
-      "Black Christmas",
-      "My Bloody Valentine"
+      "Primer",
+      "Gattaca",
+      "First Moon"
     ],
-    "questions": 12
+    "questions": 27
+  },
+  {
+    "persona": "Heist Caper Fan",
+    "taste": "Loves clever HEIST / caper thrillers (Ocean's Eleven, Inside Man, Heat). Dislikes war films and superhero action. Neutral elsewhere.",
+    "pass": true,
+    "score": 100,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI perfectly identified the user's love for clever heist/caper thrillers and provided excellent recommendations within this sub-genre without any disliked film suggestions.",
+    "missed": "",
+    "tasteSummary": "Loves heist",
+    "recs": [
+      "The Italian Job",
+      "The Town",
+      "Inside Man"
+    ],
+    "questions": 47
+  },
+  {
+    "persona": "Deadpan Whimsy",
+    "taste": "Loves quirky, symmetrical DEADPAN comedy-drama (Wes Anderson, Yorgos Lanthimos). Dislikes crude/gross-out comedy. Neutral elsewhere.",
+    "pass": false,
+    "score": 20,
+    "subGenre": false,
+    "hatesAvoided": true,
+    "verdict": "The AI failed to identify the specific sub-genre of quirky, symmetrical deadpan comedy-drama and provided generic romantic comedies.",
+    "missed": "Crazy Rich Asians is a mainstream romantic comedy with no elements of the user's preferred style. The Proposal similarly misses the mark as it does not align with the user's taste for quirky, symmetrical deadpan comedy-drama.",
+    "tasteSummary": "Eclectic taste",
+    "recs": [
+      "Crazy Rich Asians",
+      "The Proposal"
+    ],
+    "questions": 58
+  },
+  {
+    "persona": "Kaiju Monster Fan",
+    "taste": "Loves giant-MONSTER / kaiju films (Godzilla, Pacific Rim, King Kong). Dislikes quiet human dramas and romance. Neutral elsewhere.",
+    "pass": false,
+    "score": 0,
+    "subGenre": false,
+    "hatesAvoided": false,
+    "verdict": "The AI failed to identify the user's love for giant monster films and instead recommended quiet human dramas which the user dislikes.",
+    "missed": "The AI missed the specific sub-genre of kaiju/giant monster films and did not provide any recommendations within this preferred genre.",
+    "tasteSummary": "Eclectic taste",
+    "recs": [
+      "The Witch",
+      "Midsommar"
+    ],
+    "questions": 1
+  },
+  {
+    "persona": "Slow Cinema Arthouse",
+    "taste": "Loves SLOW arthouse cinema (Tarkovsky's Stalker, Bela Tarr, contemplative long takes). Dislikes fast blockbusters and comedy. Neutral elsewhere.",
+    "pass": true,
+    "score": 95,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified and recommended films within the slow arthouse cinema sub-genre.",
+    "missed": "",
+    "tasteSummary": "Eclectic taste",
+    "recs": [
+      "Aguirre, the Wrath of God",
+      "The Lives of Others",
+      "Tokyo Story"
+    ],
+    "questions": 58
   }
 ]
