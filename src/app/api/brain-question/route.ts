@@ -456,18 +456,12 @@ export async function POST(req: Request) {
       pool = spread.length ? spread : onTerm.length ? onTerm : samplerAll.filter(c => !rejectsUser(c));
       if (!pool.length) pool = await fetchCandidatePool(seen, locale, 8);
     }
-    // If the confirmed taste has nothing left to ask about, the quiz is genuinely out of useful
-    // questions. It used to pad the remaining meter ramp from the unrestricted popular pool,
-    // which is how a locked anime fan ended up rating Ford v Ferrari and Goodfellas at question
-    // 22. We would rather finish slightly early than ask something meaningless.
-    let exhaustedOnTaste = false;
     const safeNow = (pool || []).filter(c => !rejectsUser(c));
     if (safeNow.length) pool = safeNow;
     else {
       // Nothing on-taste survived the gate. Rather than hand a locked user whatever TMDB is
       // trending — this is where Shawshank reached a mecha fan and Police Academy a fantasy fan —
       // fall back through progressively wider ON-TASTE sources first.
-      exhaustedOnTaste = !!lockedLove;
       const lockFam2 = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
       const famAny = lockFam2
         ? samplerAll.filter(c => subGenreFamily(samplerProbeOf(c.id) || '') === lockFam2)
@@ -589,7 +583,11 @@ export async function POST(req: Request) {
     // Complete only once the ALREADY-DISPLAYED meter (prevShown) has reached 96 — so the final
     // visible step is 96→100 (≤4), never e.g. 92→100. The meter shows 96 on one question, then
     // the next response is the recommendations at 100.
-    const done = userAsked || (wantFinish && (prevShown >= 96 || (exhaustedOnTaste && prevShown >= 80)));
+    // Finishing early on exhaustion produced exactly the jump this meter exists to prevent: a
+    // real browser run ended 82% -> 100% in one step and then claimed 99% accuracy. Now that every
+    // fallback pool is on-taste, running out of material is rare enough that the honest ramp is
+    // affordable; exhaustion only tells the meter to keep climbing, never to skip ahead.
+    const done = userAsked || (wantFinish && prevShown >= 96);
 
     if (!done) {
       // Serve the next question — always a real pool movie. A SINGLE failed detail fetch must

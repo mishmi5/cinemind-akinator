@@ -73,7 +73,7 @@ export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 
     const kwId = await keywordIdForHint(hint);
     if (kwId) {
       const page = 1 + Math.floor(Math.random() * 3);
-      const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&with_keywords=${kwId}&page=${page}`, { next: { revalidate: 0 } });
+      const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&vote_average.gte=6&with_keywords=${kwId}&page=${page}`, { next: { revalidate: 0 } });
       if (res.ok) {
         const data = await res.json();
         const out = (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
