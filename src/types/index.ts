@@ -20,6 +20,8 @@ export interface MovieContext {
   _genreIds?: number[];
   /** Curated sub-genre niches (from TMDB keywords) — the individuality layer */
   _niches?: string[];
+  /** Micro-genre tags from the formula engine's own tagger (text + genre-id matching) */
+  _microTags?: string[];
 }
 
 export interface Question {
@@ -82,4 +84,22 @@ export interface AnswerPayload {
   askedTitles?: string[];
   /** Niches of the answered movie — feeds the sub-genre taste layer */
   niches?: string[];
+  /** formula engine contract */
+  microTags?: string[];
+  /** formula engine contract */
+  currentConfidence?: number;
+  /** formula engine contract */
+  historyCount?: number;
+  /** formula engine contract */
+  askedMovieIds?: string[];
+  /** formula engine contract */
+  userAffinities?: Record<string, number>;
+  /** formula engine contract */
+  seenMovieIds?: string[];
+  /** formula engine contract */
+  locale?: string;
+  /** formula engine contract */
+  seed?: number;
+  /** formula engine contract */
+  questionId?: string;
 }
