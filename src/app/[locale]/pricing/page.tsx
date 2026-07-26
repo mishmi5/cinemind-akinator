@@ -1,10 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
+import { useSearchParams } from 'next/navigation';
 
 export default function PricingPage() {
   const [loadingPlan, setLoadingPlan] = useState<'credits' | 'elite' | null>(null);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('canceled') === 'true') {
+      alert('התשלום בוטל. אם נתקלת בבעיה, אנחנו כאן כדי לעזור!');
+    }
+  }, [searchParams]);
 
   const handleCheckout = async (planType: 'credits' | 'elite') => {
     setLoadingPlan(planType);
