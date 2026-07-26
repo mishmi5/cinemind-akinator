@@ -182,13 +182,22 @@ export async function POST(req: Request) {
     // sweeping all ~25 sub-genres and running to the cap.
     const leaderFamNow = (leader && leader.hi >= 2 && history.length >= 12) ? subGenreFamily(leader.t) : undefined;
     const focusFams = leaderFamNow ? new Set([leaderFamNow, ...(FAMILY_ADJ[leaderFamNow] || [])]) : null;
-    const uncovered = samplerAll
-      .filter(c => {
-        const t = samplerProbeOf(c.id);
-        if (!t || probe[t] || disliked.includes(t)) return false;
-        if (focusFams && !focusFams.has(subGenreFamily(t) || '')) return false;
-        return true;
-      });
+    // Each sub-genre used to get exactly ONE exemplar: probe it once and it was settled forever,
+    // so a giallo fan who simply never connected with Suspiria had giallo written off. Terms that
+    // came back AMBIGUOUS (one rating, no strong hit, not clearly rejected) get a SECOND chance
+    // with their other exemplar — but only after every term has had a first look, and only inside
+    // the focus families, so the quiz stays bounded.
+    const ambiguous = (t: string) => { const p = probe[t]; return !!p && p.n < 2 && p.hi === 0 && p.lo < 2; };
+    const firstLook: typeof samplerAll = [];
+    const secondChance: typeof samplerAll = [];
+    for (const c of samplerAll) {
+      const t = samplerProbeOf(c.id);
+      if (!t || disliked.includes(t)) continue;
+      if (focusFams && !focusFams.has(subGenreFamily(t) || '')) continue;
+      if (!probe[t]) firstLook.push(c);
+      else if (ambiguous(t)) secondChance.push(c);
+    }
+    const uncovered = firstLook.length ? firstLook : secondChance;
     const sweepDone = uncovered.length === 0;
     // EARLY-STOP (adaptive length): if the leader is a PERFECT 5★ love AND its whole family
     // has been explored — so every close neighbour was compared and the drill-off settled —
@@ -260,8 +269,13 @@ export async function POST(req: Request) {
     // plateau then a jump). (a) sweep coverage, (b) rated-count progress — keeps inching up
     // as the user answers, (c) leader strength as a CONTINUOUS value (hits + how far the avg
     // sits above neutral), not a binary lock. A real lock pins it to ~1.
-    const sweepProgress = Math.min(1, Object.keys(probe).length / 12);
-    const ratedProgress = Math.min(1, history.length / 24);
+    // TRUE sweep coverage (probed vs. probed+remaining) instead of a fixed /12 denominator that
+    // saturated after 12 terms and then contributed nothing for the rest of the quiz.
+    const probedCount = Object.keys(probe).length;
+    const sweepProgress = probedCount / Math.max(1, probedCount + uncovered.length);
+    // Rated progress is measured against the real ceiling (MAX_Q), not 24 — at /24 it saturated
+    // a third of the way in and stopped moving the meter.
+    const ratedProgress = Math.min(1, history.length / MAX_Q);
     // CONTINUOUS lock-proximity so the meter RAMPS smoothly toward 100 instead of completing
     // at ~75% and jumping. It blends: how many of the needed confirming hits the leader has,
     // how many close contenders are already drilled (the drill-off progress), and how
@@ -280,7 +294,7 @@ export async function POST(req: Request) {
     const creep = Math.min(1, history.length / 50);
     // Small creep weight so it gives gentle forward motion WITHOUT masking a real DROP when an
     // answer adds uncertainty (a leader contradiction lowers leaderStrength + contraPenalty).
-    const confidence = Math.max(0.05, Math.min(0.99, 0.24 * sweepProgress + 0.18 * ratedProgress + 0.55 * leaderStrength + 0.03 * creep) - contraPenalty);
+    const confidence = Math.max(0.05, Math.min(0.99, 0.28 * sweepProgress + 0.28 * ratedProgress + 0.41 * leaderStrength + 0.03 * creep) - contraPenalty);
 
     // DISPLAY METER: ease the SHOWN percent toward the true confidence by at most 4 points per
     // answer (owner wants smooth 1-4% steps, never a 5→42 jump). The previous shown value
@@ -291,8 +305,15 @@ export async function POST(req: Request) {
     // ── Completion intent: the engine WANTS to finish once the taste is locked (after MIN_Q),
     //    or a hard cap is reached. Two caps: MAX_Q on RATED answers, and a TOTAL-SHOWN cap on
     //    movies presented (incl. "didn't see") so the quiz ALWAYS terminates. ──
-    const atCap = history.length >= MAX_Q;
-    const atShownCap = (history.length + notSeen) >= SHOWN_CAP; // session-scoped, not cross-quiz
+    // The caps must actually bound the quiz. Completion needs the DISPLAYED meter at 96 and the
+    // meter only moves ≤4/step, so finishing has to START a few questions BEFORE the cap —
+    // otherwise the quiz ran ~23 questions past SHOWN_CAP purely to let the meter catch up.
+    // CLOSING_WINDOW reserves exactly enough steps (8 × 4 = 32 points) for that ramp, so the
+    // quiz ends AT the cap rather than long after it.
+    const CLOSING_WINDOW = 8;
+    const shownCount = history.length + notSeen; // session-scoped, not cross-quiz
+    const atCap = history.length >= MAX_Q - CLOSING_WINDOW;
+    const atShownCap = shownCount >= SHOWN_CAP - CLOSING_WINDOW;
     const wantFinish = atShownCap || (history.length >= MIN_Q && (atCap || !!lockedLove));
 
     // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
@@ -307,6 +328,13 @@ export async function POST(req: Request) {
     else if (target > prevShown) shown = Math.min(target, prevShown + 4);  // rise ≤ 4
     else if (target < prevShown) shown = Math.max(target, prevShown - 4);  // fall ≤ 4 (uncertainty)
     else shown = prevShown;
+    // MINIMUM MOVEMENT: the spec is 1-4% EVERY step. Whenever the taste model barely changes
+    // (a long drill-off, or a mid-sweep stretch where each new term is probed only once) the
+    // target could sit still for 15-25 answers and the meter looked frozen. If the user actually
+    // rated something and nothing pulled the meter down, nudge it one point. Capped at 95 so it
+    // can never reach the completion threshold on its own — only real confidence finishes a quiz.
+    const ratedThisTurn = !payload.isInit && typeof payload.answer === 'number';
+    if (ratedThisTurn && shown === prevShown && !wantFinish && shown < 95) shown = prevShown + 1;
 
     // Complete only once the ALREADY-DISPLAYED meter (prevShown) has reached 96 — so the final
     // visible step is 96→100 (≤4), never e.g. 92→100. The meter shows 96 on one question, then
@@ -364,10 +392,25 @@ export async function POST(req: Request) {
       if (h.rating <= LO) { if (h.id) hatedIds.add(h.id); h.genres.forEach(g => hatedGenres.add(g)); }
     }
     for (const g of lovedGenres) hatedGenres.delete(g);
+    // Per-genre filtering SELF-CANCELS for a franchise: someone who hates Marvel but likes Action
+    // clears "Action" from hatedGenres, so Guardians of the Galaxy slipped through. So also record
+    // the full genre COMBINATION of each rejected film — a candidate carrying every genre of a
+    // rejected combination is the same kind of film, even if one of those genres is liked alone.
+    const hatedCombos = history
+      .filter(h => h.rating <= LO && h.genres.length >= 2)
+      .map(h => h.genres);
+    // Sequels/spin-offs of a rejected film share distinctive title words ("Guardians", "Avengers",
+    // "Star Wars") — cheap, API-free franchise detection.
+    const STOP = new Set(['the', 'and', 'of', 'a', 'an', 'part', 'vol', 'movie', 'ה', 'של', 'את']);
+    const tokens = (t: string) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 4 && !STOP.has(w));
+    const hatedTokens = new Set(history.filter(h => h.rating <= LO).flatMap(h => tokens(h.title)));
     const isBad = (m: Rec) => {
       if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
       const names = genreNames(m._genreIds || []);
-      return names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n));
+      if (names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) return true;
+      if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) return true;
+      if (tokens(m.title).some(w => hatedTokens.has(w))) return true;
+      return false;
     };
     const add = (m: Rec | null) => { if (m && !resolved.some(x => x.id === m.id) && !isBad(m)) resolved.push(m); };
 
@@ -412,11 +455,48 @@ export async function POST(req: Request) {
         if (lovedGenres.size === 0 || names.some(n => lovedGenres.has(n))) resolved.push(m);
       }
     }
+    // ABSOLUTE last resort. The old version dropped the genre guard entirely to guarantee three
+    // picks, which is exactly how a purely-rejected style reached the final list. Relax on a
+    // HARMLESS axis instead: re-offer a curated on-taste film the user was already shown (as long
+    // as they did not rate it low). Novelty is sacrificed, never taste.
+    if (resolved.length < 3 && lovedTerms.length) {
+      for (const term of lovedTerms) {
+        if (resolved.length >= 3) break;
+        for (const m of await recommendBySubGenre(term, [], locale, 8)) {
+          if (resolved.length >= 3) break;
+          if (resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
+          const names = genreNames(m._genreIds || []);
+          if (names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) continue;
+          if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) continue;
+          resolved.push(m);
+        }
+      }
+    }
+    // Only when the user expressed NO likes at all (nothing to be on-taste with) do we reach for
+    // popular films — and even then the rejection filters still apply.
     if (resolved.length < 3) {
       for (const c of await fetchCandidatePool(seen, locale, 40)) {
         if (resolved.length >= 3) break;
         const m = await movieById(c.id, locale);
-        if (m && !resolved.some(x => x.id === m.id) && !askedMovieIds.includes(m.id) && !hatedIds.has(m.id)) resolved.push(m);
+        if (!m || resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
+        const names = genreNames(m._genreIds || []);
+        if (names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) continue;
+        if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) continue;
+        resolved.push(m);
+      }
+    }
+
+    // A TMDB blip can leave every source above empty, which showed an empty results screen at
+    // the end of a long quiz. One short retry against the curated seeds (title lookups are
+    // week-cached, so this usually succeeds even mid-outage) before we give up.
+    if (!resolved.length) {
+      await new Promise(r => setTimeout(r, 400));
+      for (const term of (lovedTerms.length ? lovedTerms : [confirmedTerm].filter(Boolean))) {
+        if (resolved.length >= 3) break;
+        for (const m of await recommendBySubGenre(term, [], locale, 5)) {
+          if (resolved.length >= 3) break;
+          if (!resolved.some(x => x.id === m.id) && !hatedIds.has(m.id)) resolved.push(m);
+        }
       }
     }
 

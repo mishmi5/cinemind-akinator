@@ -236,7 +236,19 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
     const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}${yq}`, { next: { revalidate: 604800 } });
     if (!res.ok) return null;
     const d = await res.json();
-    const hit = (d.results || []).find((m: any) => m.poster_path && m.overview) || (d.results || [])[0];
+    // Taking TMDB's FIRST usable result made curated blockbusters resolve to obscure
+    // sequels, remakes and knockoffs ("Halloween" → a direct-to-video entry), which broke the
+    // whole point of an opening the user has certainly seen. Rank instead: an exact title
+    // match wins, then the best-known film (vote_count), then popularity.
+    const norm = (x: string) => (x || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const want = norm(title);
+    const usable = (d.results || []).filter((m: any) => m.poster_path && m.overview);
+    const score = (m: any) => {
+      const exact = norm(m.title) === want || norm(m.original_title) === want ? 1_000_000 : 0;
+      const starts = norm(m.title).startsWith(want) ? 100_000 : 0;
+      return exact + starts + (m.vote_count || 0) + (m.popularity || 0);
+    };
+    const hit = usable.sort((a: any, b: any) => score(b) - score(a))[0] || (d.results || [])[0];
     if (!hit || !hit.poster_path) return null;
     return {
       id: hit.id.toString(), title: hit.title || hit.original_title,

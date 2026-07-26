@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link } from '@/i18n/routing';
 import { useLocale, useTranslations } from 'next-intl';
 import { CineMindLogo } from '@/components/Navbar';
@@ -106,6 +106,20 @@ export default function ScanMovieEvaluation() {
   const [historyState, setHistoryState] = useState<SessionState[]>([]);
   const [activeToast, setActiveToast] = useState<{ text: string, emoji: string } | null>(null);
   const [activeEffect, setActiveEffect] = useState<EasterEggType | null>(null);
+  // Frozen layouts for the celebration overlays. These used to call Math.random() inline in
+  // the JSX, so every unrelated re-render (a hover, a state tick) reshuffled the confetti and
+  // matrix glyphs mid-animation. Generated once per effect activation instead.
+  const oscarBits = useMemo(
+    () => Array.from({ length: 30 }, () => ({ left: Math.random() * 100, delay: Math.random() * 0.3 })),
+    [activeEffect],
+  );
+  const matrixBits = useMemo(
+    () => Array.from({ length: 50 }, () => ({
+      left: Math.random() * 100, top: Math.random() * 100,
+      text: Math.random().toString(36).substring(2, 10),
+    })),
+    [activeEffect],
+  );
   const [isRevealed, setIsRevealed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(899); // 14:59 in seconds
   const [showSocialProof, setShowSocialProof] = useState(false);
@@ -405,7 +419,7 @@ export default function ScanMovieEvaluation() {
       {activeEffect === 'oscar' && (
         <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center overflow-hidden">
           {Array.from({ length: 30 }).map((_, i) => (
-            <div key={i} className="absolute text-7xl animate-[fall_1.5s_ease-in_forwards]" style={{ left: `${Math.random() * 100}vw`, animationDelay: `${Math.random() * 0.3}s` }}>🏆</div>
+            <div key={i} className="absolute text-7xl animate-[fall_1.5s_ease-in_forwards]" style={{ left: `${oscarBits[i].left}vw`, animationDelay: `${oscarBits[i].delay}s` }}>🏆</div>
           ))}
           <style>{`@keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(100vh) rotate(360deg); } }`}</style>
         </div>
@@ -423,7 +437,7 @@ export default function ScanMovieEvaluation() {
       {activeEffect === 'matrix' && (
         <div className="fixed inset-0 z-[100] pointer-events-none bg-black/90 flex flex-col">
           {Array.from({ length: 80 }).map((_, i) => (
-            <div key={i} className="text-emerald-500 font-mono text-xl font-bold opacity-80 absolute" style={{ left: `${Math.random() * 100}vw`, top: `${Math.random() * 100}vh` }}>{Math.random().toString(36).substring(2, 10)}</div>
+            <div key={i} className="text-emerald-500 font-mono text-xl font-bold opacity-80 absolute" style={{ left: `${matrixBits[i].left}vw`, top: `${matrixBits[i].top}vh` }}>{matrixBits[i].text}</div>
           ))}
         </div>
       )}
@@ -451,7 +465,9 @@ export default function ScanMovieEvaluation() {
 
       <div className="w-full max-w-5xl mx-auto px-4 mt-8 mb-4 flex items-center justify-between">
         <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden ml-6">
-          <div className="absolute top-0 right-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
+          {/* start-anchored so the bar grows from the side the locale reads from: right in Hebrew,
+              left in English (it used to be pinned to the physical right in both). */}
+          <div className="absolute top-0 start-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
         </div>
         <span className="text-rose-500 font-black text-sm">{confidencePercentage}%</span>
       </div>
@@ -574,7 +590,7 @@ export default function ScanMovieEvaluation() {
 
             {/* FOMO Social Proof Toast */}
             {showSocialProof && (
-              <div className="fixed bottom-6 right-6 bg-zinc-900/95 border border-emerald-500/30 shadow-[0_10px_40px_rgba(16,185,129,0.2)] p-4 rounded-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-500">
+              <div className="fixed bottom-28 right-6 bg-zinc-900/95 border border-emerald-500/30 shadow-[0_10px_40px_rgba(16,185,129,0.2)] p-4 rounded-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-500">
                 <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping relative">
                   <div className="absolute inset-0 bg-emerald-500 rounded-full opacity-50"></div>
                 </div>
@@ -604,7 +620,7 @@ export default function ScanMovieEvaluation() {
               <div className="px-6 md:px-8 pb-10 relative z-10 -mt-20 md:-mt-24 text-center">
                 <h3 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.title}</h3>
                 <p className="text-xs text-zinc-300 font-mono mb-5 uppercase tracking-[0.2em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.originalDetails}</p>
-                <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 h-10 md:h-12 overflow-hidden text-ellipsis line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
+                <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
                 
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-5 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[90px] md:min-h-[100px] leading-tight">
                   {session.currentQuestion?.text}
@@ -634,8 +650,11 @@ export default function ScanMovieEvaluation() {
                       disabled={loading} 
                       onMouseEnter={() => setHoveredStar(star)} 
                       onMouseLeave={() => setHoveredStar(null)} 
+                      onFocus={() => setHoveredStar(star)}
+                      onBlur={() => setHoveredStar(null)}
                       onClick={() => handleStarClick(star as AnswerType)} 
-                      className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90"
+                      aria-label={locale === 'he' ? `דירוג ${star} מתוך 5` : `Rate ${star} out of 5`}
+                      className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                     >
                       <svg className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-200 ${(hoveredStar !== null && star <= hoveredStar) ? 'text-orange-500 fill-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.8)] scale-110' : 'text-zinc-700 fill-transparent stroke-current stroke-1'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
                     </button>

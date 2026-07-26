@@ -2,6 +2,11 @@ import { generateObject, generateText } from 'ai';
 import { z } from 'zod';
 import { tasteModel } from './model';
 
+// Every LLM call is bounded. Without this a loading/wedged Ollama (model being pulled, GPU
+// stuck) left the request hanging forever, so the user's quiz never answered. On timeout the
+// caller falls back to its deterministic path, which always produces a correct result.
+const LLM_TIMEOUT_MS = 25_000;
+
 // ── The taste brain (Akinator-style LLM reasoner) ────────────────────────────
 // Given the user's rating history and a pool of REAL TMDB candidate movies, the
 // model either picks the single most-revealing next movie to ask about, or — once
@@ -135,6 +140,7 @@ HARD STOP: you have reached the question limit. You MUST set phase="done" now an
         system: SYSTEM,
         prompt,
         temperature: 0.4,
+        abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
       });
       return object;
     } catch {
@@ -148,6 +154,7 @@ HARD STOP: you have reached the question limit. You MUST set phase="done" now an
         system: SYSTEM + '\n\nRespond with ONLY a single JSON object, no markdown, no prose. Schema keys: phase("ask"|"done"), confidence(0-1), tasteSummary(string), nextPickId(string|null), nextReason(string|null), recommendations(array of {title, year, reason}).',
         prompt,
         temperature: 0.4,
+        abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS),
       });
       const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, ''); // strip reasoning models
       const m = cleaned.match(/\{[\s\S]*\}/);
@@ -210,7 +217,7 @@ reason citing the specific sub-genre. Do NOT recommend anything from a disliked
 sub-genre. tasteSummary must name the precise loved sub-genre.`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const { object } = await generateObject({ model, schema: RecResult, system: SYSTEM, prompt, temperature: 0.4 });
+      const { object } = await generateObject({ model, schema: RecResult, system: SYSTEM, prompt, temperature: 0.4, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
       if (object.recommendations.length > 0) return object;
     } catch { /* retry */ }
   }
@@ -232,7 +239,7 @@ export async function recReason(opts: { title: string; year?: string; term: stri
     ? `המשתמש אוהב סרטי ${term}. כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה הוא יאהב את הסרט "${title}"${year ? ` (${year})` : ''}. החזר רק את המשפט עצמו, בלי הקדמה.`
     : `The user loves ${term} films. In ONE short, natural sentence, explain why they'll love "${title}"${year ? ` (${year})` : ''}. Return just the sentence.`;
   try {
-    const { text } = await generateText({ model, prompt, temperature: 0.6 });
+    const { text } = await generateText({ model, prompt, temperature: 0.6, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
     return clean.slice(0, 240) || fallback;
   } catch { return fallback; }
@@ -262,7 +269,7 @@ franchise, studio, or overall style — what they hated (e.g. if they hated Marv
 films, never pick a Marvel or superhero film, even one on the list). Return ONLY the chosen
 titles, copied exactly from the list.`;
   try {
-    const { object } = await generateObject({ model, schema: z.object({ picks: z.array(z.string()) }), prompt, temperature: 0.3 });
+    const { object } = await generateObject({ model, schema: z.object({ picks: z.array(z.string()) }), prompt, temperature: 0.3, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const picks = object.picks.filter(p => candidates.includes(p)).slice(0, n);
     return picks.length ? picks : null;
   } catch { return null; }
