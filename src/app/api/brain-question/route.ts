@@ -239,8 +239,15 @@ export async function POST(req: Request) {
     const famsToClear = leaderFam ? [leaderFam, ...adj] : [];
     const leaderFamilyExplored = famsToClear.length > 0 &&
       !uncovered.some(c => famsToClear.includes(subGenreFamily(samplerProbeOf(c.id) || '') || ''));
-    const earlyExploit = !!leader && leader.avg === 5 && leader.hi >= 1 && leaderFamilyExplored && history.length >= MIN_Q;
-    const exploitNow = sweepDone || earlyExploit;
+    // n >= 2 is required: locking off a SINGLE 5-star sample let one lucky exemplar decide the
+    // whole quiz, and everything the user answered afterwards was ignored.
+    const earlyExploit = !!leader && leader.avg === 5 && leader.hi >= 2 && leaderFamilyExplored && history.length >= MIN_Q;
+    // INTERLEAVED DRILL: the moment a sub-genre gets a strong hit, spend the NEXT question
+    // confirming it instead of waiting for the whole sweep. Previously a 5 on Saving Private Ryan
+    // at Q15 left searchHint empty until Q51 — the quiz felt deaf, and the confirmation that
+    // shortens it arrived far too late. The sweep still resumes right after, so coverage is kept.
+    const freshLead = !!leader && leader.hi >= 1 && leader.n < 2 && history.length >= 3;
+    const exploitNow = sweepDone || earlyExploit || freshLead;
     // DRILL-OFF: drill the least-explored close contender first so every 5★ neighbour gets
     // its 2nd exemplar before we lock; once all are drilled, fall to the leader. Data-driven
     // tiebreak (the real love accrues more hits from its own keyword pool) instead of list
@@ -249,7 +256,15 @@ export async function POST(req: Request) {
     // Pre-lock: drill the least-explored close contender. Post-lock: keep drilling the LEADER
     // so the final confirmation questions (served while the meter ramps the last bit to 100%)
     // stay squarely on the user's confirmed taste — never random filler.
-    const drillTarget = exploitNow ? (lockedLove ? leader : (needDrill[0] || leader)) : null;
+    // Once the taste is LOCKED the confirmed term needs no more proof. Re-asking it produced the
+    // "last nine questions were all slashers I rated 5 — zero new information" complaint. The
+    // remaining questions (the quiz cannot end before the meter reaches 96 at <=4%/step) are
+    // spent on genuinely new ground instead: an undrilled rival first, then — via the EXPLORE
+    // branch below — sub-genres never probed. That keeps every question informative AND widens
+    // the loved set the recommendations are drawn from.
+    const drillTarget = exploitNow
+      ? (lockedLove ? (needDrill[0] || null) : (needDrill[0] || leader))
+      : null;
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
     if (drillTarget) {
@@ -370,7 +385,11 @@ export async function POST(req: Request) {
     // x-current-confidence header.
     const target = Math.round(Math.min(0.99, wantFinish ? Math.max(confidence, 0.99) : confidence) * 100);
     let shown: number;
+    // A skip is MCAR — it carries no taste signal, so it must never advance the closing ramp.
+    // It previously did: testers watched the tail march 88→92→96→100 while answering NOT_SEEN.
+    const rampBlocked = wantFinish && !payload.isInit && !!payload.movieId && typeof payload.answer !== 'number';
     if (prevShown <= 0) shown = Math.min(target, 5);                       // first question: gentle start
+    else if (rampBlocked) shown = prevShown;
     else if (target > prevShown) shown = Math.min(target, prevShown + 4);  // rise ≤ 4
     else if (target < prevShown) shown = Math.max(target, prevShown - 4);  // fall ≤ 4 (uncertainty)
     else shown = prevShown;
@@ -569,7 +588,7 @@ export async function POST(req: Request) {
     // already-chosen films, so it cannot affect the surgical selection.
     const yearOf = (p: typeof picks[number]) => (p.originalDetails || '').match(/(\d{4})/)?.[1];
     const reasons = await Promise.all(picks.map(p =>
-      recReason({ title: p.title, year: yearOf(p), term: confirmedTerm || 'this style', locale, mock })));
+      recReason({ title: p.title, year: yearOf(p), term: confirmedTerm || 'this style', locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
 
     const finalMovies = picks.map((p, i) => ({
       id: `res_${p.id}`, title: p.title,

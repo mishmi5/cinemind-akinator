@@ -229,15 +229,31 @@ sub-genre. tasteSummary must name the precise loved sub-genre.`;
 // models drift into Chinese/French mid-sentence). The model writes ONLY the prose reason
 // over an already-chosen film — it never picks the film, so it can't break the surgical
 // selection. Falls back to a clean template if the model is unavailable.
-export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean }): Promise<string> {
-  const { title, year, term, locale, mock } = opts;
+export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string }): Promise<string> {
+  const { title, year, term, locale, mock, genres = [], overview = '' } = opts;
   const fallback = locale === 'he' ? `בחירה קלאסית ומדויקת בסגנון ${term}` : `A canonical ${term} pick`;
   if (mock) return fallback;
   const model = tasteModel();
   if (!model) return fallback;
+  // GROUND THE MODEL IN THE ACTUAL FILM. Without the real genres and synopsis it confabulated:
+  // a Mississippi courtroom drama was recommended for its "spectacular battles". The reason is
+  // the one screen that must be true, so the film's own facts go into the prompt and anything
+  // outside them is forbidden.
+  const facts = [genres.length ? `ז'אנרים: ${genres.join(', ')}` : '', overview ? `תקציר: ${overview.slice(0, 300)}` : '']
+    .filter(Boolean).join(' · ');
+  const factsEn = [genres.length ? `Genres: ${genres.join(', ')}` : '', overview ? `Synopsis: ${overview.slice(0, 300)}` : '']
+    .filter(Boolean).join(' · ');
   const prompt = locale === 'he'
-    ? `המשתמש אוהב סרטי ${term}. כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה הוא יאהב את הסרט "${title}"${year ? ` (${year})` : ''}. החזר רק את המשפט עצמו, בלי הקדמה.`
-    : `The user loves ${term} films. In ONE short, natural sentence, explain why they'll love "${title}"${year ? ` (${year})` : ''}. Return just the sentence.`;
+    ? `המשתמש אוהב סרטי ${term}. הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
+${facts}
+
+כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה מי שאוהב ${term} יתחבר לסרט הזה.
+חוקים: אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב"). התחל במילים "כי" או "אם".
+החזר רק את המשפט עצמו.`
+    : `The user loves ${term} films. Facts about "${title}"${year ? ` (${year})` : ''}:
+${factsEn}
+
+In ONE short natural sentence, explain why they'll love it. Use ONLY the facts above — do not invent scenes, battles or details that are not there. Return just the sentence.`;
   try {
     const { text } = await generateText({ model, prompt, temperature: 0.6, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
