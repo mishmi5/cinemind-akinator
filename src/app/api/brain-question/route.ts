@@ -273,7 +273,13 @@ export async function POST(req: Request) {
       // pool alone is noisy (TMDB "slasher" also returns torture-porn the user rejects),
       // which would dilute the signal and prevent a clean lock.
       const curated = samplerAll.filter(c => samplerProbeOf(c.id) === drillTarget.t);
-      const drilled = curated.length ? curated : await fetchPoolByHint(drillTarget.t, seen, locale, 10);
+      // Curated exemplars alone are a FIXED playlist — two sessions replayed the same horror
+      // block in the same order ("I knew Re-Animator was next"). Blend in the keyword pool and
+      // shuffle per session so the confirm phase differs between quizzes while staying on-term.
+      const byHint = await fetchPoolByHint(drillTarget.t, seen, locale, 10);
+      const drilled = [...curated, ...byHint]
+        .filter((c, i, a) => a.findIndex(x => x.id === c.id) === i)
+        .sort((a, b) => seededRank(sessionId + a.id) - seededRank(sessionId + b.id));
       pool = drilled.length ? drilled : samplerAll;
       nextHint = drillTarget.t;
     } else if (!sweepDone) {

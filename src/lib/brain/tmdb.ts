@@ -24,7 +24,7 @@ export async function fetchCandidatePool(seenIds: string[], locale = 'he', size 
   const seen = new Set(seenIds);
   const year = 1980 + Math.floor(Math.random() * (2024 - 1980 + 1));
   const page = 1 + Math.floor(Math.random() * 5);
-  const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}&sort_by=popularity.desc&vote_count.gte=300&primary_release_year=${year}&page=${page}`;
+  const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}&sort_by=popularity.desc&vote_count.gte=500&vote_average.gte=6.2&primary_release_year=${year}&page=${page}`;
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
