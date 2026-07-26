@@ -348,6 +348,22 @@ const SUBGENRE_RECS: Record<string, string[]> = {
 };
 export function subGenreRecTitles(term: string): string[] { return SUBGENRE_RECS[term] || []; }
 
+/** The canonical seeds of a sub-genre as QUESTION candidates. Used for the confirming questions
+ *  after a taste is locked: TMDB keyword search is noisy enough to hand a locked anime fan a
+ *  Greek murder mystery, while these titles are curated and always squarely on-term. */
+export async function fetchSeedCandidates(term: string, seenIds: string[], n = 8): Promise<BrainCandidate[]> {
+  const titles = SUBGENRE_RECS[term]; if (!titles) return [];
+  const seen = new Set(seenIds);
+  const out: BrainCandidate[] = [];
+  for (const title of titles) {
+    if (out.length >= n) break;
+    const c = await candidateByTitle(title);
+    if (!c || seen.has(c.id) || out.some(x => x.id === c.id)) continue;
+    out.push(c);
+  }
+  return out;
+}
+
 /** Deterministically recommend up to `n` real, unseen films squarely inside a CONFIRMED
  *  sub-genre, from the curated canonical seeds. Surgical: no LLM title drift, no keyword
  *  noise. Returns full MovieContexts (grounded). `seenIds` excludes already-rated films. */
@@ -389,9 +405,21 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     const heTitle = m.title || m.original_title || '';
     const safeTitle = cjk.test(heTitle) && m.original_title && !cjk.test(m.original_title)
       ? m.original_title : heTitle;
+    // The subtitle line under the Hebrew title carries the original title, and for Japanese
+    // films that printed raw CJK on the question card (劇場版「鬼滅の刃」無限列車編). Ask TMDB for the
+    // English title in that case — one extra call, only for the handful of films that need it.
+    let sub = m.original_title as string;
+    if (cjk.test(sub)) {
+      try {
+        const en = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=en-US`, { next: { revalidate: 604800 } });
+        const ed = en.ok ? await en.json() : null;
+        if (ed?.title && !cjk.test(ed.title)) sub = ed.title;
+        else if (!cjk.test(safeTitle)) sub = safeTitle;
+      } catch { /* keep the original title rather than lose the line */ }
+    }
     return {
       id: m.id.toString(), title: safeTitle,
-      originalDetails: `${m.original_title} · ${m.release_date ? m.release_date.split('-')[0] : ''}`,
+      originalDetails: `${sub} · ${m.release_date ? m.release_date.split('-')[0] : ''}`,
       rating: m.vote_average, posterUrl: `/api/poster?path=${m.poster_path}`,
       overview: m.overview || '', trailerId: '', easterEgg: { type: 'oscar' },
       _genreIds: (m.genres || []).map((g: any) => g.id),
