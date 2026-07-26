@@ -248,7 +248,7 @@ export default function ScanMovieEvaluation() {
     submitAnswer(star);
   };
 
-  const submitAnswer = async (answer: AnswerType) => {
+  const submitAnswer = async (answer: AnswerType, finishNow = false) => {
     setLoading(true);
     setAnimateCard(true);
 
@@ -298,6 +298,7 @@ export default function ScanMovieEvaluation() {
           searchHint: (session as any)!.searchHint || '',
           probeScores: (session as any)!.probeScores || {},
           notSeen: (session as any)!.notSeen || 0, // session-scoped shown-cap counter (round-trips)
+          finishNow, // user pressed "enough, recommend now" — finish on this response
           title: session!.currentQuestion!.movie?.title,
           year: yearMatch ? yearMatch[1] : undefined,
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the
@@ -502,6 +503,15 @@ export default function ScanMovieEvaluation() {
                   <p className="text-zinc-300 text-base leading-relaxed max-w-xl mx-auto">
                     {isRevealed ? movie.overview : t('hidden_overview')}
                   </p>
+                  {/* WHY THIS FILM IS YOU — the actual payoff of the whole quiz. The engine
+                      already writes this per pick (recReason, in the user's language) and it was
+                      being computed and thrown away, leaving three posters and a generic synopsis
+                      that look like any recommendation widget. */}
+                  {isRevealed && (movie as { reason?: string }).reason && (
+                    <p className="mt-5 mx-auto max-w-xl text-right rtl:text-right ltr:text-left text-rose-200/90 text-base leading-relaxed border-s-2 border-rose-500/50 ps-4">
+                      {(movie as { reason?: string }).reason}
+                    </p>
+                  )}
                 </div>
 
                 {/* Paywall Overlay */}
@@ -667,6 +677,15 @@ export default function ScanMovieEvaluation() {
                 <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                   {t('not_seen')} <span>{locale === 'he' ? '›' : '‹'}</span>
                 </button>
+                {(session.historyCount ?? 0) >= 5 && (
+                  <button
+                    disabled={loading}
+                    onClick={() => submitAnswer('NOT_SEEN', true)}
+                    className="px-6 py-3 rounded-full border border-emerald-500/30 hover:bg-emerald-500/10 text-base font-bold text-emerald-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                  >
+                    {locale === 'he' ? 'מספיק, תמליץ לי עכשיו 🎬' : 'Enough — recommend now 🎬'}
+                  </button>
+                )}
                 {historyState.length > 0 && (
                   <button disabled={loading} onClick={handleBack} className="px-6 py-3 rounded-full border border-rose-500/30 hover:bg-rose-500/10 text-base font-bold text-rose-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(225,29,72,0.2)]">
                     <span>{locale === 'he' ? '‹' : '›'}</span> {t('back')}

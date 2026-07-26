@@ -241,6 +241,10 @@ export async function recReason(opts: { title: string; year?: string; term: stri
   try {
     const { text } = await generateText({ model, prompt, temperature: 0.6, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
+    // gemma2 code-switches: a Hebrew sentence comes back with Latin fragments spliced in
+    // ("הזombies בו מהירים"). On the flagship results screen that reads as a broken machine
+    // translation, so fall back to the clean template rather than ship mixed script.
+    if (locale === 'he' && /[A-Za-z]/.test(clean)) return fallback;
     return clean.slice(0, 240) || fallback;
   } catch { return fallback; }
 }

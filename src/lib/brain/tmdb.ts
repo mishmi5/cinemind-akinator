@@ -13,7 +13,7 @@ export const GENRE_NAMES: Record<number, string> = {
 };
 export const genreNames = (ids?: number[]) => (ids || []).map(id => GENRE_NAMES[id]).filter(Boolean);
 
-export interface BrainCandidate { id: string; title: string; year?: string; genres: string[]; _genreIds?: number[]; }
+export interface BrainCandidate { id: string; title: string; year?: string; genres: string[]; _genreIds?: number[]; votes?: number; }
 
 const langOf = (locale: string) => (locale === 'en' ? 'en-US' : 'he-IL');
 
@@ -254,9 +254,17 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
       id: hit.id.toString(), title: hit.title || hit.original_title,
       year: hit.release_date ? hit.release_date.split('-')[0] : undefined,
       genres: genreNames(hit.genre_ids), _genreIds: hit.genre_ids,
+      votes: hit.vote_count || 0,
     };
   } catch { return null; }
 }
+
+// A tier-1 opener only earns its slot if it is genuinely household-name. Some curated entries
+// resolve to films a mainstream user has plausibly never seen (a 1964 spaghetti western landing
+// at question 4), and every such card burns a calibration slot AND a SHOWN_CAP slot while
+// yielding zero taste signal. Below this vote_count the film is demoted to the tier-2 niche
+// sweep rather than dropped — it is still a fine probe, just not an opener.
+const OPENER_MIN_VOTES = 2500;
 
 export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandidate[]> {
   if (samplerCache) return samplerCache;
@@ -274,7 +282,10 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
     const batch = jobs.slice(i, i + 30);
     const resolved = await Promise.all(batch.map(async j => ({ ...j, cand: await candidateByTitle(j.title) })));
     for (const { term, tier, cand } of resolved) {
-      if (cand && !byId.has(cand.id)) { byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); samplerTierMap.set(cand.id, tier); }
+      if (cand && !byId.has(cand.id)) {
+        const effectiveTier = (tier === 1 && (cand.votes ?? 0) < OPENER_MIN_VOTES) ? 2 : tier;
+        byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); samplerTierMap.set(cand.id, effectiveTier);
+      }
     }
   }
   samplerCache = Array.from(byId.values());
@@ -365,8 +376,15 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     if (!res.ok) return null;
     const m = await res.json();
     if (!m.poster_path) return null;
+    // TMDB's he-IL response falls back to the ORIGINAL title when no Hebrew one exists, which
+    // put raw CJK on a Hebrew results card (機動警察パトレイバー 劇場版). Prefer a Latin title in
+    // that case — recognizable to an Israeli reader in a way the original script is not.
+    const cjk = /[　-鿿가-힯]/;
+    const heTitle = m.title || m.original_title || '';
+    const safeTitle = cjk.test(heTitle) && m.original_title && !cjk.test(m.original_title)
+      ? m.original_title : heTitle;
     return {
-      id: m.id.toString(), title: m.title || m.original_title,
+      id: m.id.toString(), title: safeTitle,
       originalDetails: `${m.original_title} · ${m.release_date ? m.release_date.split('-')[0] : ''}`,
       rating: m.vote_average, posterUrl: `/api/poster?path=${m.poster_path}`,
       overview: m.overview || '', trailerId: '', easterEgg: { type: 'oscar' },

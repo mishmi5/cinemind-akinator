@@ -80,7 +80,18 @@ function computeTaste(probe: ProbeScores) {
   // The LEAD candidate: strongest signal — most strong hits, then highest average. The
   // avg tiebreak separates a true love (Arrival/Ex Machina = 5) from a cross-genre stray
   // hit (The Thing = 4).
-  const candidates = stats.filter(s => s.hi >= 1 && s.avg >= 3.5).sort((a, b) => b.hi - a.hi || b.avg - a.avg);
+  // FAMILY EVIDENCE breaks ties by weight of evidence rather than by which sub-genre happened
+  // to be asked first. Previously several sub-genres tied at hi=1/avg=5 and the winner was
+  // simply the earliest probed — a comedy lover was told they love coming-of-age drama. Now a
+  // sub-genre backed by strong hits across its whole family wins the tie.
+  const famHits: Record<string, number> = {};
+  for (const s of stats) {
+    const fam = subGenreFamily(s.t);
+    if (fam) famHits[fam] = (famHits[fam] || 0) + s.hi;
+  }
+  const famScore = (s: { t: string }) => famHits[subGenreFamily(s.t) || ''] || 0;
+  const candidates = stats.filter(s => s.hi >= 1 && s.avg >= 3.5)
+    .sort((a, b) => b.hi - a.hi || b.avg - a.avg || famScore(b) - famScore(a) || b.n - a.n);
   const leader = candidates[0] || null;
   // CONTENDERS — sub-genres in a close 5★ race with the leader. When several neighbours
   // tie (a body-horror fan rating both "The Fly" and "Evil Dead" a 5), we must DRILL each
@@ -96,7 +107,16 @@ function computeTaste(probe: ProbeScores) {
   // of the leader) has been drilled. We no longer require EVERY tied contender to be drilled —
   // that made a broad taste (e.g. a fan of all 11 horror sub-genres) drag on; a clearly
   // dominant leader now locks once its genuine near-rivals are settled.
-  const rivals = leader ? contenders.filter(s => s.t !== leader.t && s.hi >= leader.hi - 1) : [];
+  // Only the TOP TWO rivals gate the lock. A fan of a whole family (all 11 horror sub-genres
+  // rated 5) turned every one of them into a contender, and requiring each to be drilled to n>=2
+  // meant ~22 extra questions — which is why a "sharp" taste still ran ~46 questions instead of
+  // the 15-20 the product targets. Two settled rivals already decide the race; the rest cannot
+  // overtake a leader that has out-hit them.
+  const rivals = leader
+    ? contenders.filter(s => s.t !== leader.t && s.hi >= leader.hi - 1)
+        .sort((a, b) => b.hi - a.hi || b.avg - a.avg)
+        .slice(0, 2)
+    : [];
   const lockedLove = (leader && leader.hi >= lockHitsNeeded && rivals.every(s => s.n >= 2)) ? leader : null;
   // "loved", for the recommendation prompt — confirmed-ish sub-genres, lead first.
   const loved = candidates.filter(s => s.hi >= 2 || s === leader);
@@ -180,7 +200,13 @@ export async function POST(req: Request) {
     // families and focus the remaining questions on that family + its adjacent ones — so each
     // answer steers the quiz toward the user's taste and it converges surgically instead of
     // sweeping all ~25 sub-genres and running to the cap.
-    const leaderFamNow = (leader && leader.hi >= 2 && history.length >= 12) ? subGenreFamily(leader.t) : undefined;
+    // Gate lowered: at hi>=2 && Q>=12 the narrowing effectively never engaged (the shortest
+    // observed quiz was 54 questions while the design promises ~15-20 for a clear taste). One
+    // decisive hit after the opening is already enough to bias the rest of the sweep toward that
+    // family — adjacent families stay in focusFams, and the second-chance pass re-widens if the
+    // focused family fails to accumulate hits, so a wrong early guess self-corrects.
+    const leaderFamNow = (leader && leader.hi >= 1 && leader.avg >= 4.5 && history.length >= 8)
+      ? subGenreFamily(leader.t) : undefined;
     const focusFams = leaderFamNow ? new Set([leaderFamNow, ...(FAMILY_ADJ[leaderFamNow] || [])]) : null;
     // Each sub-genre used to get exactly ONE exemplar: probe it once and it was settled forever,
     // so a giallo fan who simply never connected with Suspiria had giallo written off. Terms that
@@ -283,7 +309,11 @@ export async function POST(req: Request) {
     // so the final step to a locked 100% is small and natural.
     const need = LOCK_HITS + (leader?.contra || 0);
     const hitProg = leader ? Math.min(1, leader.hi / need) : 0;
-    const drillProg = contenders.length ? contenders.filter(s => s.n >= 2).length / contenders.length : 1;
+    // Counting only FULLY drilled contenders made this jump backwards the moment a new contender
+    // appeared (denominator +1, numerator +0), producing a 12-point meter drop around Q47 for
+    // users who had contradicted nothing. Weighting by accumulated evidence keeps it smooth.
+    const drilledEvidence = contenders.reduce((a, s) => a + Math.min(s.n, 2), 0);
+    const drillProg = contenders.length ? drilledEvidence / (2 * contenders.length) : 1;
     const leaderStrength = lockedLove ? 1 : (leader ? Math.min(0.97, 0.5 * hitProg + 0.3 * drillProg + 0.2 * (Math.max(0, leader.avg - 3) / 2)) : 0);
     // Each unresolved contradiction PULLS THE METER DOWN (0.15 apiece, capped) — the user
     // sees the percentage drop after a taste-reversing answer, signalling the engine is
@@ -294,7 +324,13 @@ export async function POST(req: Request) {
     const creep = Math.min(1, history.length / 50);
     // Small creep weight so it gives gentle forward motion WITHOUT masking a real DROP when an
     // answer adds uncertainty (a leader contradiction lowers leaderStrength + contraPenalty).
-    const confidence = Math.max(0.05, Math.min(0.99, 0.28 * sweepProgress + 0.28 * ratedProgress + 0.41 * leaderStrength + 0.03 * creep) - contraPenalty);
+    const blended = Math.min(0.99, 0.28 * sweepProgress + 0.28 * ratedProgress + 0.41 * leaderStrength + 0.03 * creep);
+    // A CONFIRMED lock is genuine high confidence — the leader out-hit its rivals and they were
+    // drilled. Holding the blend low after that (sweep coverage is still partial by design once
+    // narrowing engages) forced ~14 extra questions of pure ramp before the 96 gate, which is why
+    // a sharp taste still ran ~36-46 questions instead of the 15-20 the product targets. The
+    // ≤4%/step clamp still applies, so the meter climbs to it smoothly rather than jumping.
+    const confidence = Math.max(0.05, (lockedLove ? Math.max(blended, 0.88) : blended) - contraPenalty);
 
     // DISPLAY METER: ease the SHOWN percent toward the true confidence by at most 4 points per
     // answer (owner wants smooth 1-4% steps, never a 5→42 jump). The previous shown value
@@ -310,11 +346,21 @@ export async function POST(req: Request) {
     // otherwise the quiz ran ~23 questions past SHOWN_CAP purely to let the meter catch up.
     // CLOSING_WINDOW reserves exactly enough steps (8 × 4 = 32 points) for that ramp, so the
     // quiz ends AT the cap rather than long after it.
-    const CLOSING_WINDOW = 8;
+    // A FIXED closing window was still wrong: with the meter low (e.g. a user who skips almost
+    // everything and sits at 5%) the ramp needed far more than 8 steps, so the quiz ran to 90
+    // questions against a SHOWN_CAP of 75, and MAX_Q was overshot in most runs. Size the window
+    // from the REAL gap instead — begin closing exactly when the remaining budget equals the
+    // number of 4-point steps still needed to reach 96. The caps are then authoritative: the
+    // quiz ends AT the cap, never past it.
     const shownCount = history.length + notSeen; // session-scoped, not cross-quiz
-    const atCap = history.length >= MAX_Q - CLOSING_WINDOW;
-    const atShownCap = shownCount >= SHOWN_CAP - CLOSING_WINDOW;
-    const wantFinish = atShownCap || (history.length >= MIN_Q && (atCap || !!lockedLove));
+    const budgetLeft = Math.min(MAX_Q - history.length, SHOWN_CAP - shownCount);
+    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / 4));
+    const mustFinish = budgetLeft <= stepsNeeded;
+    // The user can stop the quiz whenever they like ("enough, recommend now"). This is an
+    // explicit request, so it finishes on THIS response with the best signal gathered — no
+    // closing ramp, because a jump the user asked for is not a surprise.
+    const userAsked = payload.finishNow === true && history.length >= 1;
+    const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && !!lockedLove);
 
     // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
     // freely UP *and DOWN* (≤4 points per answer) — a taste-reversing / uncertain answer drops
@@ -334,12 +380,17 @@ export async function POST(req: Request) {
     // rated something and nothing pulled the meter down, nudge it one point. Capped at 95 so it
     // can never reach the completion threshold on its own — only real confidence finishes a quiz.
     const ratedThisTurn = !payload.isInit && typeof payload.answer === 'number';
+    const skippedThisTurn = !payload.isInit && !!payload.movieId && typeof payload.answer !== 'number';
     if (ratedThisTurn && shown === prevShown && !wantFinish && shown < 95) shown = prevShown + 1;
+    // A skip carries no TASTE signal, but it does consume the quiz budget — leaving the bar
+    // pinned at 5% for 67 consecutive skips read as broken. Advance it at half rate so the user
+    // sees the quiz progressing without the engine claiming knowledge it does not have.
+    else if (skippedThisTurn && shown === prevShown && !wantFinish && shown < 95 && notSeen % 2 === 0) shown = prevShown + 1;
 
     // Complete only once the ALREADY-DISPLAYED meter (prevShown) has reached 96 — so the final
     // visible step is 96→100 (≤4), never e.g. 92→100. The meter shows 96 on one question, then
     // the next response is the recommendations at 100.
-    const done = wantFinish && prevShown >= 96;
+    const done = userAsked || (wantFinish && prevShown >= 96);
 
     if (!done) {
       // Serve the next question — always a real pool movie. A SINGLE failed detail fetch must
@@ -404,12 +455,20 @@ export async function POST(req: Request) {
     const STOP = new Set(['the', 'and', 'of', 'a', 'an', 'part', 'vol', 'movie', 'ה', 'של', 'את']);
     const tokens = (t: string) => t.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length >= 4 && !STOP.has(w));
     const hatedTokens = new Set(history.filter(h => h.rating <= LO).flatMap(h => tokens(h.title)));
-    const isBad = (m: Rec) => {
+    // `onTaste` = the candidate came from the user's OWN confirmed/loved sub-genre seeds. The
+    // combo rule exists to stop franchise leakage ACROSS families (hating Marvel while liking
+    // Action), but it also fired on the very user this engine is built for: someone who loves one
+    // niche inside a genre they otherwise dislike (loves giallo, rates mainstream horror low) had
+    // their own locked niche filtered out and replaced with off-taste filler. Their confirmed
+    // sub-genre is exempt from the combo test — an explicit low rating on the film itself, or on
+    // its franchise, still blocks it.
+    const isBad = (m: Rec, onTaste = false) => {
       if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
+      if (tokens(m.title).some(w => hatedTokens.has(w))) return true;
       const names = genreNames(m._genreIds || []);
+      if (onTaste) return false;
       if (names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) return true;
       if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) return true;
-      if (tokens(m.title).some(w => hatedTokens.has(w))) return true;
       return false;
     };
     const add = (m: Rec | null) => { if (m && !resolved.some(x => x.id === m.id) && !isBad(m)) resolved.push(m); };
@@ -425,7 +484,7 @@ export async function POST(req: Request) {
       if (candPool.length >= 12) break;
       for (const m of await recommendBySubGenre(term, askedMovieIds, locale, 6)) {
         if (candPool.length >= 12) break;
-        if (!candPool.some(x => x.id === m.id) && !isBad(m)) candPool.push(m);
+        if (!candPool.some(x => x.id === m.id) && !isBad(m, true)) candPool.push(m);
       }
     }
     // AI TASTE DIRECTOR (gemma2): picks the final 3 FROM the real candidate pool, steered by
@@ -464,10 +523,7 @@ export async function POST(req: Request) {
         if (resolved.length >= 3) break;
         for (const m of await recommendBySubGenre(term, [], locale, 8)) {
           if (resolved.length >= 3) break;
-          if (resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
-          const names = genreNames(m._genreIds || []);
-          if (names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) continue;
-          if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) continue;
+          if (isBad(m, true) || resolved.some(x => x.id === m.id)) continue;
           resolved.push(m);
         }
       }
