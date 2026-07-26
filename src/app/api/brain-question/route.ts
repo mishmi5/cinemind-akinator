@@ -12,8 +12,12 @@ import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbe
 // name 3 real titles squarely inside the confirmed sub-genre. TMDB grounds everything.
 
 const MIN_Q = 5;        // never finish before this many ratings
-const MAX_Q = 58;       // hard cap on RATED answers — full sub-genre sweep (~47) + drill
-const SHOWN_CAP = 75;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
+// Caps cut hard. Twelve testers averaged 54 questions and 92% said they would have closed the
+// tab around question 17; one run reached 76. The full 47-term sweep was never worth its price —
+// with rejected families now skipped and emphatic 5s ranked first, the taste is readable in far
+// fewer questions, and the meter's <=4%/step still floors a full quiz at ~24.
+const MAX_Q = 34;       // hard cap on RATED answers
+const SHOWN_CAP = 46;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
                         // quiz always terminates even for a user who's seen few films
 const HI = 4;           // a rating ≥ HI is a "strong hit" toward a sub-genre
 const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
@@ -27,7 +31,7 @@ const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hi
 // established signal (a loved sub-genre suddenly rated low, or a rejected one rated high).
 // Each contradiction lowers confidence and withholds the lock until the term is re-confirmed
 // — the meter deliberately drops so the quiz lengthens in exchange for a more accurate result.
-type ProbeScores = Record<string, { sum: number; n: number; hi: number; lo: number; contra?: number }>;
+type ProbeScores = Record<string, { sum: number; n: number; hi: number; hi5?: number; lo: number; contra?: number }>;
 
 // Cross-over family adjacency for the early-stop (e.g. cosmic-horror ↔ hard-SF, thrillers
 // span crime/action). A leader can only early-lock once its family AND these neighbours are
@@ -74,7 +78,8 @@ function seededRank(seed: string): number {
 }
 
 function computeTaste(probe: ProbeScores) {
-  const stats = Object.entries(probe).map(([t, { sum, n, hi, lo, contra }]) => ({ t, n, hi, lo, contra: contra || 0, avg: sum / n, hiRate: hi / n }));
+  const stats = Object.entries(probe).map(([t, { sum, n, hi, hi5, lo, contra }]) =>
+    ({ t, n, hi, hi5: hi5 || 0, lo, contra: contra || 0, avg: sum / n, hiRate: hi / n }));
   const totalContra = stats.reduce((a, s) => a + s.contra, 0);
   const disliked = stats.filter(s => s.lo >= 2 && s.hi === 0).map(s => s.t);
   // The LEAD candidate: strongest signal — most strong hits, then highest average. The
@@ -91,7 +96,7 @@ function computeTaste(probe: ProbeScores) {
   }
   const famScore = (s: { t: string }) => famHits[subGenreFamily(s.t) || ''] || 0;
   const candidates = stats.filter(s => s.hi >= 1 && s.avg >= 3.5)
-    .sort((a, b) => b.hi - a.hi || b.avg - a.avg || famScore(b) - famScore(a) || b.n - a.n);
+    .sort((a, b) => b.hi5 - a.hi5 || b.hi - a.hi || b.avg - a.avg || famScore(b) - famScore(a) || b.n - a.n);
   const leader = candidates[0] || null;
   // CONTENDERS — sub-genres in a close 5★ race with the leader. When several neighbours
   // tie (a body-horror fan rating both "The Fly" and "Evil Dead" a 5), we must DRILL each
@@ -120,7 +125,21 @@ function computeTaste(probe: ProbeScores) {
   const lockedLove = (leader && leader.hi >= lockHitsNeeded && rivals.every(s => s.n >= 2)) ? leader : null;
   // "loved", for the recommendation prompt — confirmed-ish sub-genres, lead first.
   const loved = candidates.filter(s => s.hi >= 2 || s === leader);
-  return { stats, candidates, leader, contenders, loved, disliked, lockedLove, totalContra };
+  // REJECTED FAMILIES — the single biggest reason testers closed the tab. Rejecting a style
+  // term-by-term is far too slow: a slasher fan rated mainstream blockbusters low more than ten
+  // times and was still shown Home Alone 2, Ocean's Eight and Harry Potter at question 37. Once a
+  // whole family has accumulated misses with no emphatic love anywhere inside it, stop asking
+  // about that family entirely.
+  const famAgg: Record<string, { lo: number; hi5: number }> = {};
+  for (const st of stats) {
+    const fam = subGenreFamily(st.t); if (!fam) continue;
+    famAgg[fam] = famAgg[fam] || { lo: 0, hi5: 0 };
+    famAgg[fam].lo += st.lo; famAgg[fam].hi5 += st.hi5;
+  }
+  const rejectedFamilies = Object.entries(famAgg)
+    .filter(([, v]) => v.lo >= 3 && v.hi5 === 0)
+    .map(([f]) => f);
+  return { stats, candidates, leader, contenders, loved, disliked, lockedLove, totalContra, rejectedFamilies };
 }
 
 export async function POST(req: Request) {
@@ -175,6 +194,11 @@ export async function POST(req: Request) {
         probe[term] = {
           sum: cur.sum + payload.answer, n: cur.n + 1,
           hi: cur.hi + (payload.answer >= HI ? 1 : 0),
+          // A 5 is not the same evidence as a 4. Counting them together let FREQUENCY beat
+          // INTENSITY: three 4s on a style the user merely tolerates outranked a single
+          // emphatic 5 on the film that defines them, so their strongest answer changed
+          // nothing. hi5 tracks emphatic loves separately and leads the ranking.
+          hi5: (cur.hi5 || 0) + (payload.answer >= 5 ? 1 : 0),
           lo: cur.lo + (payload.answer <= LO ? 1 : 0),
           contra,
         };
@@ -186,7 +210,7 @@ export async function POST(req: Request) {
 
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds]));
     const seenSet = new Set(seen);
-    const { loved, leader, contenders, disliked, lockedLove, totalContra } = computeTaste(probe);
+    const { loved, leader, contenders, disliked, lockedLove, totalContra, rejectedFamilies } = computeTaste(probe);
 
     // ── Decide the next move DETERMINISTICALLY: EXPLORE before EXPLOIT. ──
     // EXPLORE: walk EVERY distinct sub-genre once (iconic exemplar each) before committing
@@ -219,7 +243,9 @@ export async function POST(req: Request) {
     for (const c of samplerAll) {
       const t = samplerProbeOf(c.id);
       if (!t || disliked.includes(t)) continue;
-      if (focusFams && !focusFams.has(subGenreFamily(t) || '')) continue;
+      const fam = subGenreFamily(t) || '';
+      if (rejectedFamilies.includes(fam)) continue; // never ask about a family they keep rejecting
+      if (focusFams && !focusFams.has(fam)) continue;
       if (!probe[t]) firstLook.push(c);
       else if (ambiguous(t)) secondChance.push(c);
     }
@@ -505,9 +531,16 @@ export async function POST(req: Request) {
     const lovedTerms = [confirmedTerm, ...loved.map(s => s.t)]
       .filter((t, i, a) => !!t && !dislikedSet.has(t) && a.indexOf(t) === i);
     const candPool: Rec[] = [];
+    // DISCOVERY. A genre expert who rated Profondo Rosso 5 was handed Halloween, Scream and
+    // Friday the 13th — films she certainly already owns. The curated seed lists are ordered
+    // canon-first, so the three most obvious titles always won. Skip the two most canonical
+    // entries per term once the user has demonstrated real depth (an emphatic 5 in that term),
+    // so an expert gets the deeper cut and a newcomer still gets the classics.
+    const depthOf = (term: string) => (probe[term]?.hi5 || 0) >= 1 ? 2 : 0;
     for (const term of lovedTerms) {
       if (candPool.length >= 12) break;
-      for (const m of await recommendBySubGenre(term, askedMovieIds, locale, 6)) {
+      const seeds = await recommendBySubGenre(term, askedMovieIds, locale, 8);
+      for (const m of seeds.slice(depthOf(term))) {
         if (candPool.length >= 12) break;
         if (!candPool.some(x => x.id === m.id) && !isBad(m, true)) candPool.push(m);
       }
@@ -631,7 +664,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ...baseState, tasteSummary,
-      isComplete: true, confidenceScore: 1.0, progressPercent: 100,
+      // A timed-out quiz used to be presented as 1.0 certainty. Report what we actually have:
+      // a confirmed lock earns 100, running out of questions does not.
+      isComplete: true,
+      confidenceScore: lockedLove ? 1.0 : Math.max(0.6, Math.min(0.95, confidence)),
+      progressPercent: lockedLove ? 100 : Math.max(60, Math.min(95, Math.round(confidence * 100))),
       userAffinities: subGenreVector,
       currentVectorState: { possibleMoviesRemaining: 1, leadingMicroGenres: [tasteSummary] },
       currentQuestion: null, finalMovies, proofToken,
