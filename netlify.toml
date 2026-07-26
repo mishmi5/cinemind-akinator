@@ -1,0 +1,13 @@
+# Netlify configuration for CineMind Akinator (Next.js).
+# Hosting target: Netlify (paid). Backend: Firebase (auth + Firestore).
+# The Next.js runtime is provided by @netlify/plugin-nextjs.
+
+[build]
+  command = "npm run build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Cron schedules live in-code on each scheduled function (netlify/functions/cron-*.mts).
+# Scheduled functions only run on published production deploys — never on previews or
+# branch deploys — so nothing fires until the site is taken live.
