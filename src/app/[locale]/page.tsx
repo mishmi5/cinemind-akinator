@@ -106,9 +106,8 @@ export default function LandingPage() {
         <div className="bg-black/40 border border-white/10 rounded-[2rem] p-8 md:p-12 mb-12 w-full max-w-3xl backdrop-blur-md shadow-2xl relative overflow-hidden flex flex-col items-center">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[100px]"></div>
           
-          <p className="text-xl text-zinc-300 font-medium mb-6 relative z-10">
-            {t('subtitle')}
-          </p>
+          {/* The subtitle is already the <h2> directly above this card — repeating it here
+              printed the same sentence twice on the landing page. */}
           <p className="text-zinc-400 leading-relaxed mb-10 relative z-10 text-lg text-center whitespace-pre-wrap">
             {t('description')}
           </p>
