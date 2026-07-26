@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { recReason, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
-import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, genreNames } from '@/lib/brain/tmdb';
+import { fetchCandidatePool, fetchPoolByHint, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
 
 // Taste-brain quiz endpoint (Akinator-style). DETERMINISTIC sub-genre navigation:
 // the route — not the LLM — decides what to ask. Why: a 14B local model is unreliable
@@ -593,6 +593,9 @@ export async function POST(req: Request) {
     // this is the customer-facing "answer" the LLM provides. Generated in parallel over the
     // already-chosen films, so it cannot affect the surgical selection.
     const yearOf = (p: typeof picks[number]) => (p.originalDetails || '').match(/(\d{4})/)?.[1];
+    // Availability is fetched alongside the reasons — a rec the user cannot act on tonight is
+    // not a recommendation. Region is IL; a miss just omits the row.
+    const watch = await Promise.all(picks.map(p => getWatchProviders(p.id, 'IL')));
     const reasons = await Promise.all(picks.map(p =>
       recReason({ title: p.title, year: yearOf(p), term: confirmedTerm || 'this style', locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
 
@@ -602,6 +605,7 @@ export async function POST(req: Request) {
       posterUrl: p.posterUrl, trailerId: p.trailerId, overview: p.overview,
       _genreIds: p._genreIds,
       reason: reasons[i] || (confirmedTerm ? `A canonical ${confirmedTerm} pick` : ''),
+      watch: watch[i] || null, // where to actually watch it in Israel
     }));
 
     return NextResponse.json({

@@ -512,6 +512,32 @@ export default function ScanMovieEvaluation() {
                       {(movie as { reason?: string }).reason}
                     </p>
                   )}
+                  {/* WHERE TO WATCH IT TONIGHT, IN ISRAEL. A pick nobody can act on is not a
+                      recommendation — and the split Israeli catalogue (Netflix / Disney+ / HBO Max
+                      via Cellcom / yes / HOT VOD) is the actual pain this product solves. */}
+                  {isRevealed && (() => {
+                    const w = (movie as { watch?: { stream: { name: string; logo: string }[]; rent: { name: string; logo: string }[]; link?: string } }).watch;
+                    if (!w || (!w.stream.length && !w.rent.length)) return null;
+                    const Row = ({ label, list }: { label: string; list: { name: string; logo: string }[] }) => (
+                      list.length ? (
+                        <div className="flex items-center gap-2 flex-wrap justify-center">
+                          <span className="text-xs text-zinc-500 font-bold">{label}</span>
+                          {list.slice(0, 4).map(p => (
+                            <span key={p.name} className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg ps-1 pe-2 py-1">
+                              <img src={p.logo} alt="" className="w-5 h-5 rounded" />
+                              <span className="text-xs text-zinc-300">{p.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null
+                    );
+                    return (
+                      <div className="mt-5 flex flex-col gap-2 items-center">
+                        <Row label={locale === 'he' ? 'כלול במנוי:' : 'Included with:'} list={w.stream} />
+                        <Row label={locale === 'he' ? 'להשכרה/קנייה:' : 'Rent or buy:'} list={w.rent} />
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Paywall Overlay */}

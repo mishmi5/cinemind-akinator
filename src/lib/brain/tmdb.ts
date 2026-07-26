@@ -430,3 +430,34 @@ export async function getTrailer(id: string): Promise<string> {
     return chosen ? chosen.key : '';
   } catch { return ''; }
 }
+
+// ── WHERE TO WATCH IT, IN ISRAEL ─────────────────────────────────────────────
+// A recommendation nobody can act on is worth nothing, and the Israeli catalogue is split
+// across Netflix / Disney+ / HBO Max via Cellcom / yes / HOT VOD — figuring out where a film
+// actually is IS the user's real pain. This is also the one thing a chatbot cannot fake: it
+// will happily hallucinate that a film is on yes VOD. TMDB's provider data is JustWatch-backed,
+// so it is real. Cached for a day; failure is silent (the card simply omits availability).
+export interface WatchAvailability {
+  stream: { name: string; logo: string }[];  // included with a subscription
+  rent: { name: string; logo: string }[];    // rent or buy
+  link?: string;                             // JustWatch page for the region
+}
+
+export async function getWatchProviders(id: string, region = 'IL'): Promise<WatchAvailability | null> {
+  if (!KEY || !/^\d+$/.test(id)) return null;
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${KEY}`, { next: { revalidate: 86400 } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const r = data?.results?.[region];
+    if (!r) return null;
+    const map = (arr?: { provider_name: string; logo_path: string }[]) =>
+      (arr || []).map(p => ({ name: p.provider_name, logo: `https://image.tmdb.org/t/p/w45${p.logo_path}` }));
+    const stream = map(r.flatrate);
+    // rent and buy are usually the same storefronts; dedupe so the card is not a wall of logos.
+    const rent = map([...(r.rent || []), ...(r.buy || [])])
+      .filter((p, i, a) => a.findIndex(x => x.name === p.name) === i);
+    if (!stream.length && !rent.length) return null;
+    return { stream, rent, link: r.link };
+  } catch { return null; }
+}
