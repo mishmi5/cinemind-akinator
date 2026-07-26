@@ -9,16 +9,35 @@ export async function GET() {
   const backend = brainBackend();
   const model = process.env.OLLAMA_MODEL || 'qwen2.5:14b-instruct';
   const base = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+  // Checking only that ollama answers is NOT enough: it happily returns 200 on /api/tags while
+  // the engine's model is absent, so the probe used to report llm:"up", degraded:false with a
+  // missing model — a lying health check. We verify the MODEL ITSELF is installed, and whether
+  // it is currently resident in VRAM (warm) so ops can tell "ready" from "will cold-start".
   let llm: 'up' | 'down' = 'down';
+  let modelInstalled = false;
+  let modelWarm = false;
   try {
     const r = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(4000) });
-    llm = r.ok ? 'up' : 'down';
+    if (r.ok) {
+      llm = 'up';
+      const tags = await r.json().catch(() => null);
+      modelInstalled = !!tags?.models?.some((m: { name?: string }) => m.name === model);
+      if (modelInstalled) {
+        const ps = await fetch(`${base}/api/ps`, { signal: AbortSignal.timeout(4000) })
+          .then(x => x.json()).catch(() => null);
+        modelWarm = !!ps?.models?.some((m: { name?: string }) => m.name === model);
+      }
+    }
   } catch { llm = 'down'; }
+  const ready = llm === 'up' && modelInstalled;
   return NextResponse.json({
     ok: true,                 // the deterministic engine can always serve
     engine: 'brain-deterministic',
     backend, model, llm,
-    degraded: llm !== 'up',   // true → recs use templated reasons (still correct), recover the LLM
+    modelInstalled, modelWarm,
+    // degraded → recs fall back to templated reasons (still correct). True when ollama is down
+    // OR the model is missing, so `ollama pull <model>` is the recovery action.
+    degraded: !ready,
     ts: Date.now(),
   });
 }
