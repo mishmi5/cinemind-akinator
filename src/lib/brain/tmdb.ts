@@ -363,7 +363,13 @@ export async function recommendBySubGenre(term: string, seenIds: string[], local
     const cand = await candidateByTitle(title);
     if (!cand || seen.has(cand.id) || out.some(m => m.id === cand.id)) continue;
     const m = await movieById(cand.id, locale);
-    if (m) out.push(m);
+    // When BOTH the localized and the original title are CJK (e.g. Mobile Suit Gundam), the
+    // earlier guard has nothing Latin to fall back to and a Hebrew results card ends up showing
+    // 機動戦士ガンダム. The curated seed name we searched for is the readable fallback.
+    if (m) {
+      if (/[　-鿿가-힯]/.test(m.title)) m.title = title.replace(/\s*\(\d{4}\)\s*$/, '');
+      out.push(m);
+    }
   }
   return out;
 }

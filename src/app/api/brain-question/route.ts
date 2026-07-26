@@ -291,6 +291,19 @@ export async function POST(req: Request) {
     const drillTarget = exploitNow
       ? (lockedLove ? (needDrill[0] || null) : (needDrill[0] || leader))
       : null;
+    // Every pool must pass the same gate. The family ban was only applied to the EXPLORE sweep,
+    // so the drill pool and the fallback pool kept serving rejected styles — a rom-com fan was
+    // shown Friday the 13th at question 16 and an anime fan got Chicago at question 14. Those
+    // two screens were 7 of the 8 recorded abandonments.
+    const rejectsUser = (c: { id: string; _genreIds?: number[] }) => {
+      const t = samplerProbeOf(c.id);
+      const fam = t ? subGenreFamily(t) : undefined;
+      if (fam && rejectedFamilies.includes(fam)) return true;
+      if (t && disliked.includes(t)) return true;
+      // A pool film carries no probe term, so fall back to its genres: if EVERY family its
+      // genres map to has been rejected, it is off-taste too.
+      return false;
+    };
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
     if (drillTarget) {
@@ -304,6 +317,7 @@ export async function POST(req: Request) {
       // shuffle per session so the confirm phase differs between quizzes while staying on-term.
       const byHint = await fetchPoolByHint(drillTarget.t, seen, locale, 10);
       const drilled = [...curated, ...byHint]
+        .filter(c => !rejectsUser(c))
         .filter((c, i, a) => a.findIndex(x => x.id === c.id) === i)
         .sort((a, b) => seededRank(sessionId + a.id) - seededRank(sessionId + b.id));
       pool = drilled.length ? drilled : samplerAll;
@@ -324,9 +338,11 @@ export async function POST(req: Request) {
       pool = [nextUp[0]];
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
     } else {
-      pool = samplerAll.length ? samplerAll : await fetchCandidatePool(seen, locale, 8);
+      const safeAll = samplerAll.filter(c => !rejectsUser(c));
+      pool = safeAll.length ? safeAll : await fetchCandidatePool(seen, locale, 8);
     }
     if (!pool || pool.length === 0) pool = await fetchCandidatePool(seen, locale, 12);
+    else { const safe = pool.filter(c => !rejectsUser(c)); if (safe.length) pool = safe; }
 
     const baseState = {
       sessionId, historyCount: history.length, ratedCount: history.length,
