@@ -380,7 +380,7 @@ export async function POST(req: Request) {
     // The user can stop the quiz whenever they like ("enough, recommend now"). This is an
     // explicit request, so it finishes on THIS response with the best signal gathered — no
     // closing ramp, because a jump the user asked for is not a surprise.
-    const userAsked = payload.finishNow === true && history.length >= 1;
+    const userAsked = payload.finishNow === true && history.length >= MIN_Q;
     const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && !!lockedLove);
 
     // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
@@ -608,11 +608,33 @@ export async function POST(req: Request) {
       watch: watch[i] || null, // where to actually watch it in Israel
     }));
 
+    // ── PERSIST THE TASTE ────────────────────────────────────────────────────────────────
+    // The brain never issued a proofToken, so /api/user/bootstrap rejected every brain quiz with
+    // 403 and NO profile was ever written — the returning-customer half of the product simply did
+    // not exist. Emit the same signed proof the formula engine does, but carry the SUB-GENRE
+    // vector (what this engine actually knows) instead of broad genre affinities, so a saved
+    // profile can drive later recommendations without re-running the quiz.
+    const subGenreVector: Record<string, number> = {};
+    for (const [term, p] of Object.entries(probe)) {
+      if (!p.n) continue;
+      // −1 (rejected) … +1 (loved), weighted by how much evidence we have for that term.
+      const strength = Math.min(1, p.n / 2);
+      subGenreVector[term] = Number((((p.sum / p.n) - 3) / 2 * strength).toFixed(3));
+    }
+    const { signSessionState } = await import('@/lib/sessionToken');
+    const proofToken = signSessionState({
+      sessionId,
+      totalAnswers: history.length, // real ratings only — NOT_SEEN never counts
+      affinities: subGenreVector,
+      completedAt: Date.now(),
+    });
+
     return NextResponse.json({
       ...baseState, tasteSummary,
       isComplete: true, confidenceScore: 1.0, progressPercent: 100,
+      userAffinities: subGenreVector,
       currentVectorState: { possibleMoviesRemaining: 1, leadingMicroGenres: [tasteSummary] },
-      currentQuestion: null, finalMovies,
+      currentQuestion: null, finalMovies, proofToken,
     }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ error: 'Brain error: ' + String(error) }, { status: 500 });
