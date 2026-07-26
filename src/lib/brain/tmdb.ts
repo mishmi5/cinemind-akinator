@@ -401,20 +401,22 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     // TMDB's he-IL response falls back to the ORIGINAL title when no Hebrew one exists, which
     // put raw CJK on a Hebrew results card (機動警察パトレイバー 劇場版). Prefer a Latin title in
     // that case — recognizable to an Israeli reader in a way the original script is not.
-    const cjk = /[　-鿿가-힯]/;
+    // Not just CJK: the Hebrew UI also received องค์บาก (Thai) and Сталкер (Cyrillic) as the
+    // film's "original title" line. Anything with no Latin letter at all is unreadable here.
+    const cjk = (t: string) => !!t && !/[A-Za-z֐-׿]/.test(t);
     const heTitle = m.title || m.original_title || '';
-    const safeTitle = cjk.test(heTitle) && m.original_title && !cjk.test(m.original_title)
+    const safeTitle = cjk(heTitle) && m.original_title && !cjk(m.original_title)
       ? m.original_title : heTitle;
     // The subtitle line under the Hebrew title carries the original title, and for Japanese
     // films that printed raw CJK on the question card (劇場版「鬼滅の刃」無限列車編). Ask TMDB for the
     // English title in that case — one extra call, only for the handful of films that need it.
     let sub = m.original_title as string;
-    if (cjk.test(sub)) {
+    if (cjk(sub)) {
       try {
         const en = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=en-US`, { next: { revalidate: 604800 } });
         const ed = en.ok ? await en.json() : null;
-        if (ed?.title && !cjk.test(ed.title)) sub = ed.title;
-        else if (!cjk.test(safeTitle)) sub = safeTitle;
+        if (ed?.title && !cjk(ed.title)) sub = ed.title;
+        else if (!cjk(safeTitle)) sub = safeTitle;
       } catch { /* keep the original title rather than lose the line */ }
     }
     return {

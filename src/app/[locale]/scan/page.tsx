@@ -114,7 +114,7 @@ export default function ScanMovieEvaluation() {
     [activeEffect],
   );
   const matrixBits = useMemo(
-    () => Array.from({ length: 50 }, () => ({
+    () => Array.from({ length: 80 }, () => ({
       left: Math.random() * 100, top: Math.random() * 100,
       text: Math.random().toString(36).substring(2, 10),
     })),
@@ -419,8 +419,8 @@ export default function ScanMovieEvaluation() {
       
       {activeEffect === 'oscar' && (
         <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center overflow-hidden">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <div key={i} className="absolute text-7xl animate-[fall_1.5s_ease-in_forwards]" style={{ left: `${oscarBits[i].left}vw`, animationDelay: `${oscarBits[i].delay}s` }}>🏆</div>
+          {oscarBits.map((bit, i) => (
+            <div key={i} className="absolute text-7xl animate-[fall_1.5s_ease-in_forwards]" style={{ left: `${bit.left}vw`, animationDelay: `${bit.delay}s` }}>🏆</div>
           ))}
           <style>{`@keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(100vh) rotate(360deg); } }`}</style>
         </div>
@@ -437,8 +437,11 @@ export default function ScanMovieEvaluation() {
       )}
       {activeEffect === 'matrix' && (
         <div className="fixed inset-0 z-[100] pointer-events-none bg-black/90 flex flex-col">
-          {Array.from({ length: 80 }).map((_, i) => (
-            <div key={i} className="text-emerald-500 font-mono text-xl font-bold opacity-80 absolute" style={{ left: `${matrixBits[i].left}vw`, top: `${matrixBits[i].top}vh` }}>{matrixBits[i].text}</div>
+          {/* Iterate the generated array itself. This rendered 80 cells from a 50-cell array, so
+              matrixBits[50] was undefined and reading .left threw — the whole quiz page went
+              blank the moment the matrix celebration fired on a 5-star sci-fi rating. */}
+          {matrixBits.map((bit, i) => (
+            <div key={i} className="text-emerald-500 font-mono text-xl font-bold opacity-80 absolute" style={{ left: `${bit.left}vw`, top: `${bit.top}vh` }}>{bit.text}</div>
           ))}
         </div>
       )}
