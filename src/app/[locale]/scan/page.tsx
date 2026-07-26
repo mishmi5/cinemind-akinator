@@ -20,7 +20,9 @@ interface StartingMovie extends MovieContext {
 // All three endpoints share a response shape, so the rest of the UI is identical.
 function getEngine(): { url: string; brainHeaders: Record<string, string>; isBrain: boolean } {
   const FORMULA = { url: '/api/next-question', brainHeaders: {}, isBrain: false };
-  const BRAIN = (mock = false) => ({ url: '/api/brain-question', brainHeaders: mock ? { 'x-brain-mock': '1' } : {}, isBrain: true });
+  // brainHeaders is cast because the ternary widens to a union of two object literals, which is
+  // not assignable to Record<string, string> — that mismatch was failing `tsc` / `next build`.
+  const BRAIN = (mock = false) => ({ url: '/api/brain-question', brainHeaders: (mock ? { 'x-brain-mock': '1' } : {}) as Record<string, string>, isBrain: true });
   if (typeof window === 'undefined') return BRAIN();
   const params = new URLSearchParams(window.location.search);
   const engine = params.get('engine');

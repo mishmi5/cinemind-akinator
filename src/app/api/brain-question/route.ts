@@ -314,9 +314,23 @@ export async function POST(req: Request) {
     const done = wantFinish && prevShown >= 96;
 
     if (!done) {
-      // Serve the next question — always a real pool movie.
-      const picked = pool[Math.floor(Math.random() * pool.length)];
-      const movie = picked ? await movieById(picked.id, locale) : null;
+      // Serve the next question — always a real pool movie. A SINGLE failed detail fetch must
+      // never end the quiz: previously one null from movieById (TMDB hiccup, 429, or a title
+      // with no poster) fell straight through to the DONE block below, so the user saw the meter
+      // jump from wherever it was to 100% + recommendations mid-quiz. Try several candidates,
+      // then refill from the popular pool, and only give up if TMDB is truly unreachable.
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      let movie: Awaited<ReturnType<typeof movieById>> = null;
+      for (const cand of shuffled.slice(0, 6)) {
+        movie = await movieById(cand.id, locale);
+        if (movie) break;
+      }
+      if (!movie) {
+        for (const cand of await fetchCandidatePool(seen, locale, 10)) {
+          movie = await movieById(cand.id, locale);
+          if (movie) break;
+        }
+      }
       if (movie) {
         movie.trailerId = await getTrailer(movie.id);
         const tasteSummary = lockedLove ? `Confirming: ${lockedLove.t}` : leader ? `Closing in on: ${leader.t}` : 'Mapping your taste…';
