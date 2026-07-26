@@ -1,0 +1,87 @@
+[
+  {
+    "persona": "Cerebral Hard-SF",
+    "taste": "Loves cerebral, idea-driven HARD science fiction (Arrival, Ex Machina, Primer, 2001). Dislikes space-opera spectacle and superhero films. Neutral elsewhere.",
+    "pass": true,
+    "score": 95,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the specific sub-genre and provided perfect recommendations.",
+    "missed": "",
+    "tasteSummary": "Loves hard science fiction",
+    "recs": [
+      "Arrival",
+      "Ex Machina",
+      "Primer"
+    ],
+    "questions": 27
+  },
+  {
+    "persona": "Heist Caper Fan",
+    "taste": "Loves clever HEIST / caper thrillers (Ocean's Eleven, Inside Man, Heat). Dislikes war films and superhero action. Neutral elsewhere.",
+    "pass": true,
+    "score": 100,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the specific sub-genre and provided perfect recommendations.",
+    "missed": "",
+    "tasteSummary": "Loves heist",
+    "recs": [
+      "Heat",
+      "The Italian Job",
+      "Inside Man"
+    ],
+    "questions": 35
+  },
+  {
+    "persona": "Deadpan Whimsy",
+    "taste": "Loves quirky, symmetrical DEADPAN comedy-drama (Wes Anderson, Yorgos Lanthimos). Dislikes crude/gross-out comedy. Neutral elsewhere.",
+    "pass": true,
+    "score": 90,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the specific sub-genre of 'deadpan comedy' and provided recommendations that fit well within the user's preferred style without any missteps.",
+    "missed": "",
+    "tasteSummary": "Loves deadpan comedy",
+    "recs": [
+      "The Lobster",
+      "Moonrise Kingdom",
+      "The Royal Tenenbaums"
+    ],
+    "questions": 46
+  },
+  {
+    "persona": "Kaiju Monster Fan",
+    "taste": "Loves giant-MONSTER / kaiju films (Godzilla, Pacific Rim, King Kong). Dislikes quiet human dramas and romance. Neutral elsewhere.",
+    "pass": true,
+    "score": 100,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the user's love for giant-monster films and provided appropriate recommendations.",
+    "missed": "",
+    "tasteSummary": "Loves kaiju monster",
+    "recs": [
+      "Godzilla",
+      "King Kong",
+      "Cloverfield"
+    ],
+    "questions": 17
+  },
+  {
+    "persona": "Slow Cinema Arthouse",
+    "taste": "Loves SLOW arthouse cinema (Tarkovsky's Stalker, Bela Tarr, contemplative long takes). Dislikes fast blockbusters and comedy. Neutral elsewhere.",
+    "pass": true,
+    "score": 100,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "The AI accurately identified the user's taste in slow arthouse cinema and provided appropriate recommendations.",
+    "missed": "",
+    "tasteSummary": "Loves slow cinema arthouse",
+    "recs": [
+      "Stalker",
+      "Andrei Rublev",
+      "Autour de Jeanne Dielman"
+    ],
+    "questions": 46
+  }
+]

@@ -42,14 +42,17 @@ function pickArchetype(affinities, contrarian) {
   const values = Object.values(affinities);
   if (values.length === 0) return 'The Basic Binge-Watcher';
   const maxScore = Math.max(...values);
-  const MIN_SIGNAL = 3;
+  const MIN_SIGNAL = 2; // mirror deriveTaste.ts: niche-purist-who-hates-all tops ~+2
   if (maxScore < MIN_SIGNAL) return 'The Basic Binge-Watcher';
+  // Mirror of deriveTaste.ts: 0.85 leniency, ORDER = most-specific first.
+  // Action/Thriller/Crime above Animation/Family (Army Vet); Escapist (broad rider
+  // bucket) below the specific ones (Animation Student / Pixar-rides-on-Adventure).
   const hasStrongSignal = (genres) => genres.some(g => (affinities[g] || 0) >= maxScore * 0.85 && (affinities[g] || 0) >= MIN_SIGNAL);
   if (hasStrongSignal(['Horror'])) return 'The Cinematic Edge-Lord';
   if (hasStrongSignal(['Romance'])) return 'The Hopeless Romantic';
+  if (hasStrongSignal(['Action', 'Thriller', 'Crime'])) return 'The Action Junkie';
   if (hasStrongSignal(['Animation', 'Family'])) return 'The Family & Animation Enthusiast';
   if (hasStrongSignal(['Sci-Fi', 'Fantasy', 'Adventure', 'Mystery'])) return 'The Escapist';
-  if (hasStrongSignal(['Action', 'Thriller', 'Crime'])) return 'The Action Junkie';
   if (hasStrongSignal(['History', 'Documentary', 'Drama']) || contrarian > 0.8) return 'The Pretentious Cinephile';
   return 'The Basic Binge-Watcher';
 }
@@ -324,7 +327,13 @@ function resolveVote(persona, titleText, questionNumber) {
   // 1. Taste-bucket vote — baseline phase only (12 questions: init + 11). Sequels in
   //    the live-TMDB phase share substrings with baseline titles ("The Matrix
   //    Reloaded" ⊃ "The Matrix") and must fall through to keywords/default.
-  const bucket = questionNumber <= 12 ? bucketOf(titleText) : null;
+  // Window widened 12→18: the engine's baseline now runs until 11 RATED movies, so
+  // a skipper's baseline extends past screen 12. Bucket-voting baseline titles for
+  // a few extra screens keeps skip-heavy personas expressing their real taste (a
+  // missed baseline bucket = a lost taste axis). bucketOf only matches the curated
+  // baseline titles, so a stray live sequel in this window voting like its original
+  // is harmless.
+  const bucket = questionNumber <= 18 ? bucketOf(titleText) : null;
   if (bucket && persona.bucketVotes && persona.bucketVotes[bucket] !== undefined) {
     return persona.bucketVotes[bucket];
   }
@@ -398,12 +407,19 @@ async function run() {
     let lastTitle = '';
     let stuckCycles = 0;
     const trailerBugs = [];
+    const ratedAdvanceBugs = []; // NOT_SEEN must never advance the rated clock
+    const pacingBugs = [];       // confidence must not spike before the model knows the user
+    const recHateBugs = [];      // a recommendation must never be in a confirmed-hated genre
+    let votesCast = 0;  // real 1–5★ ratings this quiz
+    let skipsCast = 0;  // NOT_SEEN clicks this quiz
     let trailersChecked = 0;
 
     try {
       await page.goto(`http://localhost:3000/${locale}/scan`, { waitUntil: 'networkidle2', timeout: 45000 });
 
-      while (questionCount < 45 && !quizComplete) {
+      // Cap raised 45→75: with NOT_SEEN no longer advancing the rated clock,
+      // skip-heavy personas legitimately need more screens to reach 40 RATED.
+      while (questionCount < 90 && !quizComplete) {
         try {
           await page.waitForSelector('button.group', { timeout: 25000 });
         } catch {
@@ -456,18 +472,18 @@ async function run() {
 
         // NOT_SEEN attention-span simulation
         if (persona.notSeenChance && Math.random() < persona.notSeenChance) {
-          questionCount++;
           const clicked = await page.evaluate(() => {
             const btns = Array.from(document.querySelectorAll('button'));
             const b = btns.find(x => x.innerText.includes('לא ראיתי') || x.innerText.toLowerCase().includes('seen'));
             if (b) { b.click(); return true; }
             return false;
           });
-          if (!clicked) {
-            await page.evaluate(() => { const s = document.querySelectorAll('button.group'); if (s.length >= 5) s[2].click(); });
-          }
-          await humanPause();
-          continue;
+          // Only treat it as a skip when the SKIP button was genuinely clicked. A
+          // missed click used to fall back to clicking the 3rd star — a real 3★
+          // RATING mislabeled as a skip. If the button isn't on screen this frame,
+          // fall through to a normal vote instead of faking the skip.
+          if (clicked) { questionCount++; skipsCast++; await humanPause(); continue; }
+          // else: skip button absent — fall through to the normal star-vote below.
         }
 
         // Trailer spot-check: a real user clicks the trailer sometimes. Verify
@@ -500,6 +516,7 @@ async function run() {
 
         const vote = resolveVote(persona, titleText, questionCount + 1);
         questionCount++;
+        votesCast++; // a real 1–5★ rating — the only thing that should advance ratedCount
         if (Math.random() < 0.25) await humanScroll(page); // sometimes read the overview first
         const clicked = await humanStarClick(page, vote);
         if (!clicked) {
@@ -509,17 +526,48 @@ async function run() {
           }, vote);
         }
         await humanPause();
+
+        // Confidence-pacing invariant (TASTE-FORMULA.md §10): the meter must NOT
+        // claim to know the user before it has any coverage. 3 decisive clicks on
+        // one genre is not "70% sure". Allow a generous ceiling, flag only egregious
+        // early spikes.
+        const confProbe = await page.evaluate(() => window.__cinemind_session
+          ? { c: window.__cinemind_session.confidenceScore, r: window.__cinemind_session.ratedCount, done: window.__cinemind_session.isComplete }
+          : null);
+        if (confProbe && !confProbe.done && confProbe.r > 0 && confProbe.r < 6 && confProbe.c > 0.55) {
+          pacingBugs.push(`confidence ${(confProbe.c * 100).toFixed(0)}% at only ${confProbe.r} rated answers (premature — no coverage yet)`);
+        }
       }
 
       // settle + collect finals
       await sleep(2500);
       const finals = await page.evaluate(() => ({
         aff: window.__cinemind_final_affinities || null,
-        movies: window.__cinemind_final_movies ? window.__cinemind_final_movies.map(m => ({ id: m.id, title: m.title, trailerId: m.trailerId || '' })) : [],
+        movies: window.__cinemind_final_movies ? window.__cinemind_final_movies.map(m => ({ id: m.id, title: m.title, trailerId: m.trailerId || '', genres: m._genreIds || [] })) : [],
+        ratedCount: window.__cinemind_session ? window.__cinemind_session.ratedCount : null,
+        genreObs: window.__cinemind_session ? window.__cinemind_session.genreObs : {},
       }));
       finalAffinities = finals.aff;
       finalMovies = finals.movies;
       if (finalAffinities) quizComplete = true;
+
+      // Recs-respect-hate invariant (owner: 1★ a style → it must NOT come back as a
+      // recommendation). A genre is CONFIRMED-disliked when its raw observations
+      // average ≤ −1 over ≥2 votes. No final recommendation may carry such a genre.
+      const obs = finals.genreObs || {};
+      const hatedGenres = new Set(Object.keys(obs).filter(g => obs[g].n >= 2 && (obs[g].sum / obs[g].n) <= -1));
+      for (const m of finals.movies) {
+        const clash = (m.genres || []).filter(g => hatedGenres.has(String(g)));
+        if (clash.length) recHateBugs.push(`rec "${m.title}" carries confirmed-hated genre(s) ${clash.join(',')}`);
+      }
+      // Race-free omitted-item invariant (memory: notseen-is-omitted-item): the
+      // engine's RATED clock must equal the number of real star-votes we cast —
+      // never more. If a NOT_SEEN had advanced ratedCount, finalRated would exceed
+      // votesCast. (End-of-quiz check avoids the mid-flight settle races that a
+      // per-skip before/after probe suffered.)
+      if (finals.ratedCount !== null && finals.ratedCount > votesCast) {
+        ratedAdvanceBugs.push(`final ratedCount ${finals.ratedCount} > star-votes cast ${votesCast} (NOT_SEEN advanced the clock)`);
+      }
     } catch (e) {
       console.log(`   ❌ quiz flow error: ${e.message.slice(0, 140)}`);
     }
@@ -547,24 +595,30 @@ async function run() {
     }
     const pagesHealthy = pageAudits.every(a => a.ok);
 
-    const questionsSane = questionCount >= 15 && questionCount <= 45;
+    const questionsSane = questionCount >= 15 && questionCount <= 90;
     const noQuizErrors = quizConsoleErrors.length === 0;
+    const noRatedAdvanceBugs = ratedAdvanceBugs.length === 0;
+    const noPacingBugs = pacingBugs.length === 0;
+    const noRecHateBugs = recHateBugs.length === 0;
 
     const noPosterBugs = posterBugs.length === 0;
     const noDuplicates = duplicateTitles.length === 0;
     const finalsWithTrailers = finalMovies.filter(m => m.trailerId && m.trailerId.length > 5).length;
     const trailersOk = trailerBugs.length === 0 && (finalMovies.length === 0 || finalsWithTrailers >= 2);
-    const subscribe = archetypeMatch && quizComplete && personalized && noQuizErrors && pagesHealthy && questionsSane && noPosterBugs && noDuplicates && trailersOk;
+    const subscribe = archetypeMatch && quizComplete && personalized && noQuizErrors && pagesHealthy && questionsSane && noPosterBugs && noDuplicates && trailersOk && noRatedAdvanceBugs && noPacingBugs && noRecHateBugs;
     const reasons = [];
     if (!archetypeMatch) reasons.push(`archetype: got "${archetype}", wanted "${persona.expected}"`);
     if (!quizComplete) reasons.push('quiz never completed');
     if (!personalized) reasons.push(`recs not personalized (${finalMovies.length} movies, ids: ${recIds.join(',')})`);
     if (!noQuizErrors) reasons.push(`quiz console errors: ${quizConsoleErrors.slice(0, 2).join(' | ')}`);
     if (!pagesHealthy) reasons.push(`unhealthy pages: ${pageAudits.filter(a => !a.ok).map(a => `${a.path}[s=${a.status},txt=${a.textLength},img=${a.brokenImages},err=${a.consoleErrors.length}:${a.consoleErrors[0] || ''}]`).join(' ')}`);
-    if (!questionsSane) reasons.push(`question count ${questionCount} outside 15-45`);
+    if (!questionsSane) reasons.push(`question count ${questionCount} outside 15-75`);
     if (!noPosterBugs) reasons.push(`broken/placeholder posters: ${posterBugs.slice(0, 3).join(' | ')}`);
     if (!noDuplicates) reasons.push(`duplicate movies in one quiz: ${duplicateTitles.slice(0, 3).join(' | ')}`);
     if (!trailersOk) reasons.push(`trailer issues: ${trailerBugs.slice(0, 2).join(' | ') || `only ${finalsWithTrailers}/3 final recs have trailers`}`);
+    if (!noRatedAdvanceBugs) reasons.push(`NOT_SEEN advanced completion: ${ratedAdvanceBugs.slice(0, 2).join(' | ')}`);
+    if (!noPacingBugs) reasons.push(`confidence paced too fast: ${pacingBugs.slice(0, 2).join(' | ')}`);
+    if (!noRecHateBugs) reasons.push(`recommended a hated style: ${recHateBugs.slice(0, 2).join(' | ')}`);
 
     const tp = tasteProfile(finalAffinities);
     console.log(`   ${subscribe ? '✅ SUBSCRIBES' : '❌ CHURNS'} | ${archetype} | Q=${questionCount}${reasons.length ? ' | ' + reasons.join(' ; ') : ''}`);
@@ -579,7 +633,7 @@ async function run() {
       trailerBugs, finalsWithTrailers,
       tasteProfile: tasteProfile(finalAffinities),
       finalAffinities,
-      quizConsoleErrors, posterBugs, duplicateTitles, pageAudits, subscribe, reasons,
+      quizConsoleErrors, posterBugs, duplicateTitles, ratedAdvanceBugs, pacingBugs, recHateBugs, pageAudits, subscribe, reasons,
     });
 
     await context.close();
@@ -587,8 +641,42 @@ async function run() {
 
   await browser.close();
 
+  // ── Cross-quiz VARIETY assertion (owner: every quiz must differ from the last) ──
+  // Drive the API twice headlessly, feeding quiz-1's movies as x-recent-ids into
+  // quiz-2, and assert the second quiz barely repeats the first.
+  let varietyBug = null;
+  try {
+    const postQ = async (headers, body) => {
+      const r = await fetch('http://localhost:3000/api/next-question', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-locale': 'he', ...headers }, body: JSON.stringify(body),
+      });
+      return r.json();
+    };
+    const hdr = (s, recent) => ({ 'x-history-count': String(s.historyCount), 'x-rated-count': String(s.ratedCount), 'x-genre-obs': JSON.stringify(s.genreObs || {}), 'x-niche-obs': JSON.stringify(s.nicheObs || {}), 'x-recent-ids': JSON.stringify(recent), 'x-genre-stats': JSON.stringify(s.genreStats || {}), 'x-asked-ids': JSON.stringify(s.askedMovieIds || []), 'x-affinities': JSON.stringify(s.userAffinities || {}) });
+    const runQuiz = async (recent) => {
+      let s = await postQ({ 'x-recent-ids': JSON.stringify(recent) }, { isInit: true, sessionId: 'var_' + recent.length });
+      const ids = []; let n = 0;
+      if (s.currentQuestion) ids.push(s.currentQuestion.movie.id);
+      while (!s.isComplete && n < 22) {
+        const mv = s.currentQuestion && s.currentQuestion.movie; if (!mv) break; n++;
+        const g = mv._genreIds || [];
+        const v = g.some(x => [28, 878, 53].includes(x)) ? 5 : (g.some(x => [27, 16].includes(x)) ? 1 : 3);
+        s = await postQ(hdr(s, recent), { sessionId: s.sessionId, movieId: mv.id, answer: v, genreIds: g, niches: mv._niches || [] });
+        if (s.currentQuestion) ids.push(s.currentQuestion.movie.id);
+      }
+      return ids;
+    };
+    const q1 = await runQuiz([]);
+    const q2 = await runQuiz(q1);
+    const overlap = q2.filter(id => q1.includes(id)).length;
+    const pct = q2.length ? Math.round(100 * overlap / q2.length) : 0;
+    console.log(`\n🔀 variety check: quiz-2 repeats ${overlap}/${q2.length} of quiz-1 (${pct}%)`);
+    if (pct > 20) varietyBug = `consecutive quizzes overlap ${pct}% (>20% — quizzes too repetitive)`;
+  } catch (e) { console.log('variety check error:', e.message.slice(0, 120)); }
+
   const subs = results.filter(r => r.subscribe).length;
-  const bugs = results.reduce((n, r) => n + r.quizConsoleErrors.length + r.posterBugs.length + r.duplicateTitles.length + r.trailerBugs.length + r.pageAudits.reduce((m, a) => m + a.consoleErrors.length + a.brokenImages + (a.status >= 400 ? 1 : 0), 0), 0);
+  const bugs = (varietyBug ? 1 : 0) + results.reduce((n, r) => n + r.quizConsoleErrors.length + r.posterBugs.length + r.duplicateTitles.length + r.trailerBugs.length + (r.ratedAdvanceBugs ? r.ratedAdvanceBugs.length : 0) + (r.pacingBugs ? r.pacingBugs.length : 0) + (r.recHateBugs ? r.recHateBugs.length : 0) + r.pageAudits.reduce((m, a) => m + a.consoleErrors.length + a.brokenImages + (a.status >= 400 ? 1 : 0), 0), 0);
+  if (varietyBug) console.log(`⚠️ VARIETY BUG: ${varietyBug}`);
   const churn = Math.round(((30 - subs) / 30) * 100);
 
 

@@ -30,7 +30,13 @@ export async function POST(req: Request) {
     const { verifySessionState } = await import('@/lib/sessionToken');
     const validState = verifySessionState(proofToken);
 
-    if (!validState || !validState.affinities || validState.totalAnswers < 25 || !validState.sessionId) {
+    // Floor matches the engine's own MIN_Q. Quiz length is adaptive by design — a sharp taste
+    // locks in ~12 ratings and the "enough, recommend now" control finishes at MIN_Q — so the
+    // old floor of 15 rejected legitimate completions and silently prevented the profile from
+    // ever being written. The token is HMAC-signed server-side, so forgery (not length) is what
+    // the security actually rests on. proofToken.totalAnswers carries ratedCount; NOT_SEEN never
+    // counts toward it.
+    if (!validState || !validState.affinities || validState.totalAnswers < 5 || !validState.sessionId) {
       return NextResponse.json({ error: 'Invalid or missing proof token. Quiz must be completed legitimately.' }, { status: 403 });
     }
 

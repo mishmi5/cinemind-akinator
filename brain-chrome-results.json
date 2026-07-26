@@ -1,0 +1,87 @@
+[
+  {
+    "persona": "Cerebral Hard-SF",
+    "taste": "Loves cerebral, idea-driven HARD science fiction (Arrival, Ex Machina, Primer, 2001). Dislikes space-opera spectacle and superhero films. Neutral elsewhere.",
+    "pass": true,
+    "score": 95,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "Perfectly captured the specific sub-genre and avoided dislikes with canonical examples.",
+    "missed": "",
+    "tasteSummary": "Loves hard science fiction",
+    "recs": [
+      "Gattaca",
+      "Primer",
+      "Solaris"
+    ],
+    "questions": 28
+  },
+  {
+    "persona": "Heist Caper Fan",
+    "taste": "Loves clever HEIST / caper thrillers (Ocean's Eleven, Inside Man, Heat). Dislikes war films and superhero action. Neutral elsewhere.",
+    "pass": true,
+    "score": 95,
+    "subGenre": true,
+    "hatesAvoided": true,
+    "verdict": "Perfectly captured the specific sub-genre with canonical examples, avoided dislikes.",
+    "missed": "None - all recommendations are classic heist/caper films within the user's love list.",
+    "tasteSummary": "Loves heist",
+    "recs": [
+      "Inside Man",
+      "The Italian Job",
+      "The Town"
+    ],
+    "questions": 34
+  },
+  {
+    "persona": "Deadpan Whimsy",
+    "taste": "Loves quirky, symmetrical DEADPAN comedy-drama (Wes Anderson, Yorgos Lanthimos). Dislikes crude/gross-out comedy. Neutral elsewhere.",
+    "pass": false,
+    "score": 80,
+    "subGenre": false,
+    "hatesAvoided": true,
+    "verdict": "Recommended correct sub-genre but failed to name it specifically",
+    "missed": "Did not identify 'quirky, symmetrical deadpan comedy-drama' as the sub-genre; instead, used broad term 'deadpan comedy' which is insufficient for sub-genre identification.",
+    "tasteSummary": "Loves deadpan comedy",
+    "recs": [
+      "The Royal Tenenbaums",
+      "Napoleon Dynamite",
+      "Moonrise Kingdom"
+    ],
+    "questions": 19
+  },
+  {
+    "persona": "Kaiju Monster Fan",
+    "taste": "Loves giant-MONSTER / kaiju films (Godzilla, Pacific Rim, King Kong). Dislikes quiet human dramas and romance. Neutral elsewhere.",
+    "pass": false,
+    "score": 0,
+    "subGenre": false,
+    "hatesAvoided": false,
+    "verdict": "Completely missed the sub-genre and recommended hated genres",
+    "missed": "AI failed to identify the specific sub-genre (kaiju/giant monster) and instead recommended psychological thrillers (Memento, Shutter Island, Prisoners), which are in the disliked genres (dramas/thrillers) and not the loved kaiju sub-genre.",
+    "tasteSummary": "Eclectic taste",
+    "recs": [
+      "Memento",
+      "Shutter Island",
+      "Prisoners"
+    ],
+    "questions": 21
+  },
+  {
+    "persona": "Slow Cinema Arthouse",
+    "taste": "Loves SLOW arthouse cinema (Tarkovsky's Stalker, Bela Tarr, contemplative long takes). Dislikes fast blockbusters and comedy. Neutral elsewhere.",
+    "pass": false,
+    "score": 0,
+    "subGenre": false,
+    "hatesAvoided": false,
+    "verdict": "AI failed to identify the specific sub-genre and recommended mainstream films that don't align with the user's love for slow arthouse cinema.",
+    "missed": "The AI did not identify the specific sub-genre (slow arthouse cinema) and recommended mainstream films (A Single Man, The Secret Life of Walter Mitty, Before Sunrise) that are not contemplative slow cinema but rather more conventional romantic dramas with faster pacing.",
+    "tasteSummary": "Eclectic taste",
+    "recs": [
+      "A Single Man",
+      "The Secret Life of Walter Mitty",
+      "Before Sunrise"
+    ],
+    "questions": 58
+  }
+]

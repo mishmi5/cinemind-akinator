@@ -1,0 +1,22 @@
+[
+  { "name": "Giallo Horror", "taste": "Loves Italian GIALLO horror (Argento's Suspiria, Deep Red, Tenebrae — black-gloved killers, lurid color, baroque set-pieces). Dislikes generic American slasher and supernatural ghost films. Neutral elsewhere." },
+  { "name": "Splatter Gorehound", "taste": "Loves over-the-top SPLATTER horror-comedy (Evil Dead 2, Braindead/Dead Alive, Re-Animator). Dislikes slow-burn atmospheric horror and supernatural. Neutral elsewhere." },
+  { "name": "Found-Footage Horror", "taste": "Loves FOUND-FOOTAGE horror (The Blair Witch Project, Paranormal Activity, REC, Cloverfield). Dislikes glossy studio horror and period costume drama. Neutral elsewhere." },
+  { "name": "Mecha Anime", "taste": "Loves MECHA anime (Neon Genesis Evangelion, Gundam, giant-robot pilots). Dislikes cute pastoral hand-drawn Ghibli and romance. Neutral elsewhere." },
+  { "name": "Stop-Motion Animation", "taste": "Loves STOP-MOTION animation (Coraline, Kubo and the Two Strings, Wallace & Gromit, Fantastic Mr. Fox). Dislikes CGI-blockbuster animation. Neutral elsewhere." },
+  { "name": "Spaghetti Western", "taste": "Loves SPAGHETTI WESTERNS (Leone's The Good the Bad and the Ugly, Once Upon a Time in the West, Django). Dislikes modern superhero action and horror. Neutral elsewhere." },
+  { "name": "Classic Film Noir", "taste": "Loves 1940s-50s CLASSIC FILM NOIR (Double Indemnity, The Maltese Falcon, Out of the Past — chiaroscuro, femme fatales). Dislikes modern neon neo-noir and action. Neutral elsewhere." },
+  { "name": "Fincher Psych-Thriller", "taste": "Loves grounded PSYCHOLOGICAL THRILLERS (Se7en, Zodiac, Prisoners, Gone Girl — methodical, dark, no supernatural). Dislikes supernatural horror and broad comedy. Neutral elsewhere." },
+  { "name": "Disaster Spectacle", "taste": "Loves DISASTER films (Twister, The Day After Tomorrow, 2012, San Andreas). Dislikes quiet character dramas and romance. Neutral elsewhere." },
+  { "name": "Courtroom Drama", "taste": "Loves COURTROOM dramas (12 Angry Men, A Few Good Men, The Verdict, A Time to Kill). Dislikes action and fantasy. Neutral elsewhere." },
+  { "name": "Coming-of-Age Indie", "taste": "Loves COMING-OF-AGE indie dramas (Lady Bird, Boyhood, Stand By Me, Call Me By Your Name). Dislikes loud action and horror. Neutral elsewhere." },
+  { "name": "Cosmic Sci-Fi Epic", "taste": "Loves grand COSMIC SCI-FI EPICS (Interstellar, Dune, Contact, 2001 — awe, scale, ideas). Dislikes campy space opera (Guardians) and superhero. Neutral elsewhere." },
+  { "name": "Creature Feature", "taste": "Loves CREATURE FEATURES — natural/animal monsters (Jaws, Tremors, The Descent, Crawl). Dislikes supernatural ghost horror and giant city-stomping kaiju. Neutral elsewhere." },
+  { "name": "Le Carre Spy", "taste": "Loves slow CEREBRAL ESPIONAGE (Tinker Tailor Soldier Spy, The Spy Who Came in from the Cold, Bridge of Spies). Dislikes flashy Bond/Mission-Impossible action-spy spectacle. Neutral elsewhere." },
+  { "name": "Wuxia Poet", "taste": "Loves poetic WUXIA (Hero, House of Flying Daggers, Crouching Tiger — wirework, painterly). Dislikes gritty modern MMA brawlers (The Raid). Neutral elsewhere." },
+  { "name": "Black Comedy", "taste": "Loves DARK / BLACK COMEDY (In Bruges, Fargo, Burn After Reading, Three Billboards). Dislikes broad slapstick and gross-out. Neutral elsewhere." },
+  { "name": "Holiday Christmas", "taste": "Loves feel-good CHRISTMAS movies (Elf, Home Alone, The Holiday, Love Actually). Dislikes horror and bleak drama. Neutral elsewhere." },
+  { "name": "Epic High Fantasy", "taste": "Loves EPIC HIGH FANTASY (The Lord of the Rings, The Hobbit, Willow — grand quests, good vs evil). Dislikes grimdark and modern superhero. Neutral elsewhere." },
+  { "name": "Slow Cinema Arthouse", "taste": "Loves SLOW arthouse cinema (Tarkovsky's Stalker, Bela Tarr, contemplative long takes). Dislikes fast blockbusters and comedy. Neutral elsewhere." },
+  { "name": "Erotic Thriller", "taste": "Loves 90s EROTIC THRILLERS (Basic Instinct, Fatal Attraction, Body Heat). Dislikes gore horror and fantasy. Neutral elsewhere." }
+]

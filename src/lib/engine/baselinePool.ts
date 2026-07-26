@@ -128,9 +128,24 @@ export function getBaselinePlan(sessionId: string, locale: string): MovieContext
   return picks.map(c => candidateToMovie(c, locale));
 }
 
-export function pickBaselineMovie(sessionId: string, askedMovieIds: string[], locale: string): MovieContext | null {
+export function pickBaselineMovie(
+  sessionId: string,
+  askedMovieIds: string[],
+  locale: string,
+  affinities: Record<string, number> = {}
+): MovieContext | null {
   const plan = getBaselinePlan(sessionId, locale);
-  return plan.find(m => !askedMovieIds.includes(m.id)) || null;
+  const remaining = plan.filter(m => !askedMovieIds.includes(m.id));
+  // Honor strong dislike even during the coverage phase: if the user just 1★'d a
+  // style, don't immediately serve another movie of the SAME primary genre (the
+  // classic "I hated horror and got horror2 next" complaint). We DEFER such a
+  // candidate to the back rather than dropping it, so every axis is still
+  // eventually measured if nothing un-hated remains.
+  const acceptable = remaining.find(m => {
+    const g = (m._genreIds || [])[0];
+    return g === undefined || (affinities[g.toString()] || 0) > -4;
+  });
+  return acceptable || remaining[0] || null;
 }
 
 /** Full flat pool (all candidates) — emergency fallback when TMDB is unreachable. */

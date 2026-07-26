@@ -106,8 +106,8 @@ export default function FloatingChatWidget() {
 
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 font-sans" dir="rtl">
-      {/* Chat Window */}
+    <div className="fixed bottom-6 right-6 z-30 font-sans" dir="rtl">
+      {/* Chat Window — pinned bottom-RIGHT so it never overlaps the user avatar (bottom-left). */}
       {isOpen && (
         <div className="bg-[#111113] border border-zinc-800 rounded-2xl w-80 h-96 flex flex-col shadow-2xl mb-4 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300">
           <div className="bg-gradient-to-r from-indigo-600 to-rose-600 p-4 text-white font-bold flex justify-between items-center shadow-md">

@@ -1,13 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ReactNode, JSX } from 'react';
+import React, { ReactNode } from 'react';
 
 interface MotionWrapperProps {
   children: ReactNode;
   delay?: number;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
+  // React 19 removed the global JSX namespace — it now lives under React.JSX.
+  as?: keyof React.JSX.IntrinsicElements;
 }
 
 export function MotionWrapper({ children, delay = 0, className = '', as = 'div' }: MotionWrapperProps) {

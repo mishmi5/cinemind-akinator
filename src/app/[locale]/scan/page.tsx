@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Link } from '@/i18n/routing';
 import { useLocale, useTranslations } from 'next-intl';
 import { CineMindLogo } from '@/components/Navbar';
@@ -12,6 +12,23 @@ import { useAuth } from '@/context/AuthContext';
 
 interface StartingMovie extends MovieContext {
   dynamicQuestion: string;
+}
+
+// Engine switch. The DETERMINISTIC sub-genre brain is now the DEFAULT for every user
+// (surgical sub-genre resolution, adaptive length). Opt OUT to the legacy v12 formula
+// with `?engine=formula` (or `?brain=0`); `?brain=mock` runs the brain's offline mock.
+// All three endpoints share a response shape, so the rest of the UI is identical.
+function getEngine(): { url: string; brainHeaders: Record<string, string>; isBrain: boolean } {
+  const FORMULA = { url: '/api/next-question', brainHeaders: {}, isBrain: false };
+  // brainHeaders is cast because the ternary widens to a union of two object literals, which is
+  // not assignable to Record<string, string> — that mismatch was failing `tsc` / `next build`.
+  const BRAIN = (mock = false) => ({ url: '/api/brain-question', brainHeaders: (mock ? { 'x-brain-mock': '1' } : {}) as Record<string, string>, isBrain: true });
+  if (typeof window === 'undefined') return BRAIN();
+  const params = new URLSearchParams(window.location.search);
+  const engine = params.get('engine');
+  const b = params.get('brain');
+  if (engine === 'formula' || b === '0') return FORMULA;
+  return BRAIN(b === 'mock');
 }
 
 // Hermetic fallback component — transient network blips get ONE retry with a
@@ -89,6 +106,20 @@ export default function ScanMovieEvaluation() {
   const [historyState, setHistoryState] = useState<SessionState[]>([]);
   const [activeToast, setActiveToast] = useState<{ text: string, emoji: string } | null>(null);
   const [activeEffect, setActiveEffect] = useState<EasterEggType | null>(null);
+  // Frozen layouts for the celebration overlays. These used to call Math.random() inline in
+  // the JSX, so every unrelated re-render (a hover, a state tick) reshuffled the confetti and
+  // matrix glyphs mid-animation. Generated once per effect activation instead.
+  const oscarBits = useMemo(
+    () => Array.from({ length: 30 }, () => ({ left: Math.random() * 100, delay: Math.random() * 0.3 })),
+    [activeEffect],
+  );
+  const matrixBits = useMemo(
+    () => Array.from({ length: 50 }, () => ({
+      left: Math.random() * 100, top: Math.random() * 100,
+      text: Math.random().toString(36).substring(2, 10),
+    })),
+    [activeEffect],
+  );
   const [isRevealed, setIsRevealed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(899); // 14:59 in seconds
   const [showSocialProof, setShowSocialProof] = useState(false);
@@ -96,7 +127,25 @@ export default function ScanMovieEvaluation() {
   // Titles shown this session — sent to the server so same-title movies
   // (remakes, re-releases) are never served twice in one quiz.
   const seenTitlesRef = useRef<string[]>([]);
+  // Rolling window of movie ids served across recent quizzes — sent to the server so
+  // a new quiz doesn't repeat the last one's movies (cross-quiz variety).
+  const recentRef = useRef<string[]>([]);
   const maxProgressRef = useRef(0);
+
+  // E2E probe: mirror the FULL live session to window so the persona swarms can read the
+  // served question (currentQuestion), the final picks (finalMovies) and the rated clock
+  // (ratedCount — the NOT_SEEN omitted-item invariant). Cheap, test-only, no UI impact.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).__cinemind_session = session
+      ? {
+          ...session,
+          ratedCount: session.ratedCount ?? session.historyCount,
+          progressPercent: session.progressPercent ?? 0,
+          genreObs: session.genreObs || {},
+        }
+      : null;
+  }, [session]);
 
   useEffect(() => {
     Object.keys(SOUNDS).forEach(key => {
@@ -106,15 +155,21 @@ export default function ScanMovieEvaluation() {
     });
 
     const localAsked = JSON.parse(localStorage.getItem('cinemind_asked_movies') || '[]');
+    // Cross-quiz variety: movies shown in recent quizzes, excluded so each new quiz
+    // feels fresh (TASTE-FORMULA.md §11). Rolling window in localStorage.
+    recentRef.current = JSON.parse(localStorage.getItem('cinemind_recent_movies') || '[]');
 
     const initSession = async () => {
       try {
-        const res = await fetch('/api/next-question', {
+        const eng = getEngine();
+        const res = await fetch(eng.url, {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
+          headers: {
+            'Content-Type': 'application/json',
             'x-asked-ids': JSON.stringify(localAsked),
-            'x-locale': locale
+            'x-recent-ids': JSON.stringify(recentRef.current),
+            'x-locale': locale,
+            ...eng.brainHeaders,
           },
           body: JSON.stringify({ sessionId: `session_${Date.now()}`, isInit: true })
         });
@@ -130,6 +185,17 @@ export default function ScanMovieEvaluation() {
     };
     
     initSession();
+  }, []);
+
+  // Keep the local AI (gemma2:9b) loaded the whole time the user is on the quiz: ping the
+  // warm endpoint on mount and every 4 min so the model stays resident in VRAM (keep_alive:-1)
+  // — the AI taste-director + reasons are then instant. Brain engine only; fire-and-forget.
+  useEffect(() => {
+    if (getEngine().url !== '/api/brain-question') return;
+    const warm = () => { fetch('/api/brain-warm').catch(() => {}); };
+    warm();
+    const id = setInterval(warm, 4 * 60 * 1000);
+    return () => clearInterval(id);
   }, []);
 
   const loadLocalFallback = (localAsked: string[]) => {
@@ -182,7 +248,7 @@ export default function ScanMovieEvaluation() {
     submitAnswer(star);
   };
 
-  const submitAnswer = async (answer: AnswerType) => {
+  const submitAnswer = async (answer: AnswerType, finishNow = false) => {
     setLoading(true);
     setAnimateCard(true);
 
@@ -192,23 +258,49 @@ export default function ScanMovieEvaluation() {
     if (currentTitle && !seenTitlesRef.current.includes(currentTitle)) {
       seenTitlesRef.current.push(currentTitle);
     }
+    // Record the answered movie into the cross-quiz recent window (rolling, cap 150).
+    const answeredId = session!.currentQuestion?.movie?.id;
+    if (answeredId && !recentRef.current.includes(answeredId)) {
+      recentRef.current = [...recentRef.current, answeredId].slice(-150);
+      try { localStorage.setItem('cinemind_recent_movies', JSON.stringify(recentRef.current)); } catch {}
+    }
 
     try {
-      const doFetch = () => fetch('/api/next-question', {
+      const eng = getEngine();
+      const yearMatch = (session!.currentQuestion!.movie?.originalDetails || '').match(/(\d{4})/);
+      const doFetch = () => fetch(eng.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-current-confidence': session!.confidenceScore.toString(),
           'x-history-count': session!.historyCount.toString(),
+          // Rated clock + Fisher info + genre exposure tally round-trip the
+          // server's stateless taste estimate (NOT_SEEN never advances the clock).
+          'x-rated-count': (session!.ratedCount ?? session!.historyCount).toString(),
+          'x-info': (session!.infoSum ?? 0).toString(),
+          'x-genre-obs': JSON.stringify(session!.genreObs || {}),
+          'x-niche-obs': JSON.stringify(session!.nicheObs || {}),
+          'x-recent-ids': JSON.stringify(recentRef.current),
+          'x-genre-stats': JSON.stringify(session!.genreStats || {}),
           'x-asked-ids': JSON.stringify(session!.askedMovieIds),
           'x-affinities': JSON.stringify(session!.userAffinities || {}),
-          'x-locale': locale
+          'x-locale': locale,
+          ...eng.brainHeaders,
         },
         body: JSON.stringify({
           sessionId: session!.sessionId, questionId: session!.currentQuestion!.id,
           answer, movieId: session!.currentQuestion!.movie?.id,
           genreIds: session!.currentQuestion!.movie?._genreIds || [],
           niches: session!.currentQuestion!.movie?._niches || [],
+          // Brain engine round-trips the rating history + title/year in the BODY
+          // (Hebrew titles can't go in headers). Harmless for the formula engine.
+          ratingHistory: session!.ratingHistory || [],
+          searchHint: (session as any)!.searchHint || '',
+          probeScores: (session as any)!.probeScores || {},
+          notSeen: (session as any)!.notSeen || 0, // session-scoped shown-cap counter (round-trips)
+          finishNow, // user pressed "enough, recommend now" — finish on this response
+          title: session!.currentQuestion!.movie?.title,
+          year: yearMatch ? yearMatch[1] : undefined,
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the
           // server exclude them. Body (not header) because Hebrew titles aren't
           // valid ISO-8859-1 header values.
@@ -279,6 +371,16 @@ export default function ScanMovieEvaluation() {
     }
   };
 
+  // TEMPORARY paywall bypass (env-gated, removable with one flag flip): while the
+  // taste engine is under QA we want the FULL flow — quiz → real recommendations —
+  // without the ₪9 gate blocking inspection. Set NEXT_PUBLIC_BYPASS_PAYWALL=true to
+  // auto-reveal the picks on completion; unset/false restores the live paywall.
+  useEffect(() => {
+    if (session?.isComplete && process.env.NEXT_PUBLIC_BYPASS_PAYWALL === 'true') {
+      setIsRevealed(true);
+    }
+  }, [session?.isComplete]);
+
   // FOMO Mechanics Effect
   useEffect(() => {
     if (session?.isComplete && !isRevealed) {
@@ -306,11 +408,11 @@ export default function ScanMovieEvaluation() {
     );
   }
 
-  // Honest meter: server's progressPercent (confidence-vs-questions racer),
-  // kept monotonic — a progress bar must never move backwards.
-  const rawProgress = session.progressPercent ?? Math.round(session.confidenceScore * 100);
-  if (rawProgress > maxProgressRef.current) maxProgressRef.current = rawProgress;
-  const confidencePercentage = Math.max(1, maxProgressRef.current);
+  // Honest meter: follow the server's progressPercent DIRECTLY (it is already eased to ≤4%
+  // per answer and is intentionally bidirectional — it rises on confirming answers and dips
+  // on uncertain/contradicting ones). No monotonic max: a forced "never go back" would hide
+  // those dips and also cause the jump-to-100.
+  const confidencePercentage = Math.max(1, session.progressPercent ?? Math.round(session.confidenceScore * 100));
   const dynamicPhrase = getDynamicPhrase(session.historyCount);
   return (
     <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
@@ -318,7 +420,7 @@ export default function ScanMovieEvaluation() {
       {activeEffect === 'oscar' && (
         <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center overflow-hidden">
           {Array.from({ length: 30 }).map((_, i) => (
-            <div key={i} className="absolute text-7xl animate-[fall_1.5s_ease-in_forwards]" style={{ left: `${Math.random() * 100}vw`, animationDelay: `${Math.random() * 0.3}s` }}>🏆</div>
+            <div key={i} className="absolute text-7xl animate-[fall_1.5s_ease-in_forwards]" style={{ left: `${oscarBits[i].left}vw`, animationDelay: `${oscarBits[i].delay}s` }}>🏆</div>
           ))}
           <style>{`@keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(100vh) rotate(360deg); } }`}</style>
         </div>
@@ -336,7 +438,7 @@ export default function ScanMovieEvaluation() {
       {activeEffect === 'matrix' && (
         <div className="fixed inset-0 z-[100] pointer-events-none bg-black/90 flex flex-col">
           {Array.from({ length: 80 }).map((_, i) => (
-            <div key={i} className="text-emerald-500 font-mono text-xl font-bold opacity-80 absolute" style={{ left: `${Math.random() * 100}vw`, top: `${Math.random() * 100}vh` }}>{Math.random().toString(36).substring(2, 10)}</div>
+            <div key={i} className="text-emerald-500 font-mono text-xl font-bold opacity-80 absolute" style={{ left: `${matrixBits[i].left}vw`, top: `${matrixBits[i].top}vh` }}>{matrixBits[i].text}</div>
           ))}
         </div>
       )}
@@ -364,7 +466,9 @@ export default function ScanMovieEvaluation() {
 
       <div className="w-full max-w-5xl mx-auto px-4 mt-8 mb-4 flex items-center justify-between">
         <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden ml-6">
-          <div className="absolute top-0 right-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
+          {/* start-anchored so the bar grows from the side the locale reads from: right in Hebrew,
+              left in English (it used to be pinned to the physical right in both). */}
+          <div className="absolute top-0 start-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
         </div>
         <span className="text-rose-500 font-black text-sm">{confidencePercentage}%</span>
       </div>
@@ -399,6 +503,41 @@ export default function ScanMovieEvaluation() {
                   <p className="text-zinc-300 text-base leading-relaxed max-w-xl mx-auto">
                     {isRevealed ? movie.overview : t('hidden_overview')}
                   </p>
+                  {/* WHY THIS FILM IS YOU — the actual payoff of the whole quiz. The engine
+                      already writes this per pick (recReason, in the user's language) and it was
+                      being computed and thrown away, leaving three posters and a generic synopsis
+                      that look like any recommendation widget. */}
+                  {isRevealed && (movie as { reason?: string }).reason && (
+                    <p className="mt-5 mx-auto max-w-xl text-right rtl:text-right ltr:text-left text-rose-200/90 text-base leading-relaxed border-s-2 border-rose-500/50 ps-4">
+                      {(movie as { reason?: string }).reason}
+                    </p>
+                  )}
+                  {/* WHERE TO WATCH IT TONIGHT, IN ISRAEL. A pick nobody can act on is not a
+                      recommendation — and the split Israeli catalogue (Netflix / Disney+ / HBO Max
+                      via Cellcom / yes / HOT VOD) is the actual pain this product solves. */}
+                  {isRevealed && (() => {
+                    const w = (movie as { watch?: { stream: { name: string; logo: string }[]; rent: { name: string; logo: string }[]; link?: string } }).watch;
+                    if (!w || (!w.stream.length && !w.rent.length)) return null;
+                    const Row = ({ label, list }: { label: string; list: { name: string; logo: string }[] }) => (
+                      list.length ? (
+                        <div className="flex items-center gap-2 flex-wrap justify-center">
+                          <span className="text-xs text-zinc-500 font-bold">{label}</span>
+                          {list.slice(0, 4).map(p => (
+                            <span key={p.name} className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg ps-1 pe-2 py-1">
+                              <img src={p.logo} alt="" className="w-5 h-5 rounded" />
+                              <span className="text-xs text-zinc-300">{p.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null
+                    );
+                    return (
+                      <div className="mt-5 flex flex-col gap-2 items-center">
+                        <Row label={locale === 'he' ? 'כלול במנוי:' : 'Included with:'} list={w.stream} />
+                        <Row label={locale === 'he' ? 'להשכרה/קנייה:' : 'Rent or buy:'} list={w.rent} />
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Paywall Overlay */}
@@ -487,7 +626,7 @@ export default function ScanMovieEvaluation() {
 
             {/* FOMO Social Proof Toast */}
             {showSocialProof && (
-              <div className="fixed bottom-6 right-6 bg-zinc-900/95 border border-emerald-500/30 shadow-[0_10px_40px_rgba(16,185,129,0.2)] p-4 rounded-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-500">
+              <div className="fixed bottom-28 right-6 bg-zinc-900/95 border border-emerald-500/30 shadow-[0_10px_40px_rgba(16,185,129,0.2)] p-4 rounded-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-500">
                 <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping relative">
                   <div className="absolute inset-0 bg-emerald-500 rounded-full opacity-50"></div>
                 </div>
@@ -517,7 +656,7 @@ export default function ScanMovieEvaluation() {
               <div className="px-6 md:px-8 pb-10 relative z-10 -mt-20 md:-mt-24 text-center">
                 <h3 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.title}</h3>
                 <p className="text-xs text-zinc-300 font-mono mb-5 uppercase tracking-[0.2em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.originalDetails}</p>
-                <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 h-10 md:h-12 overflow-hidden text-ellipsis line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
+                <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
                 
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-5 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[90px] md:min-h-[100px] leading-tight">
                   {session.currentQuestion?.text}
@@ -535,17 +674,25 @@ export default function ScanMovieEvaluation() {
 
               <div className="w-full flex justify-between items-center px-4 mb-6">
                 <span className="text-sm text-zinc-500 font-black uppercase tracking-widest">{t('hate')}</span>
-                <div className="stars-container flex gap-2 sm:gap-4 md:gap-6" dir="ltr">
+                {/* NO dir="ltr" here: forcing LTR inside the RTL page put star #1 (which submits
+                    the value 1 = hated) physically under the "אוהב" label and star #5 under "שונא",
+                    so every Hebrew rating reached the engine INVERTED. Inheriting the page's
+                    direction keeps star #1 next to "שונא" and star #5 next to "אוהב" in both
+                    locales, so the value always matches the label the user aimed at. */}
+                <div className="stars-container flex gap-2 sm:gap-4 md:gap-6">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button 
                       key={star} 
                       disabled={loading} 
                       onMouseEnter={() => setHoveredStar(star)} 
                       onMouseLeave={() => setHoveredStar(null)} 
+                      onFocus={() => setHoveredStar(star)}
+                      onBlur={() => setHoveredStar(null)}
                       onClick={() => handleStarClick(star as AnswerType)} 
-                      className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90"
+                      aria-label={locale === 'he' ? `דירוג ${star} מתוך 5` : `Rate ${star} out of 5`}
+                      className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                     >
-                      <svg className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-200 ${(hoveredStar !== null && (locale === 'he' ? star >= hoveredStar : star <= hoveredStar)) ? 'text-orange-500 fill-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.8)] scale-110' : 'text-zinc-700 fill-transparent stroke-current stroke-1'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
+                      <svg className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-200 ${(hoveredStar !== null && star <= hoveredStar) ? 'text-orange-500 fill-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.8)] scale-110' : 'text-zinc-700 fill-transparent stroke-current stroke-1'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
                     </button>
                   ))}
                 </div>
@@ -556,6 +703,15 @@ export default function ScanMovieEvaluation() {
                 <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                   {t('not_seen')} <span>{locale === 'he' ? '›' : '‹'}</span>
                 </button>
+                {(session.historyCount ?? 0) >= 5 && (
+                  <button
+                    disabled={loading}
+                    onClick={() => submitAnswer('NOT_SEEN', true)}
+                    className="px-6 py-3 rounded-full border border-emerald-500/30 hover:bg-emerald-500/10 text-base font-bold text-emerald-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                  >
+                    {locale === 'he' ? 'מספיק, תמליץ לי עכשיו 🎬' : 'Enough — recommend now 🎬'}
+                  </button>
+                )}
                 {historyState.length > 0 && (
                   <button disabled={loading} onClick={handleBack} className="px-6 py-3 rounded-full border border-rose-500/30 hover:bg-rose-500/10 text-base font-bold text-rose-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(225,29,72,0.2)]">
                     <span>{locale === 'he' ? '‹' : '›'}</span> {t('back')}

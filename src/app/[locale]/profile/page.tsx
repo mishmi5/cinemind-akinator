@@ -41,6 +41,29 @@ export default function UserProfile() {
     if (savedXp) setXp(parseInt(savedXp, 10));
   }, []);
 
+  // The REAL taste profile the quiz saved. This screen is what a subscriber is paying to keep,
+  // so it must show what the engine actually knows — it used to render three invented genres
+  // identical for every visitor.
+  const [taste, setTaste] = useState<{
+    hasProfile: boolean;
+    isPremium?: boolean;
+    loved: { term: string; score: number }[];
+    rejected: { term: string; score: number }[];
+    totalTerms?: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await authUser.getIdToken();
+        const res = await fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok && !cancelled) setTaste(await res.json());
+      } catch { /* leave the empty state — never block the page on this */ }
+    })();
+    return () => { cancelled = true; };
+  }, [authUser]);
+
   const copyReferralLink = () => {
     const link = `https://cinemind.co/?ref=${authUser?.uid || 'guest'}`;
     navigator.clipboard.writeText(link);
@@ -77,10 +100,10 @@ export default function UserProfile() {
           </div>
 
           <div className="flex-1 text-center md:text-right z-10">
-            <h1 className="text-4xl font-black mb-1">{user.name}</h1>
+            <h1 className="text-4xl font-black mb-1">{authUser?.displayName || authUser?.email?.split('@')[0] || (taste?.hasProfile ? 'הפרופיל שלך' : 'אורח')}</h1>
             <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{title}</div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold mb-2">
-              👑 {user.plan}
+              👑 {taste?.isPremium ? 'CineMind Elite' : 'חשבון חינם'}
             </div>
             <div className="text-xs text-zinc-500 mb-4 font-mono">
               {!isFirebaseConfigured ? "אורח זמני" : 
@@ -108,14 +131,24 @@ export default function UserProfile() {
               <span className="text-indigo-500">🧬</span> ה-DNA הקולנועי שלך
             </h2>
             <div className="space-y-4">
-              {user.topGenres.map((genre, idx) => (
-                <div key={idx}>
+              {!authUser && (
+                <p className="text-zinc-400 text-sm">
+                  התחבר כדי לראות את פרופיל הטעם שנשמר לך — ולקבל המלצה חדשה כל שבוע בלי לענות שוב.
+                </p>
+              )}
+              {authUser && taste && !taste.hasProfile && (
+                <p className="text-zinc-400 text-sm">
+                  עוד לא עשית את השאלון — אחרי שתסיים אותו יופיע כאן הטעם האישי שלך, ברזולוציית תת-ז'אנר.
+                </p>
+              )}
+              {(taste?.loved || []).map(({ term, score }) => (
+                <div key={term}>
                   <div className="flex justify-between text-sm font-bold mb-1">
-                    <span>{genre}</span>
-                    <span style={{ color: accent.hex }}>{100 - (idx * 15)}%</span>
+                    <span>{term}</span>
+                    <span style={{ color: accent.hex }}>{Math.round(score * 100)}%</span>
                   </div>
                   <div className="w-full bg-white/5 rounded-full h-2">
-                    <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${100 - (idx * 15)}%`, backgroundColor: accent.hex, boxShadow: `0 0 10px ${accent.glow}` }}></div>
+                    <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${Math.round(score * 100)}%`, backgroundColor: accent.hex, boxShadow: `0 0 10px ${accent.glow}` }}></div>
                   </div>
                 </div>
               ))}
@@ -146,6 +179,16 @@ export default function UserProfile() {
                   </div>
                 </div>
               ))}
+              {!!taste?.rejected?.length && (
+                <div className="pt-4 mt-2 border-t border-white/5">
+                  <div className="text-xs text-zinc-500 font-bold mb-2">ומה שלא נמליץ לך לעולם:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {taste.rejected.map(({ term }) => (
+                      <span key={term} className="text-xs bg-white/5 border border-white/10 text-zinc-400 rounded-lg px-2 py-1">{term}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
