@@ -442,7 +442,10 @@ export async function POST(req: Request) {
       const onTerm = lockedLove
         ? [...await fetchSeedCandidates(lockedLove.t, seen, 8), ...await fetchPoolByHint(lockedLove.t, seen, locale, 8)]
             .filter((c, i, a) => a.findIndex(x => x.id === c.id) === i)
-            .filter(c => !seenSet.has(c.id))
+            // The taste gate was missing here, so TMDB keyword noise walked straight in: a locked
+            // epic-fantasy fan spent questions 26-29 on Godzilla x Kong, Curse of the Golden
+            // Flower and The Thin Red Line — a war film, returned for the keyword "fantasy".
+            .filter(c => !seenSet.has(c.id) && !rejectsUser(c))
         : [];
       // Family filler is fine, repetition is not: a heist fan spent the last eight questions on
       // war films because the sampler holds eight war blockbusters and nothing skipped the term
