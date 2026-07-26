@@ -46,6 +46,7 @@ export default function UserProfile() {
   // identical for every visitor.
   const [taste, setTaste] = useState<{
     hasProfile: boolean;
+    isPremium?: boolean;
     loved: { term: string; score: number }[];
     rejected: { term: string; score: number }[];
     totalTerms?: number;
@@ -99,10 +100,10 @@ export default function UserProfile() {
           </div>
 
           <div className="flex-1 text-center md:text-right z-10">
-            <h1 className="text-4xl font-black mb-1">{user.name}</h1>
+            <h1 className="text-4xl font-black mb-1">{authUser?.displayName || authUser?.email?.split('@')[0] || (taste?.hasProfile ? 'הפרופיל שלך' : 'אורח')}</h1>
             <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{title}</div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold mb-2">
-              👑 {user.plan}
+              👑 {taste?.isPremium ? 'CineMind Elite' : 'חשבון חינם'}
             </div>
             <div className="text-xs text-zinc-500 mb-4 font-mono">
               {!isFirebaseConfigured ? "אורח זמני" : 
@@ -130,7 +131,12 @@ export default function UserProfile() {
               <span className="text-indigo-500">🧬</span> ה-DNA הקולנועי שלך
             </h2>
             <div className="space-y-4">
-              {taste && !taste.hasProfile && (
+              {!authUser && (
+                <p className="text-zinc-400 text-sm">
+                  התחבר כדי לראות את פרופיל הטעם שנשמר לך — ולקבל המלצה חדשה כל שבוע בלי לענות שוב.
+                </p>
+              )}
+              {authUser && taste && !taste.hasProfile && (
                 <p className="text-zinc-400 text-sm">
                   עוד לא עשית את השאלון — אחרי שתסיים אותו יופיע כאן הטעם האישי שלך, ברזולוציית תת-ז'אנר.
                 </p>
