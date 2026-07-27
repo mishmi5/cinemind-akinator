@@ -330,6 +330,7 @@ export default function ScanMovieEvaluation() {
           searchHint: (session as any)!.searchHint || '',
           probeScores: (session as any)!.probeScores || {},
           notSeen: (session as any)!.notSeen || 0, // session-scoped shown-cap counter (round-trips)
+          skipYears: (session as any)!.skipYears || [], // years of films they had not seen — era steering
           finishNow, // user pressed "enough, recommend now" — finish on this response
           title: session!.currentQuestion!.movie?.title,
           year: yearMatch ? yearMatch[1] : undefined,

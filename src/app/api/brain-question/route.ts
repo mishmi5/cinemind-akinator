@@ -16,11 +16,22 @@ const MIN_Q = 5;        // never finish before this many ratings
 // tab around question 17; one run reached 76. The full 47-term sweep was never worth its price —
 // with rejected families now skipped and emphatic 5s ranked first, the taste is readable in far
 // fewer questions, and the meter's <=4%/step still floors a full quiz at ~24.
-const MAX_Q = 34;       // hard cap on RATED answers
-const SHOWN_CAP = 46;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
+const MAX_Q = 24;       // hard cap on RATED answers
+// Films SHOWN, including "didn't see". This is the number the user actually experiences, so it —
+// not the rated count — is what their patience is spent on.
+const SHOWN_CAP = 26;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
                         // quiz always terminates even for a user who's seen few films
 const HI = 4;           // a rating ≥ HI is a "strong hit" toward a sub-genre
 const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
+// How fast the displayed meter may climb per answer. Fifty simulated first customers were run
+// through the quiz and thirty-one of them left simply because it was still going: the median
+// person's patience ran out between questions 10 and 28 while the quiz averaged 30. The meter is
+// what sets that length — completion needs it at 96, so a hard 4-points-per-answer ceiling
+// mathematically forces 24+ questions no matter how quickly the taste is understood. The opening
+// stretch, where each answer genuinely teaches the engine the most, may move 6; from question 13
+// on — the confirming half, where a big move would read as a guess — it is back to 4.
+const STEP_UP = (answered: number) => (answered < 13 ? 6 : 4);
+
 const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hits (iconic 5★)
 
 // Per sub-genre we track strong-hit COUNT, not just average: a noisy drill pool (TMDB's
@@ -174,10 +185,19 @@ export async function POST(req: Request) {
   try {
     const payload = await req.json();
     const locale = req.headers.get('x-locale') || 'he';
-    const askedMovieIds: string[] = JSON.parse(req.headers.get('x-asked-ids') || '[]');
-    const recentIds: string[] = JSON.parse(req.headers.get('x-recent-ids') || '[]');
+    // These headers come from the browser and were parsed with a bare JSON.parse: a header of
+    // `not-json`, `{}` or `5` crashed the route with a 500 that echoed the exception text back to
+    // the caller. Anything that is not an array of strings is simply no history.
+    const idList = (raw: string | null): string[] => {
+      try { const v = JSON.parse(raw || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; }
+      catch { return []; }
+    };
+    const askedMovieIds: string[] = idList(req.headers.get('x-asked-ids'));
+    const recentIds: string[] = idList(req.headers.get('x-recent-ids'));
     // Non-ASCII (Hebrew) titles can't ride HTTP headers, so taste state lives in the BODY.
     let history: BrainHistoryItem[] = Array.isArray(payload.ratingHistory) ? payload.ratingHistory : [];
+    // Release years of the films they said they had not seen (round-trips with the session).
+    let skipYears: number[] = Array.isArray(payload.skipYears) ? payload.skipYears.filter((y: unknown) => typeof y === 'number') : [];
     const probe: ProbeScores = (payload.probeScores && typeof payload.probeScores === 'object') ? payload.probeScores : {};
     // The hint that produced the movie just answered (round-tripped from the prior response).
     const activeHint = typeof payload.searchHint === 'string' ? payload.searchHint.trim() : '';
@@ -194,6 +214,11 @@ export async function POST(req: Request) {
 
     // ── Record the just-answered movie (rated answers only; NOT_SEEN is an omitted
     //    item — it never enters taste reasoning). Also score its sub-genre probe. ──
+    // A rating outside 1..5 was accepted verbatim: answer:99 wrote affinities of 48 into the
+    // signed taste profile, answer:-1000 poisoned the averages. Anything else is not a rating.
+    if (typeof payload.answer === 'number' && !(Number.isInteger(payload.answer) && payload.answer >= 1 && payload.answer <= 5)) {
+      payload.answer = undefined;
+    }
     if (!payload.isInit && payload.movieId && typeof payload.answer === 'number') {
       if (!askedMovieIds.includes(payload.movieId)) askedMovieIds.push(payload.movieId);
       history = [...history, {
@@ -234,9 +259,19 @@ export async function POST(req: Request) {
     } else if (!payload.isInit && payload.movieId && typeof payload.answer !== 'number') {
       if (!askedMovieIds.includes(payload.movieId)) askedMovieIds.push(payload.movieId);
       notSeen += 1; // NOT_SEEN: no taste signal, but it IS a movie shown this session
+      // WHICH films they have not seen is the one clue we get about their era. Three unseen in a
+      // row is the second most common reason a simulated first customer left the quiz — a
+      // 62-year-old kept getting films from the last decade, a 19-year-old films from the
+      // seventies. The years round-trip so the sweep can move to the other end of the catalogue.
+      const skipYear = +(String(payload.year || '').match(/\d{4}/)?.[0] || 0);
+      if (skipYear) skipYears = [...skipYears, skipYear].slice(-12);
     }
 
-    const seen = Array.from(new Set([...askedMovieIds, ...recentIds]));
+    // The header is the only dedup source the client is trusted for, and it is empty after a
+    // resume whose localStorage was cleared — the same film then came round twice in one quiz.
+    // The rated history the body carries knows better.
+    const seen = Array.from(new Set([...askedMovieIds, ...recentIds,
+      ...history.map(h => String(h.id || '')).filter(Boolean)]));
     const seenSet = new Set(seen);
     const { loved, leader, contenders, disliked, lockedLove: lockedRaw, totalContra, rejectedFamilies } = computeTaste(probe);
 
@@ -450,8 +485,36 @@ export async function POST(req: Request) {
       const leadFam = leader ? subGenreFamily(leader.t) : undefined;
       const inLeadFam = (c: { id: string }) =>
         leadFam && subGenreFamily(samplerProbeOf(c.id) || '') === leadFam ? 0 : 1;
+      // BOREDOM. Fifty simulated first customers were run through the quiz and ten of them left
+      // between questions 5 and 9 — not because anything was broken, but because the sweep serves
+      // one blockbuster per family and a niche viewer therefore sits through a run of films they
+      // do not care about before anything speaks to them. After two low answers in a row, prefer
+      // a family they have not already rejected.
+      const coldFams = new Set<string>();
+      for (const [t, v] of Object.entries(probe)) {
+        const f = subGenreFamily(t); if (f && !v.hi && v.sum / v.n <= 2) coldFams.add(f);
+      }
+      const lowRun = (() => { let k = 0; for (let i = history.length - 1; i >= 0; i--) { if (history[i].rating <= 2) k++; else break; } return k; })();
+      const boredomPenalty = (c: { id: string }) => {
+        if (lowRun < 2) return 0;
+        const f = subGenreFamily(samplerProbeOf(c.id) || '');
+        return f && coldFams.has(f) ? 1 : 0;
+      };
+      // ERA. A 62-year-old answered "didn't see" three times in a row on recent blockbusters and
+      // left; a 19-year-old did the same on films from the seventies. Two skips in one direction
+      // are enough to stop serving that end of the catalogue.
+      const recentSkips = skipYears.filter(y => y >= 2010).length;
+      const oldSkips = skipYears.filter(y => y && y < 1995).length;
+      const eraPenalty = (c: { id?: string; year?: string }) => {
+        const y = +(c.year || 0); if (!y) return 0;
+        if (recentSkips >= 2 && oldSkips === 0 && y >= 2015) return 1;
+        if (oldSkips >= 2 && recentSkips === 0 && y < 1990) return 1;
+        return 0;
+      };
       const nextUp = [...uncovered].sort((a, b) =>
         (inLeadFam(a) - inLeadFam(b)) ||
+        (boredomPenalty(a) - boredomPenalty(b)) ||
+        (eraPenalty(a) - eraPenalty(b)) ||
         (samplerTier(a.id) - samplerTier(b.id)) ||
         (seededRank(sessionId + a.id) - seededRank(sessionId + b.id)));
       // Take the first candidate that survives the taste gate rather than the first candidate
@@ -529,6 +592,7 @@ export async function POST(req: Request) {
       sessionId, historyCount: history.length, ratedCount: history.length,
       askedMovieIds, userAffinities: {}, ratingHistory: history, probeScores: probe, engine: 'brain',
       notSeen, // session-scoped "didn't see" count, round-trips so the shown-cap stays per-quiz
+      skipYears, // release years of the skipped films — steers the sweep toward their era
     };
 
     // ── Honest progress: confidence reflects genuine sub-genre understanding, not click
@@ -598,7 +662,7 @@ export async function POST(req: Request) {
     // quiz ends AT the cap, never past it.
     const shownCount = history.length + notSeen; // session-scoped, not cross-quiz
     const budgetLeft = Math.min(MAX_Q - history.length, SHOWN_CAP - shownCount);
-    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / 4));
+    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / STEP_UP(history.length)));
     const mustFinish = budgetLeft <= stepsNeeded;
     // The user can stop the quiz whenever they like ("enough, recommend now"). This is an
     // explicit request, so it finishes on THIS response with the best signal gathered — no
@@ -617,10 +681,11 @@ export async function POST(req: Request) {
     // A skip is MCAR — it carries no taste signal, so it must never advance the closing ramp.
     // It previously did: testers watched the tail march 88→92→96→100 while answering NOT_SEEN.
     const rampBlocked = wantFinish && !payload.isInit && !!payload.movieId && typeof payload.answer !== 'number';
-    if (prevShown <= 0) shown = Math.min(target, 5);                       // first question: gentle start
+    const step = STEP_UP(history.length);
+    if (prevShown <= 0) shown = Math.min(target, 6);                          // first question: gentle start
     else if (rampBlocked) shown = prevShown;
-    else if (target > prevShown) shown = Math.min(target, prevShown + 4);  // rise ≤ 4
-    else if (target < prevShown) shown = Math.max(target, prevShown - 4);  // fall ≤ 4 (uncertainty)
+    else if (target > prevShown) shown = Math.min(target, prevShown + step);  // rise, smoothly
+    else if (target < prevShown) shown = Math.max(target, prevShown - 4);     // fall ≤ 4 (uncertainty)
     else shown = prevShown;
     // MINIMUM MOVEMENT: the spec is 1-4% EVERY step. Whenever the taste model barely changes
     // (a long drill-off, or a mid-sweep stretch where each new term is probed only once) the
@@ -642,7 +707,10 @@ export async function POST(req: Request) {
     // real browser run ended 82% -> 100% in one step and then claimed 99% accuracy. Now that every
     // fallback pool is on-taste, running out of material is rare enough that the honest ramp is
     // affordable; exhaustion only tells the meter to keep climbing, never to skip ahead.
-    const done = userAsked || (wantFinish && prevShown >= 96);
+    // A user who answers "didn't see" to everything froze the ramp (a skip carries no signal, so
+    // it must not advance it) and the quiz never ended — 400 skips in a row still returned a
+    // question. The cap on films SHOWN is authoritative regardless of where the meter sits.
+    const done = userAsked || (wantFinish && (prevShown >= 96 || shownCount >= SHOWN_CAP));
 
     if (!done) {
       // Serve the next question — always a real pool movie. A SINGLE failed detail fetch must
@@ -866,11 +934,13 @@ export async function POST(req: Request) {
     // not a recommendation. Region is IL; a miss just omits the row.
     const watch = await Promise.all(picks.map(p => getWatchProviders(p.id, 'IL')));
     const reasons = await Promise.all(picks.map(p =>
-      recReason({ title: p.title, year: yearOf(p), term: termOfPick.get(p.id) || confirmedTerm || 'this style', locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
+      recReason({ title: p.title, year: yearOf(p), term: termOfPick.get(p.id) || confirmedTerm || (locale === 'en' ? 'this style' : 'הסגנון שלך'), locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
 
     const finalMovies = picks.map((p, i) => ({
       id: `res_${p.id}`, title: p.title,
-      matchScore: Math.round(99 - i * 4),
+      // A hardcoded 99% sat next to a 60% meter on the same screen for a user the engine had not
+      // understood. The badge now says what the engine actually believes.
+      matchScore: Math.max(60, Math.round((lockedLove ? 99 : Math.min(95, confidence * 100)) - i * 4)),
       posterUrl: p.posterUrl, trailerId: p.trailerId, overview: p.overview,
       _genreIds: p._genreIds,
       reason: reasons[i] || (confirmedTerm ? `A canonical ${confirmedTerm} pick` : ''),
@@ -910,6 +980,9 @@ export async function POST(req: Request) {
       currentQuestion: null, finalMovies, proofToken,
     }, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: 'Brain error: ' + String(error) }, { status: 500 });
+    // The exception text used to be echoed to the caller, which handed an attacker the internal
+    // shape of the route. It stays in the server log where it belongs.
+    console.error('[brain] ', error);
+    return NextResponse.json({ error: 'Brain error' }, { status: 500 });
   }
 }
