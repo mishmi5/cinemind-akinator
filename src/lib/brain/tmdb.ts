@@ -445,19 +445,26 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     // films that printed raw CJK on the question card (劇場版「鬼滅の刃」無限列車編). Ask TMDB for the
     // English title in that case — one extra call, only for the handful of films that need it.
     let sub = m.original_title as string;
-    if (cjk(sub)) {
+    let overview = (m.overview || '') as string;
+    // One English lookup covers both gaps: an unreadable original-title line, and a film TMDB has
+    // no Hebrew synopsis for — the card then rendered as a bare title over a poster (seen on Rudy
+    // and on I giorni dell'ira). An English synopsis beats no synopsis.
+    if (cjk(sub) || !overview.trim()) {
       try {
         const en = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=en-US`, { next: { revalidate: 604800 } });
         const ed = en.ok ? await en.json() : null;
-        if (ed?.title && !cjk(ed.title)) sub = ed.title;
-        else if (!cjk(safeTitle)) sub = safeTitle;
-      } catch { /* keep the original title rather than lose the line */ }
+        if (cjk(sub)) {
+          if (ed?.title && !cjk(ed.title)) sub = ed.title;
+          else if (!cjk(safeTitle)) sub = safeTitle;
+        }
+        if (!overview.trim() && ed?.overview) overview = ed.overview;
+      } catch { /* keep what we have rather than lose the line */ }
     }
     return {
       id: m.id.toString(), title: safeTitle,
       originalDetails: `${sub} · ${m.release_date ? m.release_date.split('-')[0] : ''}`,
       rating: m.vote_average, posterUrl: `/api/poster?path=${m.poster_path}`,
-      overview: m.overview || '', trailerId: '', easterEgg: { type: 'oscar' },
+      overview, trailerId: '', easterEgg: { type: 'oscar' },
       _genreIds: (m.genres || []).map((g: any) => g.id),
     };
   } catch { return null; }
