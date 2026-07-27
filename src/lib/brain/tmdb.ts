@@ -146,7 +146,9 @@ const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
   { term: 'courtroom drama', titles: ['12 Angry Men', 'A Few Good Men'] },
   { term: 'erotic thriller', titles: ['Basic Instinct', 'Fatal Attraction'] },
   // Comedy — distinctive first.
-  { term: 'satire', titles: ['Dr. Strangelove', 'Thank You for Smoking'] },
+  // Without the year, TMDB's exact-title bonus handed "Dr. Strangelove" to a 2026 entry with zero
+  // votes — the card rendered 0 stars and no trailer.
+  { term: 'satire', titles: ['Dr. Strangelove (1964)', 'Thank You for Smoking'] },
   { term: 'black comedy', titles: ['In Bruges', 'Fargo'] },
   { term: 'deadpan comedy', titles: ['The Grand Budapest Hotel', 'The Lobster'] },
   { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Naked Gun'] },
@@ -306,7 +308,7 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
 // pool. Every title is a defensible, central member of its sub-genre with minimal neighbour
 // bleed (e.g. slasher excludes supernatural "Nightmare on Elm St" and torture-porn "Saw").
 const SUBGENRE_RECS: Record<string, string[]> = {
-  'giallo': ['Suspiria', 'Deep Red', 'Tenebrae', 'Blood and Black Lace', 'The Bird with the Crystal Plumage', "Don't Torture a Duckling", 'Opera', 'A Bay of Blood'],
+  'giallo': ['Suspiria', 'Deep Red', 'Tenebrae (1982)', 'Blood and Black Lace', 'The Bird with the Crystal Plumage', "Don't Torture a Duckling", 'Opera', 'A Bay of Blood'],
   'slasher': ['Halloween', 'Scream', 'Friday the 13th', 'Black Christmas', 'My Bloody Valentine', 'Prom Night', 'Happy Death Day', 'Sleepaway Camp'],
   'splatter horror comedy': ['The Evil Dead', 'Evil Dead II', 'Re-Animator', 'Braindead', 'Bad Taste', 'The Return of the Living Dead', 'Tokyo Gore Police', 'Planet Terror'],
   'body horror': ['The Fly', 'The Thing', 'Videodrome', 'Possessor', 'Tetsuo: The Iron Man', 'Society', 'From Beyond', 'Titane'],
@@ -340,7 +342,7 @@ const SUBGENRE_RECS: Record<string, string[]> = {
   'whodunit mystery': ['Knives Out', 'Murder on the Orient Express', 'Death on the Nile', 'Glass Onion', 'Clue', 'Gosford Park', 'The Last of Sheila', 'Sleuth'],
   'courtroom drama': ['12 Angry Men', 'A Few Good Men', 'The Verdict', 'A Time to Kill', 'Primal Fear', 'Witness for the Prosecution', 'Philadelphia', 'My Cousin Vinny'],
   'erotic thriller': ['Basic Instinct', 'Fatal Attraction', 'Body Heat', 'Unfaithful', 'Wild Things', 'Indecent Proposal', 'Disclosure (1994)', 'Dressed to Kill'],
-  'satire': ['Dr. Strangelove', 'Thank You for Smoking', 'In the Loop', 'Wag the Dog', 'Network', 'Idiocracy', 'The Death of Stalin', 'Election'],
+  'satire': ['Dr. Strangelove (1964)', 'Thank You for Smoking', 'In the Loop', 'Wag the Dog', 'Network', 'Idiocracy', 'The Death of Stalin', 'Election'],
   'black comedy': ['In Bruges', 'Fargo', 'Burn After Reading', 'Three Billboards Outside Ebbing, Missouri', 'Seven Psychopaths', 'Jojo Rabbit', 'The Death of Stalin', 'A Serious Man'],
   'deadpan comedy': ['The Grand Budapest Hotel', 'The Lobster', 'Moonrise Kingdom', 'The Royal Tenenbaums', 'Napoleon Dynamite', 'The Favourite', 'Dogtooth', 'Rushmore'],
   'slapstick comedy': ['Dumb and Dumber', 'The Naked Gun', 'Airplane!', 'Hot Shots!', 'The Pink Panther', 'Tommy Boy', 'Ace Ventura: Pet Detective', "Mr. Bean's Holiday"],

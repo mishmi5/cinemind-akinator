@@ -628,7 +628,10 @@ export default function ScanMovieEvaluation() {
                       
                       <div className="mt-8 pt-6 border-t border-white/5">
                         <p className="text-zinc-500 text-sm">
-                          {t('already_elite')} <button onClick={() => setIsRevealed(true)} className="text-rose-400 hover:text-rose-300 font-bold transition-colors underline underline-offset-4">{t('login_test')}</button>
+                          {/* This used to be a button that simply set isRevealed — the paywall was
+                              decorative and one click took the paid content for free. It is a link
+                              to the real login now, and the reveal happens only for an entitled user. */}
+                          {t('already_elite')} <Link href="/login" className="text-rose-400 hover:text-rose-300 font-bold transition-colors underline underline-offset-4">{t('login_test')}</Link>
                         </p>
                       </div>
                     </div>

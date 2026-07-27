@@ -3,9 +3,17 @@
 import React, { useState } from 'react';
 import { Link } from '@/i18n/routing';
 import { CineMindLogo } from '@/components/Navbar';
+import { notFound } from 'next/navigation';
+
+// The dashboard was served to anyone who typed /admin, complete with an invented ₪12,450 MRR and
+// a table of user emails. Until it is wired to real data behind a real admin claim, it is not a
+// page — it is a screenshot waiting to happen.
+const ADMIN_ENABLED = process.env.NEXT_PUBLIC_ENABLE_ADMIN === 'true';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+
+  if (!ADMIN_ENABLED) return notFound();
 
   // נתוני דמי ללוח הבקרה (יחוברו ל-Firebase/Stripe בהמשך)
   const stats = {

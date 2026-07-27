@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkRateLimit } from '@/lib/rateLimit';
 import { recReason, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
 import { allSubGenreTerms, fetchCandidatePool, fetchFamilyPool, fetchPoolByHint, fetchSeedCandidates, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
@@ -16,10 +17,13 @@ const MIN_Q = 5;        // never finish before this many ratings
 // tab around question 17; one run reached 76. The full 47-term sweep was never worth its price —
 // with rejected families now skipped and emphatic 5s ranked first, the taste is readable in far
 // fewer questions, and the meter's <=4%/step still floors a full quiz at ~24.
-const MAX_Q = 24;       // hard cap on RATED answers
-// Films SHOWN, including "didn't see". This is the number the user actually experiences, so it —
-// not the rated count — is what their patience is spent on.
-const SHOWN_CAP = 26;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
+// NOT a target length — a safety net. The quiz is as long as this particular person needs it to
+// be: a sharp taste is settled in fifteen, a genuinely ambiguous one may take fifty, and that is
+// the right outcome. What the owner is buying with those extra questions is a recommendation
+// precise enough that the customer comes back.
+const MAX_Q = 80;       // hard cap on RATED answers
+// Films SHOWN, including "didn't see" — the real backstop so a session cannot run forever.
+const SHOWN_CAP = 90;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
                         // quiz always terminates even for a user who's seen few films
 const HI = 4;           // a rating ≥ HI is a "strong hit" toward a sub-genre
 const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
@@ -183,6 +187,14 @@ function computeTaste(probe: ProbeScores) {
 
 export async function POST(req: Request) {
   try {
+    // The endpoint had no limit at all: thirty concurrent finish-requests took fifty seconds each,
+    // because every one of them fans out into TMDB lookups and three LLM calls, and a fresh
+    // sessionId defeats every cache. A quiz is one answer every few seconds; sixty a minute is
+    // already generous for a human.
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
+    if (!checkRateLimit('brain:' + ip, 60, 60_000)) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
     const payload = await req.json();
     const locale = req.headers.get('x-locale') || 'he';
     // These headers come from the browser and were parsed with a bare JSON.parse: a header of
@@ -397,7 +409,13 @@ export async function POST(req: Request) {
     // the 13th and a fantasy fan with End of Evangelion, nine questions after being read
     // correctly. Once locked, only same-family contenders are worth another question.
     const lockFamNow = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
-    const postLockDrill = needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null;
+    // Once locked, the quiz needs one more confirming hit on the LEADER before it can finish
+    // (see `surgical` below). Drilling rivals instead left the leader's evidence frozen, so the
+    // quiz kept going with nothing left to prove and ran past fifty questions. Confirm the thing
+    // we are about to recommend first; the rivals get the questions after that.
+    const needsMoreProof = !!lockedLove && lockedLove.hi < LOCK_HITS + 1;
+    const postLockDrill = needsMoreProof ? lockedLove
+      : (needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null);
     // Pre-lock, an undrilled contender from ANOTHER family is not worth a question either: a
     // quiz already closing in on mecha anime spent question 20 on Re-Animator and World War Z.
     // With no same-family rival left, confirm the leader instead.
@@ -662,13 +680,21 @@ export async function POST(req: Request) {
     // quiz ends AT the cap, never past it.
     const shownCount = history.length + notSeen; // session-scoped, not cross-quiz
     const budgetLeft = Math.min(MAX_Q - history.length, SHOWN_CAP - shownCount);
-    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / STEP_UP(history.length)));
+    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / 6));
     const mustFinish = budgetLeft <= stepsNeeded;
     // The user can stop the quiz whenever they like ("enough, recommend now"). This is an
     // explicit request, so it finishes on THIS response with the best signal gathered — no
     // closing ramp, because a jump the user asked for is not a surprise.
     const userAsked = payload.finishNow === true && history.length >= MIN_Q;
-    const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && !!lockedLove);
+    // SURGICAL CERTAINTY, not a question count. Finishing on the bare lock ended quizzes while
+    // the read was merely probable — one more confirming hit and no unresolved contradiction is
+    // what separates "we think it's slasher" from "we know it's slasher", and that difference is
+    // the whole product: the customer only comes back if the three films were exactly right.
+    // A contradiction anywhere in the quiz used to block finishing outright, and since it never
+    // decays the quiz then ran to the safety cap. It should cost EVIDENCE, not stall: each
+    // reversal on the leader demands one more confirming hit before we are willing to say we know.
+    const surgical = !!lockedLove && lockedLove.hi >= LOCK_HITS + 1 + (lockedLove.contra || 0);
+    const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && surgical);
 
     // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
     // freely UP *and DOWN* (≤4 points per answer) — a taste-reversing / uncertain answer drops
@@ -681,7 +707,11 @@ export async function POST(req: Request) {
     // A skip is MCAR — it carries no taste signal, so it must never advance the closing ramp.
     // It previously did: testers watched the tail march 88→92→96→100 while answering NOT_SEEN.
     const rampBlocked = wantFinish && !payload.isInit && !!payload.movieId && typeof payload.answer !== 'number';
-    const step = STEP_UP(history.length);
+    // Once the read is confirmed the remaining questions exist only to walk the meter up to 96.
+    // Holding those to four points each added eight questions of pure ramp to every quiz — the
+    // shortest run against fifty simulated customers was still 21 questions for a taste the
+    // engine had settled by question 8. The closing stretch moves at the opening rate.
+    const step = wantFinish ? 6 : STEP_UP(history.length);
     if (prevShown <= 0) shown = Math.min(target, 6);                          // first question: gentle start
     else if (rampBlocked) shown = prevShown;
     else if (target > prevShown) shown = Math.min(target, prevShown + step);  // rise, smoothly
