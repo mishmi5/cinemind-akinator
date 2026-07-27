@@ -735,6 +735,10 @@ export async function POST(req: Request) {
     const lovedTerms = [confirmedTerm, ...loved.map(s => s.t)]
       .filter((t, i, a) => !!t && !dislikedSet.has(t) && a.indexOf(t) === i);
     const candPool: Rec[] = [];
+    // Which sub-genre each candidate actually came from. The reason used to name the CONFIRMED
+    // term for all three picks, so a horror fan whose confirmed term was "zombie" was told that
+    // Sleepaway Camp (a slasher) and The Conjuring 2 would appeal to their love of zombie films.
+    const termOfPick = new Map<string, string>();
     // DISCOVERY. A genre expert who rated Profondo Rosso 5 was handed Halloween, Scream and
     // Friday the 13th — films she certainly already owns. The curated seed lists are ordered
     // canon-first, so the three most obvious titles always won. Skip the two most canonical
@@ -746,7 +750,7 @@ export async function POST(req: Request) {
       const seeds = await recommendBySubGenre(term, askedMovieIds, locale, 8);
       for (const m of seeds.slice(depthOf(term))) {
         if (candPool.length >= 12) break;
-        if (!candPool.some(x => x.id === m.id) && !isBad(m, true)) candPool.push(m);
+        if (!candPool.some(x => x.id === m.id) && !isBad(m, true)) { candPool.push(m); termOfPick.set(m.id, term); }
       }
     }
     // AI TASTE DIRECTOR (gemma2): picks the final 3 FROM the real candidate pool, steered by
@@ -834,7 +838,7 @@ export async function POST(req: Request) {
     // not a recommendation. Region is IL; a miss just omits the row.
     const watch = await Promise.all(picks.map(p => getWatchProviders(p.id, 'IL')));
     const reasons = await Promise.all(picks.map(p =>
-      recReason({ title: p.title, year: yearOf(p), term: confirmedTerm || 'this style', locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
+      recReason({ title: p.title, year: yearOf(p), term: termOfPick.get(p.id) || confirmedTerm || 'this style', locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
 
     const finalMovies = picks.map((p, i) => ({
       id: `res_${p.id}`, title: p.title,

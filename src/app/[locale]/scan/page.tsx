@@ -80,6 +80,9 @@ const STARTING_POOL: StartingMovie[] = [
   { id: "862", title: "צעצוע של סיפור", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/oLII3pJFSfeLFDKCZbaUIAXEqqz.jpg", overview: "צעצועים קמים לתחייה כשבני האדם לא מסתכלים.", trailerId: "v-PjgYDrg70", dynamicQuestion: "היית זורם על הרפתקת אנימציה מופלאה ומחממת לב לכל המשפחה?", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
 ];
 
+// The in-progress quiz, so a refresh resumes instead of wiping twenty answered questions.
+const RESUME_KEY = 'cinemind_active_session';
+
 const SOUNDS = {
   // Dead Google Sounds API removed to prevent CORB / Uncaught promise errors
 };
@@ -159,6 +162,25 @@ export default function ScanMovieEvaluation() {
     // feels fresh (TASTE-FORMULA.md §11). Rolling window in localStorage.
     recentRef.current = JSON.parse(localStorage.getItem('cinemind_recent_movies') || '[]');
 
+    // RESUME AN INTERRUPTED QUIZ. A refresh (or an accidental back-navigation) used to throw
+    // away twenty answered questions and start from zero, which is the most expensive thing this
+    // product can do to someone who already invested the time. The whole session state is a
+    // plain JSON object that round-trips to the server on every answer, so keeping the last one
+    // in localStorage is enough to carry on exactly where they were.
+    const resume = () => {
+      try {
+        const raw = localStorage.getItem(RESUME_KEY);
+        if (!raw) return false;
+        const saved = JSON.parse(raw) as { at: number; state: SessionState };
+        // A day-old quiz is not worth resuming — the user has moved on.
+        if (!saved?.state || !saved.state.currentQuestion || Date.now() - saved.at > 864e5) return false;
+        if (saved.state.isComplete) return false;
+        setSession(saved.state);
+        return true;
+      } catch { return false; }
+    };
+    if (resume()) return;
+
     const initSession = async () => {
       try {
         const eng = getEngine();
@@ -186,6 +208,16 @@ export default function ScanMovieEvaluation() {
     
     initSession();
   }, []);
+
+  // Persist the live session so a refresh resumes instead of restarting. Cleared the moment the
+  // quiz completes, so the next visit starts fresh rather than reopening the results.
+  useEffect(() => {
+    if (!session) return;
+    try {
+      if (session.isComplete) localStorage.removeItem(RESUME_KEY);
+      else localStorage.setItem(RESUME_KEY, JSON.stringify({ at: Date.now(), state: session }));
+    } catch { /* private mode / quota — resuming is a bonus, never a hard dependency */ }
+  }, [session]);
 
   // Keep the local AI (gemma2:9b) loaded the whole time the user is on the quiz: ping the
   // warm endpoint on mount and every 4 min so the model stays resident in VRAM (keep_alive:-1)

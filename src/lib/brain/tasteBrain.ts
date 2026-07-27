@@ -260,7 +260,14 @@ In ONE short natural sentence, explain why they'll love it. Use ONLY the facts a
     // gemma2 code-switches: a Hebrew sentence comes back with Latin fragments spliced in
     // ("הזombies בו מהירים"). On the flagship results screen that reads as a broken machine
     // translation, so fall back to the clean template rather than ship mixed script.
-    if (locale === 'he' && /[A-Za-z]/.test(clean)) return fallback;
+    // The code-switch guard used to reject ANY Latin character, but the sub-genre term and the
+    // film's own name are English by nature — so a correct Hebrew sentence mentioning
+    // "spaghetti western" was thrown away and the second and third cards fell back to the
+    // template while the first got a real reason. Ignore the term and the title, then check.
+    // Splitting on non-alphanumerics means every allowed word is already regex-safe.
+    const allowed = [term, title].join(' ').split(/[^A-Za-z0-9]+/).filter(w => w.length > 1);
+    const stripped = allowed.length ? clean.replace(new RegExp(allowed.join('|'), 'gi'), '') : clean;
+    if (locale === 'he' && /[A-Za-z]/.test(stripped)) return fallback;
     return clean.slice(0, 240) || fallback;
   } catch { return fallback; }
 }
