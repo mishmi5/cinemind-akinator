@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const VALID_PLAN_TYPES = ['credits', 'elite'] as const;
+// One paid plan. 'founder' — ₪99 once, lifetime access, capped at 200 seats.
+const VALID_PLAN_TYPES = ['founder'] as const;
 type PlanType = typeof VALID_PLAN_TYPES[number];
+
+const FOUNDER_PRICE_AGOROT = 9900; // ₪99.00, VAT included
 
 // Lazy init: constructing Stripe at module scope throws when STRIPE_SECRET_KEY
 // is unset, which crashes `next build` during page-data collection.
@@ -15,6 +18,17 @@ function getStripe(): Stripe | null {
     });
   }
   return stripeClient;
+}
+
+// The request's own origin wins over the env var: a stale NEXT_PUBLIC_BASE_URL
+// (it is http://localhost:3000 in .env.local) must never send a paying customer
+// back to localhost. If neither is available we throw instead of guessing.
+function resolveBaseUrl(req: Request): string {
+  const origin = req.headers.get('origin');
+  if (origin) return origin;
+  const fromEnv = process.env.NEXT_PUBLIC_BASE_URL;
+  if (fromEnv) return fromEnv;
+  throw new Error('Cannot resolve base URL: request has no Origin header and NEXT_PUBLIC_BASE_URL is unset');
 }
 
 export async function POST(req: Request) {
@@ -30,59 +44,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid plan type' }, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = resolveBaseUrl(req);
 
-    let sessionParams: Stripe.Checkout.SessionCreateParams;
-
-    if (planType === 'elite') {
-      // מסלול מנוי מתחדש (Subscription) - 34 ש"ח בחודש
-      sessionParams = {
-        payment_method_types: ['card'], // Stripe תומך פה אוטומטית ב-Apple/Google Pay
-        mode: 'subscription',
-        line_items: [
-          {
-            price_data: {
-              currency: 'ils',
-              product_data: {
-                name: 'CineMind Elite (Subscription)',
-                description: 'המלצות ללא הגבלה, פרופיל טעם מתעדכן, טריילרים ללא פרסומות.',
-              },
-              unit_amount: 3400, // אגורות (34.00 ש"ח)
-              recurring: {
-                interval: 'month',
-              },
+    // No payment_method_types: Stripe Checkout then offers every method enabled on
+    // the account, Apple Pay and Google Pay included. Hardcoding ['card'] blocks them.
+    // ponytail: Bit is not a Stripe method — it needs a local provider (Tranzila /
+    // Cardcom / PayPlus) as a second checkout route. Not wired yet.
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'ils',
+            product_data: {
+              name: 'CineMind מייסד — גישה לכל החיים',
+              description: 'תשלום חד-פעמי. פרופיל טעם שמור, חידונים ללא הגבלה, מייל שבועי והיסטוריית ההמלצות.',
             },
-            quantity: 1,
+            unit_amount: FOUNDER_PRICE_AGOROT,
           },
-        ],
-        success_url: `${baseUrl}/scan?success=true`,
-        cancel_url: `${baseUrl}/pricing?canceled=true`,
-      };
-    } else {
-      // תשלום חד פעמי (One-time) - 50 טוקנים ב-19 ש"ח
-      sessionParams = {
-        payment_method_types: ['card'],
-        mode: 'payment',
-        line_items: [
-          {
-            price_data: {
-              currency: 'ils',
-              product_data: {
-                name: '50 Credits Pack',
-                description: '50 קרדיטים לשימוש בזירת ה-AI שלנו.',
-              },
-              unit_amount: 1900, // אגורות (19.00 ש"ח)
-            },
-            quantity: 1,
-          },
-        ],
-        success_url: `${baseUrl}/scan?success=true`,
-        cancel_url: `${baseUrl}/pricing?canceled=true`,
-      };
-    }
-
-    // יצירת חלון התשלום המאובטח של Stripe
-    const session = await stripe.checkout.sessions.create(sessionParams);
+          quantity: 1,
+        },
+      ],
+      success_url: `${baseUrl}/scan?success=true`,
+      cancel_url: `${baseUrl}/pricing?canceled=true`,
+    });
 
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {

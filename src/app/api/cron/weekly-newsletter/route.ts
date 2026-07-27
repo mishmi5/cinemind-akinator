@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resend, isResendConfigured } from '@/lib/resend';
+import { isResendConfigured, sendMarketingEmail, isOptedOut } from '@/lib/resend';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS, UserDoc } from '@/types/firebase';
 import { recommendBySubGenre, getWatchProviders, getTrailer } from '@/lib/brain/tmdb';
@@ -16,7 +16,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 //  • one film, not a list
 export const maxDuration = 60;
 
-const HE_SUBJECT = (term: string) => `הסרט שלך לסופ״ש: ${term} 🍿`;
+// The sender prefixes "פרסומת:" (Communications Law s.30א), so no colon here.
+const HE_SUBJECT = (term: string) => `הסרט שלך לסופ״ש — ${term} 🍿`;
 
 function emailHtml(opts: {
   name: string; title: string; year?: string; reason: string;
@@ -50,10 +51,12 @@ export async function GET(request: Request) {
 
     // Only users who actually finished a quiz have a taste to send against.
     const snap = await adminDb.collection(COLLECTIONS.users).limit(500).get();
-    let sent = 0, skippedNoTaste = 0, skippedNoPick = 0;
+    let sent = 0, skippedNoTaste = 0, skippedNoPick = 0, skippedOptOut = 0;
 
     for (const doc of snap.docs) {
       const data = doc.data() as UserDoc & { email?: string; weeklySeen?: string[] };
+      // Anyone who used the unsubscribe link never gets another one of these.
+      if (isOptedOut(doc.data())) { skippedOptOut++; continue; }
       const email = data.email;
       const affinities: Record<string, number> =
         (data.tasteVector as unknown as { affinities?: Record<string, number> })?.affinities || {};
@@ -89,14 +92,9 @@ export async function GET(request: Request) {
       });
 
       try {
-        if (isResendConfigured) {
-          await resend.emails.send({
-            from: 'CineMind <hello@cinemind.studio>',
-            to: email,
-            subject: HE_SUBJECT(pickTerm),
-            html,
-          });
-        }
+        // Adds the "פרסומת:" prefix, the advertiser block, the unsubscribe link
+        // and the List-Unsubscribe header. Dry-run when there is no API key.
+        await sendMarketingEmail({ to: email, uid: doc.id, subject: HE_SUBJECT(pickTerm), html });
         // Remember it even in dry-run so a later real send does not repeat the same film.
         await doc.ref.update({ weeklySeen: FieldValue.arrayUnion(pick.id) });
         sent++;
@@ -105,8 +103,8 @@ export async function GET(request: Request) {
       }
     }
 
-    console.log(`[CRON] weekly: sent=${sent} noTaste=${skippedNoTaste} noWatchablePick=${skippedNoPick}`);
-    return NextResponse.json({ success: true, sent, skippedNoTaste, skippedNoPick, dryRun: !isResendConfigured });
+    console.log(`[CRON] weekly: sent=${sent} noTaste=${skippedNoTaste} noWatchablePick=${skippedNoPick} optOut=${skippedOptOut}`);
+    return NextResponse.json({ success: true, sent, skippedNoTaste, skippedNoPick, skippedOptOut, dryRun: !isResendConfigured });
   } catch (error: unknown) {
     console.error('[CRON Newsletter Error]', error);
     return NextResponse.json({ error: String(error) }, { status: 500 });

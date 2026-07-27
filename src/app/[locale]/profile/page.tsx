@@ -18,24 +18,16 @@ export default function UserProfile() {
   const [title, setTitle] = useState(TITLES[0]);
   const [accent, setAccent] = useState(COLORS[0]);
   
-  // נתוני דמי של משתמש מחובר
-  const user = {
-    name: "עידן",
-    plan: "CineMind Elite",
-    tokens: 420,
-    topGenres: ["Dark Comedy", "Psychological Thriller", "Cyberpunk"],
-    avatars: [
-      `https://api.dicebear.com/7.x/avataaars/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`,
-      `https://api.dicebear.com/7.x/bottts/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`,
-      `https://api.dicebear.com/7.x/micah/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`,
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`
-    ]
-  };
-
   const { user: authUser, loading } = useAuth();
   const [xp, setXp] = useState(0);
-  const [referrals, setReferrals] = useState(0);
-  
+
+  // Avatar art only — it used to sit inside a fake "user" object that also carried an
+  // invented name, plan and token balance, shown identically to every visitor.
+  const avatarSeed = authUser?.uid || 'guest';
+  const avatars = ['avataaars', 'bottts', 'micah', 'adventurer'].map(
+    (style) => `https://api.dicebear.com/7.x/${style}/svg?seed=${avatarSeed}&backgroundColor=${accent.hex.replace('#','')}`
+  );
+
   useEffect(() => {
     const savedXp = localStorage.getItem('cinemind_xp');
     if (savedXp) setXp(parseInt(savedXp, 10));
@@ -64,13 +56,7 @@ export default function UserProfile() {
     return () => { cancelled = true; };
   }, [authUser]);
 
-  const copyReferralLink = () => {
-    const link = `https://cinemind.co/?ref=${authUser?.uid || 'guest'}`;
-    navigator.clipboard.writeText(link);
-    alert('הלינק הועתק! שלח לחברים כדי להרוויח עוד קרדיטים.');
-  };
-
-  const currentAvatar = user.avatars[avatarIndex];
+  const currentAvatar = avatars[avatarIndex];
 
   if (loading) {
     return (
@@ -92,7 +78,7 @@ export default function UserProfile() {
           <div className="w-32 h-32 rounded-full border-4 p-1 relative bg-zinc-900 transition-colors duration-500" style={{ borderColor: accent.hex, boxShadow: `0 0 30px ${accent.glow}` }}>
             <img src={currentAvatar} alt="Avatar" className="w-full h-full rounded-full transition-all duration-500" />
             <button 
-              onClick={() => setAvatarIndex((prev) => (prev + 1) % user.avatars.length)}
+              onClick={() => setAvatarIndex((prev) => (prev + 1) % avatars.length)}
               className="absolute bottom-0 right-0 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center font-bold shadow-lg hover:scale-110 transition-transform"
             >
               ↻
@@ -110,7 +96,7 @@ export default function UserProfile() {
                 (authUser?.isAnonymous ? "אורח זמני" : authUser?.email)}
             </div>
             <p className="text-zinc-400 text-sm max-w-md">
-              כמשתמש Elite, יש לך גישה לניהול מתקדם של ה-DNA שלך, התאמת אווטאר אישית, וכניסה חופשית לזירת הטריוויה.
+              כאן יושב פרופיל הטעם שהחידון בנה לך, האווטאר שבחרת, וה-XP שצברת בזירה.
             </p>
           </div>
 
@@ -164,21 +150,12 @@ export default function UserProfile() {
               <span className="text-rose-500">🏆</span> הסריקות האחרונות
             </h2>
             <div className="space-y-4">
-              {[
-                { title: 'שבעה חטאים', match: 99, date: 'היום' },
-                { title: 'התחלה', match: 94, date: 'אתמול' },
-                { title: 'מטריקס', match: 91, date: 'לפני 3 ימים' }
-              ].map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center p-4 bg-black/40 rounded-xl border border-white/5">
-                  <div>
-                    <div className="font-bold text-white">{item.title}</div>
-                    <div className="text-xs text-zinc-500">{item.date}</div>
-                  </div>
-                  <div className="bg-rose-500/10 text-rose-500 px-3 py-1 rounded font-bold text-sm border border-rose-500/20">
-                    {item.match}% התאמה
-                  </div>
-                </div>
-              ))}
+              {/* The three films that used to sit here — שבעה חטאים 99%, התחלה 94%, מטריקס 91% —
+                  were hardcoded and identical for every visitor. Scan history is not stored
+                  anywhere yet, so there is nothing honest to list. */}
+              <p className="text-zinc-400 text-sm">
+                שמירת היסטוריית הסריקות עוד לא עלתה. הסרטים שקיבלת בחידון האחרון מופיעים במסך התוצאות עצמו.
+              </p>
               {!!taste?.rejected?.length && (
                 <div className="pt-4 mt-2 border-t border-white/5">
                   <div className="text-xs text-zinc-500 font-bold mb-2">ומה שלא נמליץ לך לעולם:</div>
@@ -196,7 +173,7 @@ export default function UserProfile() {
         {/* Profile Customization Section */}
         <div className="mt-8 bg-[#111113] border border-white/5 rounded-2xl p-8">
           <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-            <span style={{ color: accent.hex }}>✨</span> התאמה אישית (Elite)
+            <span style={{ color: accent.hex }}>✨</span> התאמה אישית
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -236,28 +213,14 @@ export default function UserProfile() {
           </div>
           
           <h2 className="text-2xl font-black mb-4 flex items-center gap-2">
-            <span>🎁</span> קבל המלצות בחינם
+            <span>🎁</span> חבר מביא חבר — בקרוב
           </h2>
-          <p className="text-zinc-400 mb-8 max-w-xl leading-relaxed">
-            שתף את הלינק הייחודי שלך עם חברים. על כל חבר שייכנס וישלים את החידון, אתה תקבל <strong className="text-white">חשיפת סרט אחת בחינם (בשווי ₪9)</strong>.
+          {/* This card used to hand out a referral link and promise a free ₪9 reveal per
+              friend. Nothing counted invitations and no credit was ever granted, so the
+              link and the counter are gone until the program actually exists. */}
+          <p className="text-zinc-400 max-w-xl leading-relaxed">
+            אנחנו בונים מסלול שבו הזמנת חברים מזכה אותך בהמלצות. הוא עוד לא פעיל, ולכן אין כאן לינק הפניה — כשנפעיל אותו זה יופיע בדיוק פה.
           </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 items-stretch mb-8">
-            <div className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-3 flex items-center font-mono text-sm text-zinc-500 overflow-hidden text-ellipsis whitespace-nowrap">
-              https://cinemind.co/?ref={authUser?.uid || 'guest'}
-            </div>
-            <button 
-              onClick={copyReferralLink}
-              className="px-8 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(225,29,72,0.3)] whitespace-nowrap"
-            >
-              העתק לינק
-            </button>
-          </div>
-
-          <div className="flex items-center gap-4 text-sm font-bold bg-white/5 inline-flex px-4 py-2 rounded-lg border border-white/5">
-            <span className="text-zinc-400">חברים שהזמנת:</span>
-            <span className="text-rose-400 text-lg">{referrals}</span>
-          </div>
         </div>
 
       </div>

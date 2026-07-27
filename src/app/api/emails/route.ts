@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
-// In production: import { Resend } from 'resend';
-// const resend = new Resend(process.env.RESEND_API_KEY);
+import { MARKETING_SENDER } from '@/lib/resend';
+// In production: import { resend } from '@/lib/resend';
+//
+// welcome/purchase are transactional — a reply to something the user just did —
+// so they carry no "פרסומת" marker and no unsubscribe link. If either one ever
+// grows a promo section, move it to sendMarketingEmail() in @/lib/resend.
+// Sender domain: cinemind.co.il everywhere (see MARKETING_SENDER; needs SPF+DKIM).
 
 export async function POST(req: Request) {
   try {
@@ -39,11 +44,11 @@ export async function POST(req: Request) {
     }
 
     // סימולציית שליחה (בפרודקשן מחליפים ל-resend.emails.send)
-    console.log(`[EMAIL SYSTEM] Sending '${type}' email to ${email}`);
-    
-    /* 
+    console.log(`[EMAIL SYSTEM] Sending '${type}' email from ${MARKETING_SENDER} to ${email}`);
+
+    /*
     await resend.emails.send({
-      from: 'CineMind <hello@cinemind.co.il>',
+      from: MARKETING_SENDER,
       to: email,
       subject: subject,
       html: htmlContent,

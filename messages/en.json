@@ -4,7 +4,7 @@
     "subtitle": "Honestly? We all burn at least 40 minutes just scrolling, hesitating, and eventually falling asleep on the remote.",
     "description": "So....... CineMind is here to cut the bullshit. Through a light 20-question quiz, our insane algorithm reads your mind (yes, exactly like that, I saw that smile, stop playing) and drops the exact movie you HAVE to watch right now, but like RIGHT right now, yeah? Because if not now, you'll postpone to tomorrow and tomorrow to later and... enough, it's time to watch a good movie.",
     "cta": "Save My Evening 🎬",
-    "fomo_banner": "Rotem turned her profile into a personal cinema museum. 200 movies, 15 genres, zero regrets. 🏛️"
+    "fomo_banner": "20 questions, one movie that fits you. No hour of scrolling. 🎬"
   },
   "Navigation": {
     "arena": "Online Arena",
@@ -28,7 +28,7 @@
     "discover_now": "Discover Now",
     "only": "only",
     "or_elite": "Or join Elite for unlimited access 👑",
-    "already_elite": "Already Elite?",
+    "already_elite": "Already a founder?",
     "login_test": "Log in",
     "watch_trailer": "Watch Trailer",
     "liked_recommendation": "🍿 Liked the recommendation?",
@@ -38,9 +38,9 @@
     "love": "Love",
     "not_seen": "Not Seen",
     "back": "Back",
-    "fomo_timer_warning": "Offer expires in:",
-    "fomo_loss_aversion": "Warning: If you leave now, your match data will be permanently deleted.",
-    "fomo_social_proof": "David from New York just discovered his movie 🎬"
+    "fomo_timer_warning": "No timer, no pressure. Your three films, free.",
+    "fomo_loss_aversion": "You can close this and come back — your answers are saved on this device.",
+    "fomo_social_proof": "This pick came from your answers, not from a popularity list 🎬"
   },
   "Quiz": {
     "title_span1": "The Cinematic Crack",

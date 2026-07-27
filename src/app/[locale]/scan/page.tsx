@@ -123,8 +123,10 @@ export default function ScanMovieEvaluation() {
     })),
     [activeEffect],
   );
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(899); // 14:59 in seconds
+  // THE THREE FILMS ARE FREE. That is the decision behind the founder plan: with no brand and no
+  // reviews, the quiz result IS the proof, and blurring it is the one thing guaranteed to stop
+  // anyone paying. The founder offer sits under the films as an upsell, not in front of them.
+  const [isRevealed] = useState(true);
   const [showSocialProof, setShowSocialProof] = useState(false);
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
   // Titles shown this session — sent to the server so same-title movies
@@ -404,34 +406,16 @@ export default function ScanMovieEvaluation() {
     }
   };
 
-  // TEMPORARY paywall bypass (env-gated, removable with one flag flip): while the
-  // taste engine is under QA we want the FULL flow — quiz → real recommendations —
-  // without the ₪9 gate blocking inspection. Set NEXT_PUBLIC_BYPASS_PAYWALL=true to
-  // auto-reveal the picks on completion; unset/false restores the live paywall.
+  // The one line that appears after the results is now a statement about how the picks were made,
+  // not an invented "someone in Tel Aviv just found their film" — so it can simply show.
   useEffect(() => {
-    if (session?.isComplete && process.env.NEXT_PUBLIC_BYPASS_PAYWALL === 'true') {
-      setIsRevealed(true);
-    }
+    if (!session?.isComplete) return;
+    const t1 = setTimeout(() => {
+      setShowSocialProof(true);
+      setTimeout(() => setShowSocialProof(false), 5000);
+    }, 7000);
+    return () => clearTimeout(t1);
   }, [session?.isComplete]);
-
-  // FOMO Mechanics Effect
-  useEffect(() => {
-    if (session?.isComplete && !isRevealed) {
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      
-      const socialTimer = setTimeout(() => {
-        setShowSocialProof(true);
-        setTimeout(() => setShowSocialProof(false), 5000);
-      }, 7000); // Show social proof after 7 seconds
-      
-      return () => {
-        clearInterval(timer);
-        clearTimeout(socialTimer);
-      };
-    }
-  }, [session?.isComplete, isRevealed]);
 
   if (!session) {
     return (
@@ -594,44 +578,33 @@ export default function ScanMovieEvaluation() {
                         </div>
                       )}
                       <p className="text-zinc-400 mb-8 text-lg font-medium leading-relaxed">
-                        {t('cut_bullshit')}
+                        {locale === 'he'
+                          ? 'מסלול מייסד: ₪99 פעם אחת, גישה לכל החיים. הפרופיל שלך נשמר, אפשר לעשות את החידון שוב מתי שרוצים, ומדי שבוע מגיע מייל עם סרט שמתאים לך. 200 מקומות.'
+                          : 'Founder: ₪99 once, lifetime access. Your taste profile is saved, retake the quiz whenever you want, and a matching film lands in your inbox every week. 200 seats.'}
                       </p>
-                      
+
                       <div className="flex flex-col gap-4 w-full relative">
-                        {/* FOMO Timer */}
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-red-600/20 border border-red-500/30 text-red-400 font-mono text-sm px-4 py-1.5 rounded-full flex items-center gap-2 whitespace-nowrap animate-pulse shadow-[0_0_15px_rgba(220,38,38,0.3)]">
-                          <span>⏱️ {t('fomo_timer_warning')}</span>
-                          <span className="font-bold">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
-                        </div>
-
-                        <Link 
-                          href="/pricing" 
+                        <Link
+                          href="/pricing"
                           onClick={() => posthog.capture('paywall_click_starter')}
-                          className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xl transition-all shadow-[0_0_30px_rgba(225,29,72,0.4)] hover:scale-[1.02] flex items-center justify-center gap-2 animate-[pulse_2s_infinite]"
+                          className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xl transition-all shadow-[0_0_30px_rgba(225,29,72,0.4)] hover:scale-[1.02] flex items-center justify-center gap-2"
                         >
-                          {posthog.getFeatureFlag('paywall_cta_text') === 'test' ? t('discover_now') : t('discover_now')} <span>—</span> ₪9 {t('only')}
+                          {locale === 'he' ? 'קח מקום מייסד — ₪99' : 'Take a founder seat — ₪99'}
                         </Link>
-                        
-                        {/* Loss Aversion */}
-                        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-wide px-2 text-center">
-                          ⚠️ {t('fomo_loss_aversion')}
-                        </div>
 
-                        <Link 
-                          href="/pricing" 
-                          onClick={() => posthog.capture('paywall_click_elite')}
-                          className="w-full py-4 bg-white/[0.03] hover:bg-white/10 text-white border border-white/10 rounded-2xl font-bold transition-all hover:border-white/20"
-                        >
-                          {t('or_elite')}
-                        </Link>
+                        <div className="text-xs text-zinc-500 px-2 text-center leading-relaxed">
+                          {locale === 'he'
+                            ? 'המחיר כולל מע״מ. כשה-200 ייגמרו המחיר עובר ל-₪19 לחודש, ומייסדים ממשיכים ב-₪0.'
+                            : 'VAT included. Once the 200 seats are gone the price becomes ₪19/month; founders stay at ₪0.'}
+                        </div>
                       </div>
-                      
+
                       <div className="mt-8 pt-6 border-t border-white/5">
                         <p className="text-zinc-500 text-sm">
                           {/* This used to be a button that simply set isRevealed — the paywall was
                               decorative and one click took the paid content for free. It is a link
                               to the real login now, and the reveal happens only for an entitled user. */}
-                          {t('already_elite')} <Link href="/login" className="text-rose-400 hover:text-rose-300 font-bold transition-colors underline underline-offset-4">{t('login_test')}</Link>
+                          {locale === 'he' ? 'כבר מייסד?' : 'Already a founder?'} <Link href="/login" className="text-rose-400 hover:text-rose-300 font-bold transition-colors underline underline-offset-4">{t('login_test')}</Link>
                         </p>
                       </div>
                     </div>

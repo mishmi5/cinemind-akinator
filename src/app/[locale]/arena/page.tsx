@@ -17,11 +17,9 @@ const shuffleArray = (array: any[]) => {
 
 export default function ArenaPage() {
   const [spoilerAccepted, setSpoilerAccepted] = useState(false);
-  const [matchFound, setMatchFound] = useState(false);
   const [inGame, setInGame] = useState(false);
-  
+
   const [score, setScore] = useState(0);
-  const [opponentScore, setOpponentScore] = useState(150);
   const [feedback, setFeedback] = useState<string | null>(null);
   
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -39,18 +37,13 @@ export default function ArenaPage() {
     }
   }, [inGame, questionIndex]);
 
-  const startMatchmaking = () => {
-    setMatchFound(true);
-    setTimeout(() => setInGame(true), 2500);
-  };
-
   const handleAnswer = (isAbsurd: boolean) => {
     let newScore = score;
     if (isAbsurd) {
       newScore = score + 50;
       setScore(newScore);
-      setFeedback("בול! ענית מטורלל! +50 טוקנים 🤑");
-      
+      setFeedback("בול! ענית מטורלל! +50 XP 🤑");
+
       // Update XP globally
       const currentXp = parseInt(localStorage.getItem('cinemind_xp') || '0', 10);
       const nextXp = currentXp + 50;
@@ -62,9 +55,6 @@ export default function ArenaPage() {
       setScore(newScore);
       setFeedback("אוי לא! ענית עובדה נכונה... יורדים 20 נקודות 🤦‍♂️");
     }
-    
-    // Opponent plays randomly
-    setOpponentScore(prev => prev + (Math.random() > 0.5 ? 50 : -20));
 
     // Next question after a short delay
     setTimeout(() => {
@@ -105,17 +95,17 @@ export default function ArenaPage() {
           </div>
           <h1 className="text-5xl font-black mb-4 uppercase tracking-tighter">CineMind Arena</h1>
           <p className="text-zinc-400 max-w-lg mx-auto mb-8 text-lg">
-            ברוך הבא לזירה. משחק טריוויה 1 נגד 1 בזמן אמת. 
+            ברוך הבא לזירה. משחק טריוויה לשחקן יחיד, וכל תשובה נכונה מוסיפה לך XP.
             <br/><span className="text-rose-500 font-bold">החוק: 3 תשובות הן עובדות נכונות. רק התשובה המטורללת (השגויה) מעניקה נקודות!</span>
+            <br/><span className="text-zinc-500 text-sm">משחק מול יריב חי עוד לא קיים. נפתח אותו כשהוא יהיה מוכן.</span>
           </p>
-          
+
           <div className="flex flex-col gap-4 items-center w-full mt-2">
-            <button 
-              onClick={startMatchmaking}
-              disabled={matchFound}
-              className="px-12 py-5 bg-gradient-to-r from-rose-500 to-purple-600 rounded-full font-black text-2xl hover:scale-105 transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)] disabled:opacity-50"
+            <button
+              onClick={() => setInGame(true)}
+              className="px-12 py-5 bg-gradient-to-r from-rose-500 to-purple-600 rounded-full font-black text-2xl hover:scale-105 transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)]"
             >
-              {matchFound ? "מאתר יריב... 🔍" : "חפש יריב אונליין"}
+              התחל משחק
             </button>
             <Link 
               href="/arena/leaderboard"
@@ -129,17 +119,11 @@ export default function ArenaPage() {
         // Active Game Screen
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 relative animate-in slide-in-from-bottom-8 duration-500">
           
-          <div className="w-full max-w-4xl flex justify-between items-center mb-12 px-4 md:px-8">
+          <div className="w-full max-w-4xl flex justify-center items-center mb-12 px-4 md:px-8">
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 bg-blue-500 rounded-full border-4 border-white shadow-lg mb-2 flex items-center justify-center text-2xl">😎</div>
               <span className="font-bold text-blue-400">אתה</span>
               <span className="text-2xl font-black">{score} pts</span>
-            </div>
-            <div className="text-6xl font-black text-rose-600 animate-pulse drop-shadow-[0_0_15px_rgba(225,29,72,0.8)]">VS</div>
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-red-500 rounded-full border-4 border-white shadow-lg mb-2 flex items-center justify-center text-2xl">🤖</div>
-              <span className="font-bold text-red-400">DarthVader99</span>
-              <span className="text-2xl font-black">{Math.max(0, opponentScore)} pts</span>
             </div>
           </div>
 

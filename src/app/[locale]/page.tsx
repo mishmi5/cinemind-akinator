@@ -36,7 +36,7 @@ import { useTranslations, useLocale } from 'next-intl';
 export default function LandingPage() {
   const locale = useLocale();
   const t = useTranslations('Index');
-  const [ticker, setTicker] = useState("עידן מתל אביב ניצח בזירה וזכה ב-50 טוקנים");
+  const [ticker, setTicker] = useState(tickerSentences[0]);
   const [displayMovies, setDisplayMovies] = useState<MoviePoster[]>([]);
   const [postersLoading, setPostersLoading] = useState(true);
   
