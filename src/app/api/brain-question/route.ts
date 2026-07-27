@@ -620,10 +620,17 @@ export async function POST(req: Request) {
       // then refill from the popular pool, and only give up if TMDB is truly unreachable.
       const shuffled = [...pool].sort(() => Math.random() - 0.5);
       let movie: Awaited<ReturnType<typeof movieById>> = null;
+      // A film with no Hebrew synopsis renders as a bare title over a poster — seen live on Rudy,
+      // where the card had nothing to read. Prefer a candidate that has one; only fall back to a
+      // synopsis-less film if nothing else is left.
+      let bare: Awaited<ReturnType<typeof movieById>> = null;
       for (const cand of shuffled.slice(0, 6)) {
-        movie = await movieById(cand.id, locale);
-        if (movie) break;
+        const m = await movieById(cand.id, locale);
+        if (!m) continue;
+        if (m.overview && m.overview.trim()) { movie = m; break; }
+        bare = bare || m;
       }
+      movie = movie || bare;
       if (!movie) {
         for (const cand of await fetchCandidatePool(seen, locale, 10)) {
           movie = await movieById(cand.id, locale);
