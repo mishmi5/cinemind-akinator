@@ -768,6 +768,18 @@ export async function POST(req: Request) {
     if (directed) for (const t of directed) { if (resolved.length >= 3) break; add(byTitle.get(t) || null); }
     // deterministic order of the same safe pool if the director under-filled.
     for (const m of candPool) { if (resolved.length >= 3) break; add(m); }
+    // The family's TMDB shelf. A one-term family (western) can have every curated seed used up
+    // AS A QUESTION by the time the quiz ends — a western fan reached the results screen with
+    // zero recommendations on it, which is the worst possible ending. This shelf is effectively
+    // unlimited and still squarely on-taste.
+    if (resolved.length < 3 && confirmedTerm) {
+      const fam = subGenreFamily(confirmedTerm);
+      if (fam) for (const c of await fetchFamilyPool(fam, seen, locale, 16)) {
+        if (resolved.length >= 3) break;
+        const m = await movieById(c.id, locale);
+        if (m && !isBad(m, true)) add(m);
+      }
+    }
     // keyword pool on the confirmed term (still squarely on-taste).
     if (resolved.length < 3 && confirmedTerm) {
       for (const c of await fetchPoolByHint(confirmedTerm, seen, locale, 16)) { if (resolved.length >= 3) break; add(await movieById(c.id, locale)); }
@@ -809,6 +821,18 @@ export async function POST(req: Request) {
         if (names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) continue;
         if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) continue;
         resolved.push(m);
+      }
+    }
+
+    // A user who dislikes nearly everything ends with every genre in the hated set, so each
+    // guarded tier above rejects its whole pool and the results screen came back EMPTY after a
+    // 34-question quiz — seen in a browser run. Three well-reviewed films they never rated low
+    // is a poor read but an honest one; an empty screen is neither.
+    if (resolved.length < 3) {
+      for (const c of await fetchCandidatePool(seen, locale, 40)) {
+        if (resolved.length >= 3) break;
+        const m = await movieById(c.id, locale);
+        if (m && !hatedIds.has(m.id) && !resolved.some(x => x.id === m.id)) resolved.push(m);
       }
     }
 
