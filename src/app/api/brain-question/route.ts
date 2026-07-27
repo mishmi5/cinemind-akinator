@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { getSession, startSession, saveSession, isVerified } from '@/lib/brain/sessionStore';
 import { recReason, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
 import { allSubGenreTerms, fetchCandidatePool, fetchFamilyPool, fetchPoolByHint, fetchSeedCandidates, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
@@ -206,11 +207,27 @@ export async function POST(req: Request) {
     };
     const askedMovieIds: string[] = idList(req.headers.get('x-asked-ids'));
     const recentIds: string[] = idList(req.headers.get('x-recent-ids'));
+    // ── WHOSE STATE IS IT. The quiz used to run entirely on what the browser sent back, and the
+    //    server signed that as proof of a completed quiz — so an invented ratingHistory earned a
+    //    valid token and the tokens/XP that come with it. The server now keeps its own copy of
+    //    every session it serves (src/lib/brain/sessionStore.ts) and that copy wins. The client's
+    //    copy is only a fallback for continuity after a cold start or a redeploy, and a session
+    //    restored that way is NOT eligible to be paid for.
+    const sessionKey = typeof payload.sessionId === 'string' ? payload.sessionId : '';
+    const stored = payload.isInit ? startSession(sessionKey) : getSession(sessionKey);
     // Non-ASCII (Hebrew) titles can't ride HTTP headers, so taste state lives in the BODY.
-    let history: BrainHistoryItem[] = Array.isArray(payload.ratingHistory) ? payload.ratingHistory : [];
-    // Release years of the films they said they had not seen (round-trips with the session).
-    let skipYears: number[] = Array.isArray(payload.skipYears) ? payload.skipYears.filter((y: unknown) => typeof y === 'number') : [];
-    const probe: ProbeScores = (payload.probeScores && typeof payload.probeScores === 'object') ? payload.probeScores : {};
+    let history: BrainHistoryItem[] = stored ? stored.history
+      : (Array.isArray(payload.ratingHistory) ? payload.ratingHistory : []);
+    // Release years of the films they said they had not seen.
+    let skipYears: number[] = stored ? stored.skipYears
+      : (Array.isArray(payload.skipYears) ? payload.skipYears.filter((y: unknown) => typeof y === 'number') : []);
+    const probe: ProbeScores = stored ? stored.probe
+      : ((payload.probeScores && typeof payload.probeScores === 'object') ? payload.probeScores : {});
+    // An answer is only an answer to a question we actually asked. Without this a client could
+    // rate a movie it invented, or rate the same one repeatedly, and steer the read at will.
+    if (stored && !payload.isInit && payload.movieId && !stored.served.includes(String(payload.movieId))) {
+      payload.answer = undefined;
+    }
     // The hint that produced the movie just answered (round-tripped from the prior response).
     const activeHint = typeof payload.searchHint === 'string' ? payload.searchHint.trim() : '';
     // SESSION-scoped count of "didn't see" answers (round-trips in the body). The completion
@@ -768,6 +785,13 @@ export async function POST(req: Request) {
         }
       }
       if (movie) {
+        // Remember what we asked, so the next request can be checked against it.
+        if (stored) {
+          stored.served = [...stored.served, movie.id].slice(-200);
+          stored.history = history; stored.probe = probe; stored.notSeen = notSeen;
+          stored.skipYears = skipYears; stored.shown = shown;
+          saveSession(sessionKey, stored);
+        }
         movie.trailerId = await getTrailer(movie.id);
         const tasteSummary = lockedLove ? `Confirming: ${lockedLove.t}` : leader ? `Closing in on: ${leader.t}` : 'Mapping your taste…';
         return NextResponse.json({
@@ -991,12 +1015,15 @@ export async function POST(req: Request) {
       subGenreVector[term] = Number((((p.sum / p.n) - 3) / 2 * strength).toFixed(3));
     }
     const { signSessionState } = await import('@/lib/sessionToken');
-    const proofToken = signSessionState({
+    // A token is only issued for a quiz THIS server ran. A session reconstructed from whatever
+    // the client sent — a cold start, a redeploy, or a forgery — still gets its recommendations,
+    // but it cannot be exchanged for XP or Popcorn Tokens at /api/user/bootstrap.
+    const proofToken = isVerified(sessionKey) ? signSessionState({
       sessionId,
       totalAnswers: history.length, // real ratings only — NOT_SEEN never counts
       affinities: subGenreVector,
       completedAt: Date.now(),
-    });
+    }) : undefined;
 
     return NextResponse.json({
       ...baseState, tasteSummary,
