@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
 import Stripe from 'stripe';
 import { sendTelegramAlert } from '@/lib/telegram';
 
@@ -43,6 +44,29 @@ export async function POST(req: Request) {
         const session = event.data.object as Stripe.Checkout.Session;
         const amount = ((session.amount_total ?? 0) / 100).toFixed(2);
         const currency = (session.currency ?? '').toUpperCase();
+        // GRANT WHAT THEY PAID FOR. This handler only sent a Telegram message: nothing in the
+        // codebase ever set isPremium, so a founder paid ₪99 and received exactly what a free
+        // visitor already had. The uid rides on the session as client_reference_id.
+        const uid = session.client_reference_id || (session.metadata?.uid as string | undefined);
+        if (uid && session.payment_status === 'paid') {
+          try {
+            await adminDb.collection('users').doc(uid).set({
+              isPremium: true,
+              plan: 'founder',
+              premiumSince: new Date().toISOString(),
+              stripeSessionId: session.id,        // makes a replayed event a no-op write
+              stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+            }, { merge: true });
+          } catch (err) {
+            console.error('[Stripe Webhook] failed to grant founder access for', uid, err);
+            // 500 makes Stripe retry, which is exactly what we want when the grant failed.
+            return NextResponse.json({ error: 'grant failed' }, { status: 500 });
+          }
+        } else {
+          await sendTelegramAlert(`⚠️ <b>Paid session with no uid</b>
+Session: ${session.id}
+Email: ${session.customer_details?.email || 'unknown'} — grant manually.`);
+        }
         await sendTelegramAlert(
           `🎉 <b>New Premium Subscription!</b>\nAmount: ${amount} ${currency}\nCustomer: ${session.customer_details?.email || 'Unknown'}`
         );

@@ -412,11 +412,15 @@ export async function POST(req: Request) {
     else if (newConfidence > 0.5) psychologicalMessage = locale === 'en' ? 'Filtering out thousands of irrelevant movies...' : 'מעיף עכשיו אלפי סרטים שלא בכיוון שלך בכלל...';
     else if (newConfidence > 0.3) psychologicalMessage = locale === 'en' ? 'Starting to understand you...' : 'מתחיל להבין אותך...';
 
-    // Generate proof token if complete
-    let proofToken = null;
-    if (isComplete) {
+    // A proofToken is what /api/user/bootstrap exchanges for XP and Popcorn Tokens, and this
+    // route handed one out for a single request claiming historyCount:99 — no quiz, infinite
+    // currency, one loop. The gate that closed this on the brain engine was never applied to its
+    // sibling. This route keeps no server-side session, so it cannot prove anything: it issues no
+    // token at all, and the brain engine remains the only way to earn one.
+    const proofToken = null;
+    if (false) {
       const { signSessionState } = await import('@/lib/sessionToken');
-      proofToken = signSessionState({
+      signSessionState({
         sessionId: payload.sessionId || `session_${Date.now()}`,
         totalAnswers: currentCount + 1,
         affinities: userAffinities,
