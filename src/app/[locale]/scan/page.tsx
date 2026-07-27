@@ -652,8 +652,14 @@ export default function ScanMovieEvaluation() {
             
             <div className={`w-full bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl relative transition-all duration-300 ${animateCard ? 'opacity-0 -translate-x-10 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}>
               
-              <div className="relative w-full h-[55vh] min-h-[400px] max-h-[550px] md:h-[650px] md:max-h-none bg-zinc-900">
-                <ImageWithFallback src={session.currentQuestion?.movie?.posterUrl || ''} alt="Movie" className="absolute inset-0 w-full h-full object-cover object-top opacity-100" />
+              {/* On a 390x844 phone the poster at 55vh pushed the star row to y=905 — below the
+                  fold, so the first thing a mobile visitor saw was a film and no way to answer it.
+                  42vh lands the stars inside the first screen; the desktop size is unchanged. */}
+              <div className="relative w-full h-[42vh] min-h-[280px] max-h-[550px] md:h-[650px] md:max-h-none bg-zinc-900">
+                <ImageWithFallback
+                  src={session.currentQuestion?.movie?.posterUrl || ''}
+                  alt={session.currentQuestion?.movie?.title || ''}
+                  className="absolute inset-0 w-full h-full object-cover object-top opacity-100" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent"></div>
                 {session.currentQuestion?.movie?.trailerId && (
                   <button onClick={() => setActiveTrailer(session.currentQuestion?.movie?.trailerId || null)} className={`absolute top-6 ${locale === 'he' ? 'right-6' : 'left-6'} bg-red-600/90 text-white text-sm font-bold px-5 py-2.5 rounded-full flex items-center gap-2 backdrop-blur-md hover:bg-red-500 transition-colors z-10 shadow-lg`}>
