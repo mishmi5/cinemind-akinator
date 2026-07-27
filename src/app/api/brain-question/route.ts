@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { recReason, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
-import { fetchCandidatePool, fetchPoolByHint, fetchSeedCandidates, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
+import { allSubGenreTerms, fetchCandidatePool, fetchFamilyPool, fetchPoolByHint, fetchSeedCandidates, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
 
 // Taste-brain quiz endpoint (Akinator-style). DETERMINISTIC sub-genre navigation:
 // the route — not the LLM — decides what to ask. Why: a 14B local model is unreliable
@@ -276,12 +276,20 @@ export async function POST(req: Request) {
     // family warmly rather than fanatically) sits at 4.0, so the quiz kept sweeping unrelated
     // families and served eleven consecutive films the user rated 1 — the exact stretch where
     // testers closed the tab. Two strong hits after the opening breadth is enough to commit.
-    const leaderFamNow = (leader && ((leader.hi >= 2 && history.length >= 8) || (leader.avg >= 4.5 && leader.hi >= 1 && history.length >= 8)))
+    // A single strong hit is enough to commit direction once the opening breadth is done. With
+    // the old two-hit gate a mecha fan whose lock had blinked off was sent back across the whole
+    // sampler at question 24 and asked about Murder on the Orient Express.
+    const leaderFamNow = (leader && ((leader.hi >= 2 && history.length >= 8) || (leader.hi >= 1 && history.length >= 12)))
       ? subGenreFamily(leader.t) : undefined;
     // Adjacency is insurance against a wrong early guess, so it belongs to the exploring phase
     // only. After the lock it kept the sweep wandering: an anime fan was asked about Krull and a
     // heist fan about Conan the Barbarian, nine questions after each had been read correctly.
-    const lockedFam = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
+    // The lock can blink off for a turn (a rival ties, or the leader flips to a sub-genre whose
+    // siblings are unasked) and the sweep reopened with it — a locked mecha fan was asked about
+    // Back to the Future at question 16. A leader with its confirming hits commits the family for
+    // the SWEEP even on a turn where the lock itself is not clean.
+    const lockedFam = lockedLove ? subGenreFamily(lockedLove.t)
+      : (leader && leader.hi >= LOCK_HITS && history.length >= MIN_Q ? subGenreFamily(leader.t) : undefined);
     const focusFams = lockedFam ? new Set([lockedFam])
       : leaderFamNow ? new Set([leaderFamNow, ...(FAMILY_ADJ[leaderFamNow] || [])]) : null;
     // Each sub-genre used to get exactly ONE exemplar: probe it once and it was settled forever,
@@ -330,7 +338,12 @@ export async function POST(req: Request) {
     // its 2nd exemplar before we lock; once all are drilled, fall to the leader. Data-driven
     // tiebreak (the real love accrues more hits from its own keyword pool) instead of list
     // order. Never drill mid-sweep unless early-stop conditions hold.
-    const needDrill = contenders.filter(s => s.n < 2).sort((a, b) => a.n - b.n || b.avg - a.avg);
+    // A contender from the leader's own family is the one worth another question; drilling a
+    // rival from somewhere else reads as the engine losing the thread it just found.
+    const leadFamForDrill = leader ? subGenreFamily(leader.t) : undefined;
+    const needDrill = contenders.filter(s => s.n < 2).sort((a, b) =>
+      (subGenreFamily(a.t) === leadFamForDrill ? 0 : 1) - (subGenreFamily(b.t) === leadFamForDrill ? 0 : 1)
+      || a.n - b.n || b.avg - a.avg);
     // Pre-lock: drill the least-explored close contender. Post-lock: keep drilling the LEADER
     // so the final confirmation questions (served while the meter ramps the last bit to 100%)
     // stay squarely on the user's confirmed taste — never random filler.
@@ -391,6 +404,9 @@ export async function POST(req: Request) {
     };
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
+    // Which branch produced this question. Returned on the response so a QA run can attribute an
+    // off-taste screen to the pool that served it instead of guessing.
+    let poolSrc = '';
     if (drillTarget) {
       // EXPLOIT — confirm with the target sub-genre's 2nd CURATED iconic exemplar first
       // (a reliable, recognizable test), falling back to the keyword pool. The keyword
@@ -408,8 +424,15 @@ export async function POST(req: Request) {
       // Falling back to the raw sampler here reopened every family: a locked anime fan was still
       // handed Krull. If the drill has nothing left, keep the pool on-taste and let the caller's
       // gate pick from what survives.
-      pool = drilled.length ? drilled : samplerAll.filter(c => !rejectsUser(c));
+      // Reopening the whole sampler here handed a mecha fan The Avengers at question 28. Stay
+      // inside the drilled sub-genre's own family when the drill itself has nothing left.
+      const drillFam = subGenreFamily(drillTarget.t);
+      const safeSampler = samplerAll.filter(c => !rejectsUser(c));
+      const sameFam = drillFam
+        ? safeSampler.filter(c => subGenreFamily(samplerProbeOf(c.id) || '') === drillFam) : [];
+      pool = drilled.length ? drilled : sameFam.length ? sameFam : safeSampler;
       nextHint = drillTarget.t;
+      poolSrc = 'drill';
     } else if (!sweepDone) {
       // EXPLORE — serve a not-yet-probed sub-genre. TIER-1 popular openers go FIRST (so the
       // opening ~25 questions are household-name blockbusters the user has actually seen —
@@ -431,67 +454,72 @@ export async function POST(req: Request) {
       // outright: when the head of the queue is off-taste, dropping the whole turn skipped that
       // sub-genre's only first look and the read came back one niche off.
       pool = [nextUp.find(c => !rejectsUser(c)) || nextUp[0]];
+      poolSrc = 'sweep';
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
     } else {
-      // Once the taste is locked, the remaining questions belong to the confirmed family and its
-      // neighbours. Serving the whole sampler here is what put Poltergeist in front of a cyberpunk
-      // fan and Narnia in front of a rom-com fan long after they had been read correctly.
-      // Adjacent families were still too wide once the read is CONFIRMED: an anime fan was shown
-      // Home Alone 2 and a fantasy fan The Straight Story, both nine questions after their lock.
-      // After the lock only the confirmed family remains; adjacency belongs to the exploring
-      // phase, where it protects against a wrong early guess.
-      const lockFam = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
-      const near = lockFam ? new Set([lockFam]) : null;
-      const safeAll = samplerAll.filter(c => !rejectsUser(c) &&
-        (!near || near.has(subGenreFamily(samplerProbeOf(c.id) || '') || '')));
-      // When the confirmed family runs out of unasked exemplars, the old fallback reopened the
-      // whole sampler and served a western to an anime fan. On-term films from the locked
-      // sub-genre's own keyword pool are the honest filler: every remaining question still says
-      // something about the taste being confirmed.
-      // Curated seeds first, keyword search only as a backstop — the keyword pool is what kept
-      // producing off-taste screens for users whose read was already correct.
-      // The leader counts too, not only a finished lock. With the crime family swept and no lock
-      // yet, the tail of a real quiz turned into Star Wars: Episode I, The Wedding Singer and
-      // Jackass Number Two — the popular pool, asked of someone the engine had already read as a
-      // noir fan. The strongest sub-genre so far always has curated films left to ask about.
+      // POST-SWEEP: every remaining question belongs to the taste we have already found. The
+      // sources are tried in order of how surely they are still "the right shelf", and each one
+      // passes the same rejection gate. Earlier versions fell through to whatever TMDB was
+      // trending and handed locked users Poltergeist, Krull, Jackass Number Two, Power Rangers
+      // and Out of Africa — long after their taste had been read correctly.
       const focusTerm = lockedLove?.t || leader?.t;
-      const onTerm = focusTerm
-        ? [...await fetchSeedCandidates(focusTerm, seen, 8), ...await fetchPoolByHint(focusTerm, seen, locale, 8)]
-            .filter((c, i, a) => a.findIndex(x => x.id === c.id) === i)
-            // The taste gate was missing here, so TMDB keyword noise walked straight in: a locked
-            // epic-fantasy fan spent questions 26-29 on Godzilla x Kong, Curse of the Golden
-            // Flower and The Thin Red Line — a war film, returned for the keyword "fantasy".
-            .filter(c => !seenSet.has(c.id) && !rejectsUser(c))
-        : [];
-      // Family filler is fine, repetition is not: a heist fan spent the last eight questions on
-      // war films because the sampler holds eight war blockbusters and nothing skipped the term
-      // it had already answered eight times. Least-covered term first, so every remaining
-      // question still adds information; the confirmed term's own seeds are the backstop.
-      const cover = (c: { id: string }) => { const t = samplerProbeOf(c.id); return t && probe[t] ? probe[t].n : 0; };
-      const spread = [...safeAll].sort((a, b) => cover(a) - cover(b));
-      // Order of preference: unasked sub-genres inside the family we are homing in on, then
-      // curated films from the leading sub-genre itself, and only then anything else that passed
-      // the gate. Without the middle step the tail fell straight through to unrelated families.
       const focusFam = focusTerm ? subGenreFamily(focusTerm) : undefined;
-      const inFam = focusFam
-        ? spread.filter(c => subGenreFamily(samplerProbeOf(c.id) || '') === focusFam)
-        : spread;
-      pool = inFam.length ? inFam : onTerm.length ? onTerm : spread.length ? spread : samplerAll.filter(c => !rejectsUser(c));
-      if (!pool.length) pool = await fetchCandidatePool(seen, locale, 8);
+      const gate = <T extends { id: string; _genreIds?: number[] }>(list: T[]): T[] =>
+        list.filter(c => !seenSet.has(c.id) && !rejectsUser(c));
+      const famOf = (c: { id: string }) => subGenreFamily(samplerProbeOf(c.id) || '');
+      // Least-covered sub-genre first: the sampler holds eight war blockbusters, and without this
+      // a heist fan spent the last eight questions rating war films.
+      const cover = (c: { id: string }) => { const t = samplerProbeOf(c.id); return t && probe[t] ? probe[t].n : 0; };
+      const byCover = (list: typeof samplerAll) => [...list].sort((a, b) => cover(a) - cover(b));
+
+      const tiers: [string, () => Promise<typeof samplerAll>][] = [
+        // 1. Unasked curated exemplars inside the focus family.
+        ['inFam', async () => byCover(gate(samplerAll).filter(c => focusFam && famOf(c) === focusFam))],
+        // 2. The focus sub-genre's own canonical films.
+        ['seeds', async () => focusTerm ? gate(await fetchSeedCandidates(focusTerm, seen, 8)) : []],
+        // 3. Its sibling sub-genres — same family, still the right shelf.
+        ['kinSeeds', async () => {
+          if (!focusFam) return [];
+          let out: typeof samplerAll = [];
+          for (const t of allSubGenreTerms()) {
+            if (out.length >= 8) break;
+            if (t === focusTerm || subGenreFamily(t) !== focusFam || disliked.includes(t)) continue;
+            out = out.concat(gate(await fetchSeedCandidates(t, seen, 4)));
+          }
+          return out;
+        }],
+        // 4. Keyword search on the focus term — noisiest, hence gated and late.
+        ['wide', async () => focusTerm ? gate(await fetchPoolByHint(focusTerm, seen, locale, 20)) : []],
+        // 5. An adjacent family's canonical films. A two-term family (fantasy) genuinely runs dry
+        //    around question 34, and a deliberate neighbour beats anything trending.
+        ['adjSeeds', async () => {
+          if (!focusFam) return [];
+          let out: typeof samplerAll = [];
+          for (const t of allSubGenreTerms()) {
+            if (out.length >= 8) break;
+            const f = subGenreFamily(t);
+            if (!f || !(FAMILY_ADJ[focusFam] || []).includes(f) || disliked.includes(t)) continue;
+            out = out.concat(gate(await fetchSeedCandidates(t, seen, 4)));
+          }
+          return out;
+        }],
+        // 6. The family's whole TMDB shelf. Curated lists are finite — a one-term family
+        //    (western) empties by question 22 — and this keeps every remaining question inside
+        //    the taste instead of falling through to what happens to be trending.
+        ['famPool', async () => focusFam ? gate(await fetchFamilyPool(focusFam, seen, locale, 12)) : []],
+        // 7. Anything curated that still passes the gate, then the popular pool as the last resort.
+        ['anySampler', async () => byCover(gate(samplerAll))],
+        ['popular', async () => gate(await fetchCandidatePool(seen, locale, 12))],
+      ];
+      pool = [];
+      for (const [name, get] of tiers) {
+        const got = await get();
+        if (got.length) { pool = got; poolSrc = 'post-' + name; break; }
+      }
+      if (!pool.length) { pool = await fetchCandidatePool(seen, locale, 12); poolSrc = 'post-ungated'; }
     }
-    const safeNow = (pool || []).filter(c => !rejectsUser(c));
-    if (safeNow.length) pool = safeNow;
-    else {
-      // Nothing on-taste survived the gate. Rather than hand a locked user whatever TMDB is
-      // trending — this is where Shawshank reached a mecha fan and Police Academy a fantasy fan —
-      // fall back through progressively wider ON-TASTE sources first.
-      const lockFam2 = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
-      const famAny = lockFam2
-        ? samplerAll.filter(c => subGenreFamily(samplerProbeOf(c.id) || '') === lockFam2)
-        : [];
-      const seeds = lockedLove ? await fetchSeedCandidates(lockedLove.t, seen, 8) : [];
-      pool = famAny.length ? famAny : seeds.length ? seeds : await fetchCandidatePool(seen, locale, 12);
-    }
+    { const safe = (pool || []).filter(c => !rejectsUser(c)); if (safe.length) pool = safe; }
+
 
     const baseState = {
       sessionId, historyCount: history.length, ratedCount: history.length,
@@ -641,7 +669,7 @@ export async function POST(req: Request) {
         movie.trailerId = await getTrailer(movie.id);
         const tasteSummary = lockedLove ? `Confirming: ${lockedLove.t}` : leader ? `Closing in on: ${leader.t}` : 'Mapping your taste…';
         return NextResponse.json({
-          ...baseState, tasteSummary, searchHint: nextHint,
+          ...baseState, tasteSummary, searchHint: nextHint, poolSrc,
           isComplete: false, confidenceScore: shown / 100, progressPercent: Math.min(99, shown),
           currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - shown / 100))), leadingMicroGenres: [tasteSummary] },
           currentQuestion: { id: `bq_${Date.now()}`, text: questionText(movie.title, locale), movie },

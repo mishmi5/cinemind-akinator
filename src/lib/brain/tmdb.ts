@@ -178,6 +178,8 @@ const FAMILY_OF: Record<string, string> = {
   'epic high fantasy': 'fantasy', 'sword and sorcery fantasy': 'fantasy',
 };
 export function subGenreFamily(term: string): string | undefined { return FAMILY_OF[term]; }
+/** Every sub-genre term the engine knows, for callers that need to walk a family. */
+export function allSubGenreTerms(): string[] { return Object.keys(FAMILY_OF); }
 
 // TIER-1 POPULAR OPENERS — one household-name blockbuster per broad taste. These are served
 // FIRST (the opening ~25 questions) so the user almost never answers "didn't see" early; that
@@ -347,6 +349,38 @@ const SUBGENRE_RECS: Record<string, string[]> = {
   'sword and sorcery fantasy': ['Conan the Barbarian', 'Krull', 'The Beastmaster', 'Dragonslayer', 'Red Sonja', 'Conan the Destroyer', 'The Sword and the Sorcerer', 'Hawk the Slayer'],
 };
 export function subGenreRecTitles(term: string): string[] { return SUBGENRE_RECS[term] || []; }
+
+// Our sub-genre families expressed as TMDB genre ids, for topping up a family that has run out
+// of curated material. A one-term family (western) or a two-term one (fantasy) genuinely empties
+// around question 25, and before this the quiz fell through to whatever was trending — which is
+// how a locked western fan was asked about Harold & Kumar.
+const FAMILY_GENRES: Record<string, number[]> = {
+  horror: [27], animation: [16], comedy: [35], scifi: [878], western: [37],
+  crime: [80, 53, 9648], fantasy: [14], action: [28, 12, 10752], drama: [18],
+};
+
+/** Quality films from a family's TMDB genres — the deep bench when curated material runs out. */
+export async function fetchFamilyPool(family: string, seenIds: string[], locale = 'he', size = 12): Promise<BrainCandidate[]> {
+  const genres = FAMILY_GENRES[family];
+  if (!KEY || !genres) return [];
+  const seen = new Set(seenIds);
+  const page = 1 + Math.floor(Math.random() * 4);
+  const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}`
+    + `&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.3&with_genres=${genres.join('|')}&page=${page}`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 0 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || [])
+      .filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString()))
+      .slice(0, size)
+      .map((m: any) => ({
+        id: m.id.toString(), title: m.title,
+        year: m.release_date ? m.release_date.split('-')[0] : undefined,
+        genres: genreNames(m.genre_ids), _genreIds: m.genre_ids,
+      }));
+  } catch { return []; }
+}
 
 /** The canonical seeds of a sub-genre as QUESTION candidates. Used for the confirming questions
  *  after a taste is locked: TMDB keyword search is noisy enough to hand a locked anime fan a
