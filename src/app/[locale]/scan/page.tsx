@@ -690,8 +690,14 @@ export default function ScanMovieEvaluation() {
                 </div>
               )}
 
-              <div className="w-full flex justify-between items-center px-4 mb-6">
-                <span className="text-sm text-zinc-500 font-black uppercase tracking-widest">{t('hate')}</span>
+              {/* Labels above, not beside: five 56px stars plus gaps leave ~46px for two words on
+                  a 360px phone, and "אוהב" was measured at x=-35 — off screen, hidden silently by
+                  overflow-x-hidden. The user saw one label and had to guess the other end. */}
+              <div className="w-full flex flex-col items-center px-4 mb-6">
+                <div className="w-full max-w-sm flex justify-between items-center mb-2">
+                  <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{t('hate')}</span>
+                  <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{t('love')}</span>
+                </div>
                 {/* NO dir="ltr" here: forcing LTR inside the RTL page put star #1 (which submits
                     the value 1 = hated) physically under the "אוהב" label and star #5 under "שונא",
                     so every Hebrew rating reached the engine INVERTED. Inheriting the page's
@@ -714,7 +720,6 @@ export default function ScanMovieEvaluation() {
                     </button>
                   ))}
                 </div>
-                <span className="text-sm text-zinc-500 font-black uppercase tracking-widest">{t('love')}</span>
               </div>
               
               <div className="flex gap-4 mt-6">

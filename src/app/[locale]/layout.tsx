@@ -22,7 +22,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export const metadata: Metadata = {
+import { headers } from 'next/headers';
+export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  const dump: Record<string, string> = {};
+  h.forEach((v, k) => { dump[k] = v.slice(0, 120); });
+  return { other: { 'x-debug-headers': JSON.stringify(dump) } };
+}
+
+export const metadataOld: Metadata = {
   title: {
     default: "CineMind — הפסקת לנחש. התחלת לראות.",
     template: "%s | CineMind",

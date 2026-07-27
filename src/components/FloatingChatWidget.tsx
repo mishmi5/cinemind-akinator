@@ -13,40 +13,10 @@ export default function FloatingChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    
-    const resetTimer = () => {
-      clearTimeout(timeout);
-      // Open after 60s of inactivity if not already opened and no messages yet
-      if (!isOpen && messages.length === 0) {
-        timeout = setTimeout(() => {
-          setIsOpen(true);
-          setMessages([{
-            id: 'system-1', 
-            role: 'assistant', 
-            content: 'פסססט... 🍿 עוד מתלבט מה לראות? עם מינוי Elite כבר היית באמצע הסרט עכשיו. אבל היי, אני פה לעזור, במה תרצה שנדון היום? 😎'
-          }]);
-        }, 60000);
-      }
-    };
-
-    // Track user activity
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keypress', resetTimer);
-    window.addEventListener('click', resetTimer);
-    window.addEventListener('scroll', resetTimer);
-    
-    resetTimer();
-
-    return () => {
-      clearTimeout(timeout);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keypress', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      window.removeEventListener('scroll', resetTimer);
-    };
-  }, [isOpen, messages.length]);
+  // The widget used to open ITSELF after sixty seconds of inactivity. On a 360px phone the panel
+  // is 320x384 — 89% of the width — and it landed on top of the film poster and the question,
+  // during the one activity the product asks for: thinking about a film. It also opened with a
+  // line selling "מינוי Elite", a plan that no longer exists. It opens when the user asks it to.
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +82,11 @@ export default function FloatingChatWidget() {
         <div className="bg-[#111113] border border-zinc-800 rounded-2xl w-80 h-96 flex flex-col shadow-2xl mb-4 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300">
           <div className="bg-gradient-to-r from-indigo-600 to-rose-600 p-4 text-white font-bold flex justify-between items-center shadow-md">
             <span>תמיכה מהירה - CineMind 🍿</span>
-            <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white transition-colors">
+            {/* Was a 13x24px hit area, and the only way out — no backdrop, no Escape. */}
+            <button
+              onClick={() => setIsOpen(false)}
+              aria-label="סגירת חלון התמיכה"
+              className="text-white/80 hover:text-white transition-colors min-w-11 min-h-11 flex items-center justify-center -me-2">
               ✕
             </button>
           </div>
@@ -142,7 +116,8 @@ export default function FloatingChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="הקלד הודעה..."
-              className="w-full bg-zinc-900 text-white rounded-xl px-4 py-2 outline-none focus:ring-1 focus:ring-rose-500 text-sm transition-all"
+              aria-label="הודעה לתמיכה"
+              className="w-full bg-zinc-900 text-white rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-rose-500 text-base transition-all"
             />
           </form>
         </div>
