@@ -211,7 +211,10 @@ const POPULAR_OPENERS: { term: string; titles: string[] }[] = [
   { term: 'spaghetti western', titles: ['The Good, the Bad and the Ugly', 'A Fistful of Dollars', 'For a Few Dollars More', 'Once Upon a Time in the West', 'Django Unchained', 'The Magnificent Seven', 'True Grit', 'Tombstone'] },
   { term: 'psychological thriller', titles: ['Se7en', 'Shutter Island', 'Gone Girl', 'The Silence of the Lambs', 'Prisoners', 'Memento', 'Fight Club', 'Joker'] },
   { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express', 'Glass Onion', 'Death on the Nile', 'Clue', 'Sherlock Holmes', 'The Girl with the Dragon Tattoo', 'Gosford Park'] },
-  { term: 'disaster', titles: ['Twister', 'Titanic', 'San Andreas', 'The Day After Tomorrow', 'Deep Impact', 'Armageddon', 'The Impossible', 'Greenland'] },
+  // Titanic is a romance that happens to sink a ship: as a disaster opener it reached locked
+  // heist and superhero fans (same family) and read as pure noise. The Perfect Storm is the
+  // household-name disaster film that actually behaves like one.
+  { term: 'disaster', titles: ['Twister', 'The Perfect Storm', 'San Andreas', 'The Day After Tomorrow', 'Deep Impact', 'Armageddon', 'The Impossible', 'Greenland'] },
   { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', 'The Lord of the Rings: The Two Towers', 'The Lord of the Rings: The Return of the King', "Harry Potter and the Philosopher's Stone", 'The Hobbit: An Unexpected Journey', 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'Stardust', 'Willow'] },
   { term: 'romantic comedy', titles: ['When Harry Met Sally', 'Notting Hill', 'Pretty Woman', 'Crazy Rich Asians', "Bridget Jones's Diary", '10 Things I Hate About You', 'The Proposal', 'Love Actually'] },
   { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Hangover', 'Ace Ventura: Pet Detective', 'Anchorman: The Legend of Ron Burgundy', 'Step Brothers', 'Superbad', '21 Jump Street', "We're the Millers"] },

@@ -363,8 +363,12 @@ export async function POST(req: Request) {
     // correctly. Once locked, only same-family contenders are worth another question.
     const lockFamNow = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
     const postLockDrill = needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null;
+    // Pre-lock, an undrilled contender from ANOTHER family is not worth a question either: a
+    // quiz already closing in on mecha anime spent question 20 on Re-Animator and World War Z.
+    // With no same-family rival left, confirm the leader instead.
+    const sameFamDrill = needDrill.find(d => subGenreFamily(d.t) === leadFamForDrill) || null;
     const drillTarget = (exploitNow && !siblingsPending)
-      ? (lockedLove ? postLockDrill : (needDrill[0] || leader))
+      ? (lockedLove ? postLockDrill : (sameFamDrill || leader))
       : null;
     // Every pool must pass the same gate. The family ban was only applied to the EXPLORE sweep,
     // so the drill pool and the fallback pool kept serving rejected styles — a rom-com fan was
