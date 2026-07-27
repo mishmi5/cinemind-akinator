@@ -14,6 +14,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Needed by src/app/global-not-found.tsx — the only root layout lives under
+  // the dynamic [locale] segment, so unmatched URLs have no layout to render inside.
+  experimental: {
+    globalNotFound: true,
+  },
   allowedDevOrigins: ['10.0.0.12', '10.0.0.1', 'localhost'],
   images: {
     remotePatterns: [

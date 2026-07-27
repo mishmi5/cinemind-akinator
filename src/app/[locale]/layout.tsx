@@ -29,19 +29,22 @@ export const metadata: Metadata = {
   },
   description:
     "מנוע המלצות קולנועי מבוסס AI שמפענח את ה-DNA הקולנועי שלך תוך 3 שאלות. דיוק כירורגי ברמת מיקרו-ז'אנר.",
+  // TODO(owner): אין תמונת שיתוף. צריך ליצור public/og/og-default.png בגודל 1200x630
+  // ואז להוסיף כאן images: ["/og/og-default.png"] גם ל-openGraph וגם ל-twitter.
+  // הקבצים הקיימים ב-public/icons הם SVG וריבועיים — פייסבוק, ווטסאפ וטוויטר לא מציגים אותם.
   openGraph: {
-    title: "CineMind — AI Movie Recommendations",
+    title: "CineMind — הפסקת לנחש. התחלת לראות.",
     description:
-      "Stop guessing. Start watching. CineMind decodes your cinematic DNA in 3 questions.",
+      "מנוע המלצות שמפענח את הטעם הקולנועי שלך תוך שלוש שאלות ומביא לך בדיוק את הסרט הבא.",
     siteName: "CineMind",
     locale: "he_IL",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CineMind — AI Movie Recommendations",
+    title: "CineMind — הפסקת לנחש. התחלת לראות.",
     description:
-      "Stop guessing. Start watching. CineMind decodes your cinematic DNA in 3 questions.",
+      "מנוע המלצות שמפענח את הטעם הקולנועי שלך תוך שלוש שאלות ומביא לך בדיוק את הסרט הבא.",
   },
   robots: {
     index: true,

@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import Navbar from '@/components/Navbar';
 
 export default function DuelLobbyPage() {
+  const locale = useLocale();
   const t = useTranslations('Duel');
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,13 +50,8 @@ export default function DuelLobbyPage() {
     setLoading(true);
     setError(null);
     try {
-      // First we need to find the duelId by invite code. 
-      // Wait, our API requires duelId AND inviteCode!
-      // If we only have inviteCode from the user input, we need an endpoint to lookup the duelId!
-      // Actually, let's build the API to lookup duel by invite code, OR just let them join via URL link!
-      // For now, let's just make them enter the invite link or use a lookup.
-      // Wait, if we use Firebase on the client, we can query `duels` where `inviteCode == input`!
-      
+      // /api/duel/join needs a duelId, and the user only typed an invite code —
+      // look the duel up by its code first.
       const { db } = await import('@/lib/firebase');
       const { collection, query, where, getDocs } = await import('firebase/firestore');
       const duelsRef = collection(db, 'duels');
@@ -81,19 +78,22 @@ export default function DuelLobbyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+    <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-black text-white flex flex-col">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black -z-10" />
 
-      <motion.div 
+      <Navbar />
+
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full bg-zinc-900/50 border border-zinc-800 backdrop-blur-xl p-8 rounded-3xl text-center shadow-2xl"
       >
         <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-          {t('title', { fallback: 'Taste Duel' })}
+          {t('title')}
         </h1>
         <p className="text-zinc-400 mb-8">
-          {t('subtitle', { fallback: 'Challenge your friends. Who has better cinematic DNA?' })}
+          {t('subtitle')}
         </p>
 
         {error && (
@@ -107,19 +107,19 @@ export default function DuelLobbyPage() {
           disabled={loading}
           className="w-full bg-white text-black font-bold py-4 rounded-xl mb-8 hover:bg-zinc-200 transition-colors disabled:opacity-50"
         >
-          {loading ? '...' : t('create_button', { fallback: '⚔️ Create New Duel' })}
+          {loading ? '...' : t('create_button')}
         </button>
 
         <div className="relative flex items-center py-5">
           <div className="flex-grow border-t border-zinc-800"></div>
-          <span className="flex-shrink-0 mx-4 text-zinc-500 text-sm">{t('or', { fallback: 'OR' })}</span>
+          <span className="flex-shrink-0 mx-4 text-zinc-500 text-sm">{t('or')}</span>
           <div className="flex-grow border-t border-zinc-800"></div>
         </div>
 
         <form onSubmit={handleJoinDuel} className="flex gap-2">
           <input
             type="text"
-            placeholder={t('code_placeholder', { fallback: 'Enter Invite Code' })}
+            placeholder={t('code_placeholder')}
             value={inviteCode}
             onChange={e => setInviteCode(e.target.value)}
             className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-center uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-colors"
@@ -130,10 +130,11 @@ export default function DuelLobbyPage() {
             disabled={loading || inviteCode.length < 3}
             className="bg-indigo-600 font-bold py-3 px-6 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
-            {t('join_button', { fallback: 'Join' })}
+            {t('join_button')}
           </button>
         </form>
       </motion.div>
+      </div>
     </div>
   );
 }
