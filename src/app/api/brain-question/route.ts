@@ -375,6 +375,17 @@ export async function POST(req: Request) {
       if (locked && fam && fam !== locked) return true;
       const fam2 = familyOfGenres(c._genreIds);
       if (fam2 && rejectedFamilies.includes(fam2)) return true;
+      // A film with no curated term is judged by the company it keeps: if every sub-genre of its
+      // genre-family that the user has rated came back cold, so is it. Seen live — a noir fan who
+      // gave Spider-Man a 1 was handed The Amazing Spider-Man six questions later, because one
+      // rejected term is not enough to write off a whole family but is plenty to skip its
+      // untagged neighbours.
+      if (fam2) {
+        const kin = Object.entries(probe).filter(([t]) => subGenreFamily(t) === fam2);
+        // Two cold sub-genres, not one: a single low rating inside a family is an opinion about
+        // that film, and blocking the family's untagged neighbours off it cost accuracy.
+        if (kin.length >= 2 && kin.every(([, v]) => !v.hi && v.sum / v.n <= 2)) return true;
+      }
       if (locked && !fam && fam2 && fam2 !== locked) return true;
       return false;
     };
@@ -439,8 +450,13 @@ export async function POST(req: Request) {
       // something about the taste being confirmed.
       // Curated seeds first, keyword search only as a backstop — the keyword pool is what kept
       // producing off-taste screens for users whose read was already correct.
-      const onTerm = lockedLove
-        ? [...await fetchSeedCandidates(lockedLove.t, seen, 8), ...await fetchPoolByHint(lockedLove.t, seen, locale, 8)]
+      // The leader counts too, not only a finished lock. With the crime family swept and no lock
+      // yet, the tail of a real quiz turned into Star Wars: Episode I, The Wedding Singer and
+      // Jackass Number Two — the popular pool, asked of someone the engine had already read as a
+      // noir fan. The strongest sub-genre so far always has curated films left to ask about.
+      const focusTerm = lockedLove?.t || leader?.t;
+      const onTerm = focusTerm
+        ? [...await fetchSeedCandidates(focusTerm, seen, 8), ...await fetchPoolByHint(focusTerm, seen, locale, 8)]
             .filter((c, i, a) => a.findIndex(x => x.id === c.id) === i)
             // The taste gate was missing here, so TMDB keyword noise walked straight in: a locked
             // epic-fantasy fan spent questions 26-29 on Godzilla x Kong, Curse of the Golden
@@ -453,7 +469,14 @@ export async function POST(req: Request) {
       // question still adds information; the confirmed term's own seeds are the backstop.
       const cover = (c: { id: string }) => { const t = samplerProbeOf(c.id); return t && probe[t] ? probe[t].n : 0; };
       const spread = [...safeAll].sort((a, b) => cover(a) - cover(b));
-      pool = spread.length ? spread : onTerm.length ? onTerm : samplerAll.filter(c => !rejectsUser(c));
+      // Order of preference: unasked sub-genres inside the family we are homing in on, then
+      // curated films from the leading sub-genre itself, and only then anything else that passed
+      // the gate. Without the middle step the tail fell straight through to unrelated families.
+      const focusFam = focusTerm ? subGenreFamily(focusTerm) : undefined;
+      const inFam = focusFam
+        ? spread.filter(c => subGenreFamily(samplerProbeOf(c.id) || '') === focusFam)
+        : spread;
+      pool = inFam.length ? inFam : onTerm.length ? onTerm : spread.length ? spread : samplerAll.filter(c => !rejectsUser(c));
       if (!pool.length) pool = await fetchCandidatePool(seen, locale, 8);
     }
     const safeNow = (pool || []).filter(c => !rejectsUser(c));
