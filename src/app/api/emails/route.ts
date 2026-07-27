@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { adminAuth } from '@/lib/firebase-admin';
 import { MARKETING_SENDER } from '@/lib/resend';
 // In production: import { resend } from '@/lib/resend';
 //
@@ -9,7 +10,24 @@ import { MARKETING_SENDER } from '@/lib/resend';
 
 export async function POST(req: Request) {
   try {
-    const { email, type, name } = await req.json();
+    // This route took the recipient address and the display name straight from the body, with no
+    // authentication — the moment the send below is enabled it becomes an open relay that puts
+    // attacker-written HTML in anyone's inbox, from our domain. The caller must now be a signed-in
+    // user, and we mail the address on their own account, never one they typed.
+    const authHeader = req.headers.get('authorization') || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let decoded;
+    try { decoded = await adminAuth.verifyIdToken(idToken); }
+    catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); }
+    const email = decoded.email;
+    if (!email) return NextResponse.json({ error: 'Account has no email address' }, { status: 400 });
+
+    const body = await req.json();
+    const type = body?.type;
+    // Escaped: the name was interpolated into the HTML as-is.
+    const name = String(body?.name || '').slice(0, 60)
+      .replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
     // הגדרת תוכן האימייל לפי סוג הפעולה
     let subject = '';

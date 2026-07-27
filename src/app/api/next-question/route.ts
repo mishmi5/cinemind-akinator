@@ -250,7 +250,9 @@ export async function POST(req: Request) {
     
     if (payload.movieId && !askedMovieIds.includes(payload.movieId)) {
       askedMovieIds.push(payload.movieId);
-      if (typeof payload.answer === 'number') {
+      // A rating outside 1..5 was taken at face value — answer:99 wrote an affinity of 96.
+      if (typeof payload.answer === 'number'
+          && Number.isInteger(payload.answer) && payload.answer >= 1 && payload.answer <= 5) {
         const weight = (payload.answer - 3); 
         
         if (payload.answer === 5 || payload.answer === 1) {

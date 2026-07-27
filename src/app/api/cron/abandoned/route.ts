@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cronAuthorized } from '@/lib/cronAuth';
 import { sendTelegramAlert } from '@/lib/telegram';
 import { isResendConfigured, sendMarketingEmail, findMarketingRecipient } from '@/lib/resend';
 
@@ -6,7 +7,7 @@ export async function GET(req: Request) {
   try {
     // Protect cron endpoint in production
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!cronAuthorized(req)) {
       return new Response('Unauthorized', { status: 401 });
     }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { cronAuthorized } from '@/lib/cronAuth';
 import { isResendConfigured, sendMarketingEmail, isOptedOut } from '@/lib/resend';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS, UserDoc } from '@/types/firebase';
@@ -45,7 +46,7 @@ function emailHtml(opts: {
 
 export async function GET(request: Request) {
   try {
-    if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!cronAuthorized(request)) {
       return new Response('Unauthorized', { status: 401 });
     }
 

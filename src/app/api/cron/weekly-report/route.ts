@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { cronAuthorized } from '@/lib/cronAuth';
 
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!cronAuthorized(request)) {
       return new Response('Unauthorized', { status: 401 });
     }
 
