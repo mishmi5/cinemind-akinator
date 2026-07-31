@@ -363,6 +363,19 @@ export default function ScanMovieEvaluation() {
       newState.askedMovieIds = Array.from(new Set([...(session!.askedMovieIds || []), ...(newState.askedMovieIds || [])]));
       localStorage.setItem('cinemind_asked_movies', JSON.stringify(newState.askedMovieIds));
       
+      // The cross-quiz window only remembered films we ASKED about, so the three we recommended
+      // were free to come back as the recommendations of the next visit — a returning customer
+      // saw a repeat. What we hand someone is exactly what they should not be handed again.
+      if (newState.isComplete && Array.isArray(newState.finalMovies)) {
+        const recIds = newState.finalMovies
+          .map(m => String(m.id || '').replace(/^res_/, ''))
+          .filter(id => id && !recentRef.current.includes(id));
+        if (recIds.length) {
+          recentRef.current = [...recentRef.current, ...recIds].slice(-150);
+          try { localStorage.setItem('cinemind_recent_movies', JSON.stringify(recentRef.current)); } catch {}
+        }
+      }
+
       // EXPOSE STATE FOR E2E TESTING
       if (newState.isComplete) {
         (window as any).__cinemind_final_affinities = newState.userAffinities;

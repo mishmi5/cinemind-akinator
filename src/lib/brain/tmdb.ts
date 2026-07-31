@@ -24,7 +24,7 @@ export async function fetchCandidatePool(seenIds: string[], locale = 'he', size 
   const seen = new Set(seenIds);
   const year = 1980 + Math.floor(Math.random() * (2024 - 1980 + 1));
   const page = 1 + Math.floor(Math.random() * 5);
-  const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}&sort_by=popularity.desc&vote_count.gte=500&vote_average.gte=6.2&primary_release_year=${year}&page=${page}`;
+  const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}&sort_by=popularity.desc&vote_count.gte=500&vote_average.gte=6.2&primary_release_year=${year}&page=${page}&include_adult=false`;
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
@@ -73,7 +73,7 @@ export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 
     const kwId = await keywordIdForHint(hint);
     if (kwId) {
       const page = 1 + Math.floor(Math.random() * 3);
-      const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&vote_average.gte=6&with_keywords=${kwId}&page=${page}`, { next: { revalidate: 0 } });
+      const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&vote_average.gte=6&with_keywords=${kwId}&page=${page}&include_adult=false`, { next: { revalidate: 0 } });
       if (res.ok) {
         const data = await res.json();
         const out = (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
@@ -81,7 +81,7 @@ export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 
       }
     }
     // fallback: free-text movie search on the hint
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=${lang}&query=${encodeURIComponent(hint)}`, { next: { revalidate: 86400 } });
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=${lang}&query=${encodeURIComponent(hint)}&include_adult=false`, { next: { revalidate: 86400 } });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
@@ -243,7 +243,7 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
   const title = ym ? ym[1] : raw;
   const yq = ym ? `&year=${ym[2]}` : '';
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}${yq}`, { next: { revalidate: 604800 } });
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}${yq}&include_adult=false`, { next: { revalidate: 604800 } });
     if (!res.ok) return null;
     const d = await res.json();
     // Taking TMDB's FIRST usable result made curated blockbusters resolve to obscure
@@ -374,7 +374,7 @@ export async function fetchFamilyPool(family: string, seenIds: string[], locale 
   const seen = new Set(seenIds);
   const page = 1 + Math.floor(Math.random() * 4);
   const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}`
-    + `&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.3&with_genres=${genres.join('|')}&page=${page}`;
+    + `&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.3&with_genres=${genres.join('|')}&page=${page}&include_adult=false`;
   try {
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
@@ -440,6 +440,9 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     if (!res.ok) return null;
     const m = await res.json();
     if (!m.poster_path) return null;
+    // TMDB's own adult flag. Nothing in the engine read it, so Basic Instinct arrived as question
+    // eight for a teenager and Tokyo Gore Police as a recommendation. It costs one comparison.
+    if (m.adult === true) return null;
     // TMDB's he-IL response falls back to the ORIGINAL title when no Hebrew one exists, which
     // put raw CJK on a Hebrew results card (機動警察パトレイバー 劇場版). Prefer a Latin title in
     // that case — recognizable to an Israeli reader in a way the original script is not.
@@ -447,8 +450,9 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     // film's "original title" line. Anything with no Latin letter at all is unreadable here.
     const cjk = (t: string) => !!t && !/[A-Za-z֐-׿]/.test(t);
     const heTitle = m.title || m.original_title || '';
-    const safeTitle = cjk(heTitle) && m.original_title && !cjk(m.original_title)
+    let title = cjk(heTitle) && m.original_title && !cjk(m.original_title)
       ? m.original_title : heTitle;
+    const safeTitle = title;
     // The subtitle line under the Hebrew title carries the original title, and for Japanese
     // films that printed raw CJK on the question card (劇場版「鬼滅の刃」無限列車編). Ask TMDB for the
     // English title in that case — one extra call, only for the handful of films that need it.
@@ -465,11 +469,14 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
           if (ed?.title && !cjk(ed.title)) sub = ed.title;
           else if (!cjk(safeTitle)) sub = safeTitle;
         }
+        // When BOTH titles are Japanese there was nothing to fall back to and the card printed
+        // 機動戦士ガンダム 逆襲のシャア as the film's name. The English title covers it.
+        if (cjk(title) && ed?.title && !cjk(ed.title)) title = ed.title;
         if (!overview.trim() && ed?.overview) overview = ed.overview;
       } catch { /* keep what we have rather than lose the line */ }
     }
     return {
-      id: m.id.toString(), title: safeTitle,
+      id: m.id.toString(), title,
       originalDetails: `${sub} · ${m.release_date ? m.release_date.split('-')[0] : ''}`,
       rating: m.vote_average, posterUrl: `/api/poster?path=${m.poster_path}`,
       overview, trailerId: '', easterEgg: { type: 'oscar' },
@@ -486,7 +493,7 @@ export async function resolveByTitle(title: string, year: string | null, locale 
   try {
     const q = encodeURIComponent(title);
     const yq = year ? `&year=${encodeURIComponent(year)}` : '';
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${q}${yq}`, { next: { revalidate: 86400 } });
+    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${q}${yq}&include_adult=false`, { next: { revalidate: 86400 } });
     if (!res.ok) return null;
     const data = await res.json();
     const hit = (data.results || []).find((m: any) => m.poster_path && m.overview) || (data.results || [])[0];

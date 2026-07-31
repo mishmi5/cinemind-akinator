@@ -444,7 +444,28 @@ export async function POST(req: Request) {
     // so the drill pool and the fallback pool kept serving rejected styles — a rom-com fan was
     // shown Friday the 13th at question 16 and an anime fan got Chicago at question 14. Those
     // two screens were 7 of the 8 recorded abandonments.
+    // A CHILD'S TASTE IS A SAFETY SIGNAL. A persona that rated animation and family films five and
+    // everything else one was asked about The Conjuring at question one and Kingsman at question
+    // five, and finished with three Gundam films at "99% match". The engine has no age, but a
+    // profile whose loves are the children's corner and whose rejections include horror is as
+    // clear a signal as it will ever get — and the cost of being wrong is asymmetric.
+    const familyLove = history.filter(h => h.rating >= HI && h.genres.includes('Family')).length;
+    const scaryReject = history.filter(h => h.rating <= LO && (h.genres.includes('Horror') || h.genres.includes('Thriller'))).length;
+    // One of each is enough. Waiting for two meant a child was shown The Ring at question two,
+    // and there is no upside to being slow about this: an adult who happens to love a family film
+    // and dislike one thriller loses nothing but a few horror questions.
+    const kidsMode = familyLove >= 1 && scaryReject >= 1
+      && !history.some(h => h.rating >= HI && h.genres.includes('Horror'));
+    const unsafeForKids = (c: { id: string; _genreIds?: number[] }) => {
+      if (!kidsMode) return false;
+      const t = samplerProbeOf(c.id);
+      if (t && (subGenreFamily(t) === 'horror' || t === 'erotic thriller')) return true;
+      const g = c._genreIds || [];
+      return g.includes(27) || g.includes(53) || g.includes(80);
+    };
+
     const rejectsUser = (c: { id: string; _genreIds?: number[] }) => {
+      if (unsafeForKids(c)) return true;
       const t = samplerProbeOf(c.id);
       const fam = t ? subGenreFamily(t) : undefined;
       if (fam && rejectedFamilies.includes(fam)) return true;
@@ -819,11 +840,20 @@ export async function POST(req: Request) {
     const lovedGenres = new Set<string>();
     const hatedGenres = new Set<string>();
     const hatedIds = new Set<string>();
+    // Counts, not flags: a genre that appears once in a loved film and eight times in rejected
+    // ones is not ambiguous, it is rejected.
+    const lovedGenreHits: Record<string, number> = {};
+    const hatedGenreHits: Record<string, number> = {};
     for (const h of history) {
-      if (h.rating >= HI) h.genres.forEach(g => lovedGenres.add(g));
-      if (h.rating <= LO) { if (h.id) hatedIds.add(h.id); h.genres.forEach(g => hatedGenres.add(g)); }
+      if (h.rating >= HI) h.genres.forEach(g => { lovedGenres.add(g); lovedGenreHits[g] = (lovedGenreHits[g] || 0) + 1; });
+      if (h.rating <= LO) { if (h.id) hatedIds.add(h.id); h.genres.forEach(g => { hatedGenres.add(g); hatedGenreHits[g] = (hatedGenreHits[g] || 0) + 1; }); }
     }
-    for (const g of lovedGenres) hatedGenres.delete(g);
+    // A single horror-comedy rated 5 deleted Horror from the hated set entirely, and a comedy fan
+    // who had rated every horror film 1 was then recommended Horror. A genre only stops counting
+    // as hated when it is loved MORE often than it is rejected.
+    for (const g of lovedGenres) {
+      if ((lovedGenreHits[g] || 0) > (hatedGenreHits[g] || 0)) hatedGenres.delete(g);
+    }
     // Per-genre filtering SELF-CANCELS for a franchise: someone who hates Marvel but likes Action
     // clears "Action" from hatedGenres, so Guardians of the Galaxy slipped through. So also record
     // the full genre COMBINATION of each rejected film — a candidate carrying every genre of a
@@ -849,6 +879,12 @@ export async function POST(req: Request) {
       const names = genreNames(m._genreIds || []);
       if (onTaste) return false;
       if (names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) return true;
+      // The same safety signal applies to what we finally recommend, not only to what we ask.
+      if (kidsMode && (names.includes('Horror') || names.includes('Thriller') || names.includes('Crime'))) return true;
+      // "Animation" covers both Toy Story and The End of Evangelion, and a child's profile was
+      // answered with three Gundam films at "99% match". In kids mode a pick has to carry the
+      // Family genre — the one label that separates the children's shelf from adult anime.
+      if (kidsMode && !names.includes('Family')) return true;
       if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) return true;
       return false;
     };
@@ -873,7 +909,11 @@ export async function POST(req: Request) {
     const depthOf = (term: string) => (probe[term]?.hi5 || 0) >= 1 ? 2 : 0;
     for (const term of lovedTerms) {
       if (candPool.length >= 12) break;
-      const seeds = await recommendBySubGenre(term, askedMovieIds, locale, 8);
+      // askedMovieIds only covers THIS quiz, so a returning customer with the same taste got the
+      // same three films back — visit 3 of a slasher fan repeated two of visit 2's picks. `seen`
+      // carries the cross-quiz window (x-recent-ids) as well, which is what makes the second
+      // visit feel like the engine remembers them.
+      const seeds = await recommendBySubGenre(term, seen, locale, 8);
       for (const m of seeds.slice(depthOf(term))) {
         if (candPool.length >= 12) break;
         if (!candPool.some(x => x.id === m.id) && !isBad(m, true)) { candPool.push(m); termOfPick.set(m.id, term); }
@@ -1031,7 +1071,12 @@ export async function POST(req: Request) {
       // a confirmed lock earns 100, running out of questions does not.
       isComplete: true,
       confidenceScore: lockedLove ? 1.0 : Math.max(0.6, Math.min(0.95, confidence)),
-      progressPercent: lockedLove ? 100 : Math.max(60, Math.min(95, Math.round(confidence * 100))),
+      // The final screen recomputed the percentage from scratch and ignored what the user had
+      // just been shown: a quiz sitting at 99% ended on 71%, one at 35% ended on 100%. Whatever
+      // the engine believes, the number can only move by the same small step as every other
+      // answer — it is the same meter, on the same screen, one moment later.
+      progressPercent: lockedLove ? Math.min(100, Math.max(prevShown, 96)) 
+        : Math.min(prevShown + 4, Math.max(prevShown, Math.max(60, Math.min(95, Math.round(confidence * 100))))),
       userAffinities: subGenreVector,
       currentVectorState: { possibleMoviesRemaining: 1, leadingMicroGenres: [tasteSummary] },
       currentQuestion: null, finalMovies, proofToken,
