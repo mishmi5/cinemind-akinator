@@ -64,7 +64,7 @@ export default function PricingPage() {
           <div className="bg-[#111113] border border-white/10 rounded-3xl p-8 hover:border-white/20 transition-all flex flex-col text-right">
             <h2 className="text-2xl font-black mb-4">חינם, תמיד</h2>
             <div className="text-5xl font-black text-white mb-2">₪0</div>
-            <p className="text-zinc-500 mb-6">בלי כרטיס אשראי ובלי פתיחת חשבון.</p>
+            <p className="text-zinc-400 mb-6">בלי כרטיס אשראי ובלי פתיחת חשבון.</p>
             <ul className="text-zinc-300 space-y-2 mb-8 text-sm leading-relaxed">
               <li>· החידון המלא</li>
               <li>· שלושה סרטים, וההסבר למה דווקא הם</li>
@@ -87,7 +87,7 @@ export default function PricingPage() {
             </div>
             <h2 className="text-2xl font-black mb-4 text-indigo-400">מייסד</h2>
             <div className="text-5xl font-black text-white mb-2">
-              ₪99<span className="text-xl text-zinc-500"> פעם אחת</span>
+              ₪99<span className="text-xl text-zinc-400"> פעם אחת</span>
             </div>
             <p className="text-indigo-200/60 mb-6">תשלום אחד, גישה לכל החיים. לא מנוי, אין חיוב חוזר.</p>
             <ul className="text-zinc-300 space-y-2 mb-8 text-sm leading-relaxed">
@@ -123,7 +123,7 @@ export default function PricingPage() {
         </div>
 
         {/* Price & cancellation terms */}
-        <div className="mt-6 max-w-2xl mx-auto text-right text-zinc-500 text-sm leading-relaxed space-y-2">
+        <div className="mt-6 max-w-2xl mx-auto text-right text-zinc-400 text-sm leading-relaxed space-y-2">
           <p>המחיר סופי וכולל מע״מ. אין תוספות בקופה.</p>
           <p>
             אפשר לבטל את העסקה תוך 14 יום מיום הרכישה ולקבל החזר, לפי חוק הגנת הצרכן.
@@ -143,7 +143,7 @@ export default function PricingPage() {
               100% Secure Checkout
             </div>
           </div>
-          <p className="text-zinc-500 text-sm leading-relaxed">
+          <p className="text-zinc-400 text-sm leading-relaxed">
             CineMind לעולם לא שומרת את פרטי כרטיס האשראי שלך בשרתיה. <br/>
             התשלום מוצפן ומאובטח במלואו ע&quot;י <strong className="text-zinc-400">Stripe</strong> - העומדת בתקן המחמיר PCI-DSS.
           </p>

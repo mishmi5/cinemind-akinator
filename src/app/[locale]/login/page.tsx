@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import { Link } from '@/i18n/routing';
+import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
+import SkipLink from '@/components/SkipLink';
 
 // ponytail: no auth provider is wired yet (AuthContext only does anonymous sign-in,
 // and nothing in src/ calls signInWithEmailAndPassword / signInWithPopup).
@@ -10,17 +12,20 @@ import Navbar from '@/components/Navbar';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const locale = useLocale();
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden flex flex-col selection:bg-rose-500/30">
-      
+    <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden flex flex-col selection:bg-rose-500/30">
+
+      <SkipLink />
+
       {/* תאורת רקע עדינה */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-rose-900/10 blur-[150px] pointer-events-none"></div>
 
       <Navbar />
 
       {/* אזור ההתחברות */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-10 pb-20">
+      <div id="main-content" className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-10 pb-20">
         
         {/* כותרת קטנה מעל הקופסה */}
         <div className="mb-6 flex items-center gap-2 text-2xl font-black tracking-tight">
@@ -66,26 +71,30 @@ export default function LoginPage() {
           {/* מפריד */}
           <div className="relative flex items-center py-4 mb-4">
             <div className="flex-grow border-t border-white/5"></div>
-            <span className="flex-shrink-0 mx-4 text-zinc-500 text-xs font-medium">או באמצעות מייל</span>
+            <span className="flex-shrink-0 mx-4 text-zinc-400 text-xs font-medium">או באמצעות מייל</span>
             <div className="flex-grow border-t border-white/5"></div>
           </div>
 
           {/* טופס התחברות אימייל / סיסמה */}
           <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400 block text-right">אימייל</label>
+              <label htmlFor="login-email" className="text-xs font-bold text-zinc-400 block text-start">אימייל</label>
               <div className="relative">
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-zinc-500">
+                <div className="absolute inset-y-0 start-0 flex items-center ps-4 pointer-events-none text-zinc-500">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <input 
-                  type="email" 
+                {/* The field itself stays dir="ltr" so an address reads correctly, which means its
+                    OWN logical start is always left — so the padding that clears the icon has to be
+                    expressed physically, against the wrapper's direction. */}
+                <input
+                  id="login-email"
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full bg-[#070709] border border-white/10 rounded-xl py-3 pr-11 pl-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className={`w-full bg-[#070709] border border-white/10 rounded-xl py-3 ${locale === 'he' ? 'pr-11 pl-4' : 'pl-11 pr-4'} text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 transition-all text-left disabled:opacity-40 disabled:cursor-not-allowed`}
                   dir="ltr"
                   autoComplete="email"
                   disabled
@@ -94,19 +103,20 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-zinc-400 block text-right">סיסמה</label>
+              <label htmlFor="login-password" className="text-xs font-bold text-zinc-400 block text-start">סיסמה</label>
               <div className="relative">
-                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-zinc-500">
+                <div className="absolute inset-y-0 start-0 flex items-center ps-4 pointer-events-none text-zinc-500">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                 </div>
-                <input 
-                  type="password" 
+                <input
+                  id="login-password"
+                  type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="הסיסמה שלך"
-                  className="w-full bg-[#070709] border border-white/10 rounded-xl py-3 pr-11 pl-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full bg-[#070709] border border-white/10 rounded-xl py-3 ps-11 pe-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-rose-500/50 focus:ring-1 focus:ring-rose-500/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   autoComplete="current-password"
                   disabled
                 />
@@ -126,16 +136,16 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-8 text-center text-sm font-medium">
-            <span className="text-zinc-500">רוצה להתחיל עכשיו? </span>
+            <span className="text-zinc-400">רוצה להתחיל עכשיו? </span>
             <Link href="/quiz" className="text-rose-500 hover:text-rose-400 transition-colors">התחלת שאלון בלי חשבון</Link>
           </div>
 
         </div>
 
-        <div className="mt-8 text-xs text-zinc-600 font-medium flex flex-col gap-1 items-center">
+        <div className="mt-8 text-xs text-zinc-400 font-medium flex flex-col gap-1 items-center">
           <span>בכניסה אתה מסכים ל<Link href="/terms" className="text-indigo-400 hover:underline">תנאי השימוש</Link> ול<Link href="/privacy" className="text-indigo-400 hover:underline">מדיניות הפרטיות</Link>.</span>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

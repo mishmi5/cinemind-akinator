@@ -10,21 +10,46 @@ type Props = {
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
-  const { id } = params;
+  const { locale, id } = params;
 
   const snap = await adminDb.collection(COLLECTIONS.cards).doc(id).get();
   if (!snap.exists) return {};
 
   const card = snap.data() as ShareCard;
-  
+
+  // This link is meant to be forwarded into Hebrew WhatsApp groups, so the framing
+  // text follows the route's locale. The card's own content (archetype, roast) is
+  // generated in English and stored that way in Firestore — see lib/taste/deriveTaste.ts.
+  // TODO(owner): to make the shared card fully Hebrew, the archetype names and the
+  // roast templates in src/lib/taste/deriveTaste.ts need Hebrew versions first.
+  const isHe = locale !== "en";
+  const title = isHe
+    ? `ה-DNA הקולנועי של ${card.handle}`
+    : `${card.handle}'s Cinematic DNA`;
+  const description = isHe
+    ? `יצא לו ${card.archetype}. תראו מה CineMind אמר עליו.`
+    // Every archetype name already starts with "The" (see ROAST_TEMPLATES), so no article here.
+    : `They came out ${card.archetype}. See what CineMind said.`;
+
   return {
-    title: `${card.handle}'s Cinematic DNA`,
-    description: `They are a ${card.archetype}. See their Roast!`,
+    title,
+    description,
     openGraph: {
-      title: `${card.handle}'s Cinematic DNA`,
-      description: card.roastText,
-      images: [`/cards/${id}/opengraph-image`]
-    }
+      title,
+      description,
+      type: "profile",
+      // The dynamic OG image lives next to this page and is picked up by convention;
+      // naming it explicitly keeps the locale prefix out of the URL.
+      images: [`/cards/${id}/opengraph-image`],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [`/cards/${id}/opengraph-image`],
+    },
+    // A share card belongs to one person and is reachable only by its link.
+    robots: { index: false, follow: false },
   };
 }
 

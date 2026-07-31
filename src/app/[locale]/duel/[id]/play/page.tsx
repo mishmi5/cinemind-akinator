@@ -144,7 +144,7 @@ export default function DuelPlayPage({ params }: { params: Promise<{ id: string,
                 {duel.winnerUid === duel.challenger.uid && <div className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-4">👑 Winner</div>}
                 <h3 className="text-xl font-bold mb-1">{duel.challenger.handle}</h3>
                 <p className="text-sm text-zinc-400 mb-4">{duel.challenger.tasteSnapshot?.archetype}</p>
-                <div className="text-xs text-zinc-500 mb-2 uppercase tracking-wider">{t('top_genres', { fallback: 'Top Genres' })}</div>
+                <div className="text-xs text-zinc-400 mb-2 uppercase tracking-wider">{t('top_genres', { fallback: 'Top Genres' })}</div>
                 <div className="flex flex-wrap gap-2">
                   {duel.comparison.challengerEdge.map(g => (
                     <span key={g} className="px-3 py-1 bg-zinc-800 rounded-lg text-xs">{g}</span>
@@ -157,7 +157,7 @@ export default function DuelPlayPage({ params }: { params: Promise<{ id: string,
                 {duel.winnerUid === duel.opponent?.uid && <div className="text-xs font-black text-fuchsia-400 uppercase tracking-widest mb-4">👑 Winner</div>}
                 <h3 className="text-xl font-bold mb-1">{duel.opponent?.handle}</h3>
                 <p className="text-sm text-zinc-400 mb-4">{duel.opponent?.tasteSnapshot?.archetype}</p>
-                <div className="text-xs text-zinc-500 mb-2 uppercase tracking-wider">{t('top_genres', { fallback: 'Top Genres' })}</div>
+                <div className="text-xs text-zinc-400 mb-2 uppercase tracking-wider">{t('top_genres', { fallback: 'Top Genres' })}</div>
                 <div className="flex flex-wrap gap-2">
                   {duel.comparison.opponentEdge.map(g => (
                     <span key={g} className="px-3 py-1 bg-zinc-800 rounded-lg text-xs">{g}</span>

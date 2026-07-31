@@ -22,38 +22,93 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-import { headers } from 'next/headers';
-export async function generateMetadata(): Promise<Metadata> {
-  const h = await headers();
-  const dump: Record<string, string> = {};
-  h.forEach((v, k) => { dump[k] = v.slice(0, 120); });
-  return { other: { 'x-debug-headers': JSON.stringify(dump) } };
+import { headers } from "next/headers";
+
+// The public origin. NEXT_PUBLIC_SITE_URL wins so a preview deploy shares its own
+// URLs; without it we fall back to production, never to localhost — an unset
+// metadataBase makes Next emit og:image on http://localhost, which no crawler can fetch.
+// TODO(owner): set NEXT_PUBLIC_SITE_URL in Netlify (production + previews).
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://cinemind.co.il";
+
+// TODO(owner): create public/og/og-default.png at 1200x630 — that exact path.
+// It is referenced below as the default share image for every page that has none
+// of its own. Until the file exists, WhatsApp/Facebook shares fall back to text.
+// The files under public/icons are square SVGs; those networks ignore them.
+const OG_DEFAULT = "/og/og-default.png";
+
+// next-intl's proxy already computes the locale alternates for the current URL and
+// sends them as an HTTP `Link` header. A layout has no access to the pathname, so we
+// reuse that instead of guessing, and swap the request origin for the public one.
+function alternatesFromLinkHeader(link: string | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!link) return out;
+  for (const entry of link.split(/,\s*(?=<)/)) {
+    const m = entry.match(/^<([^>]+)>.*hreflang="([^"]+)"/);
+    if (!m) continue;
+    try {
+      out[m[2]] = new URL(new URL(m[1]).pathname, SITE_URL).toString();
+    } catch { /* not a URL — skip this entry */ }
+  }
+  return out;
 }
 
-export const metadataOld: Metadata = {
-  title: {
-    default: "CineMind — הפסקת לנחש. התחלת לראות.",
-    template: "%s | CineMind",
-  },
-  description:
-    "מנוע המלצות קולנועי מבוסס AI שמפענח את ה-DNA הקולנועי שלך תוך 3 שאלות. דיוק כירורגי ברמת מיקרו-ז'אנר.",
-  // TODO(owner): אין תמונת שיתוף. צריך ליצור public/og/og-default.png בגודל 1200x630
-  // ואז להוסיף כאן images: ["/og/og-default.png"] גם ל-openGraph וגם ל-twitter.
-  // הקבצים הקיימים ב-public/icons הם SVG וריבועיים — פייסבוק, ווטסאפ וטוויטר לא מציגים אותם.
-  openGraph: {
+const COPY = {
+  he: {
     title: "CineMind — הפסקת לנחש. התחלת לראות.",
     description:
+      "מנוע המלצות קולנועי מבוסס AI שמפענח את ה-DNA הקולנועי שלך תוך 3 שאלות. דיוק כירורגי ברמת מיקרו-ז'אנר.",
+    social:
       "מנוע המלצות שמפענח את הטעם הקולנועי שלך תוך שלוש שאלות ומביא לך בדיוק את הסרט הבא.",
-    siteName: "CineMind",
     locale: "he_IL",
-    type: "website",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "CineMind — הפסקת לנחש. התחלת לראות.",
+  en: {
+    title: "CineMind — Stop guessing. Start watching.",
     description:
-      "מנוע המלצות שמפענח את הטעם הקולנועי שלך תוך שלוש שאלות ומביא לך בדיוק את הסרט הבא.",
+      "An AI recommendation engine that reads your cinematic DNA in three questions and answers at micro-genre resolution.",
+    social:
+      "Three questions, and you get the film you actually want to watch tonight.",
+    locale: "en_US",
   },
+} as const;
+
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await props.params;
+  const copy = locale === "en" ? COPY.en : COPY.he;
+  const languages = alternatesFromLinkHeader((await headers()).get("link"));
+
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: copy.title,
+      template: "%s | CineMind",
+    },
+    description: copy.description,
+    alternates: {
+      // "./" resolves against the current pathname, so every page gets its own canonical.
+      canonical: languages[locale] ?? "./",
+      languages,
+    },
+    openGraph: {
+      title: copy.title,
+      description: copy.social,
+      siteName: "CineMind",
+      locale: copy.locale,
+      type: "website",
+      images: [{ url: OG_DEFAULT, width: 1200, height: 630, alt: "CineMind" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: copy.title,
+      description: copy.social,
+      images: [OG_DEFAULT],
+    },
+    ...staticMetadata,
+  };
+}
+
+const staticMetadata: Metadata = {
   robots: {
     index: true,
     follow: true,
@@ -116,6 +171,33 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Organization + WebSite. Only claims that are true: name, URL, logo, language.
+            No SearchAction — the site has no search page to point one at. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "Organization",
+                  "@id": `${SITE_URL}/#organization`,
+                  name: "CineMind",
+                  url: SITE_URL,
+                  logo: `${SITE_URL}/icons/icon-512x512.svg`,
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": `${SITE_URL}/#website`,
+                  name: "CineMind",
+                  url: SITE_URL,
+                  inLanguage: locale === "he" ? "he-IL" : "en",
+                  publisher: { "@id": `${SITE_URL}/#organization` },
+                },
+              ],
+            }),
+          }}
+        />
         <NextIntlClientProvider messages={messages}>
           <PostHogProvider>
             <AuthProvider>

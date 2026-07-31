@@ -2,6 +2,16 @@ import { ImageResponse } from 'next/og';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS, ShareCard } from '@/types/firebase';
 
+// This image is deliberately Latin-only. next/og renders through satori, whose built-in
+// font is Latin — Hebrew glyphs come out as blank boxes unless a Hebrew font file is
+// passed in `fonts`. Everything drawn here (archetype, roast, genres) is generated in
+// English by src/lib/taste/deriveTaste.ts, so there is nothing to translate yet, and
+// shipping boxes would be worse than shipping English.
+// TODO(owner): the one field that can already be Hebrew is card.handle, which the user
+// types themselves — a Hebrew handle renders blank here. Fixing it means committing a
+// Hebrew font (e.g. public/fonts/Rubik-Bold.ttf, ~200KB), reading it with fs.readFile
+// and passing it as `fonts: [{ name: 'Rubik', data, weight: 700, style: 'normal' }]` in
+// the ImageResponse options below. Same font would then also allow a Hebrew card.
 export const alt = 'Cinemind Roast Card';
 export const size = {
   width: 1200,

@@ -97,7 +97,7 @@ export default function ArenaPage() {
           <p className="text-zinc-400 max-w-lg mx-auto mb-8 text-lg">
             ברוך הבא לזירה. משחק טריוויה לשחקן יחיד, וכל תשובה נכונה מוסיפה לך XP.
             <br/><span className="text-rose-500 font-bold">החוק: 3 תשובות הן עובדות נכונות. רק התשובה המטורללת (השגויה) מעניקה נקודות!</span>
-            <br/><span className="text-zinc-500 text-sm">משחק מול יריב חי עוד לא קיים. נפתח אותו כשהוא יהיה מוכן.</span>
+            <br/><span className="text-zinc-400 text-sm">משחק מול יריב חי עוד לא קיים. נפתח אותו כשהוא יהיה מוכן.</span>
           </p>
 
           <div className="flex flex-col gap-4 items-center w-full mt-2">

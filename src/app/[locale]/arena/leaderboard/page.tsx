@@ -40,9 +40,9 @@ export default function LeaderboardPage() {
 
         {/* Your own score — the one figure we can actually show */}
         <div className="w-full bg-[#111113]/80 backdrop-blur-xl border border-white/5 rounded-3xl p-8 sm:p-12 shadow-2xl text-center animate-in fade-in duration-1000">
-          <div className="text-sm font-bold text-zinc-500 mb-2">ה-XP שלך</div>
+          <div className="text-sm font-bold text-zinc-400 mb-2">ה-XP שלך</div>
           <div className="text-6xl font-black text-indigo-400 font-mono drop-shadow-[0_0_15px_rgba(99,102,241,0.4)]">{myXp}</div>
-          <p className="text-zinc-500 text-sm mt-6 max-w-sm mx-auto leading-relaxed">
+          <p className="text-zinc-400 text-sm mt-6 max-w-sm mx-auto leading-relaxed">
             כשנפתח דירוג בין שחקנים נעדכן כאן. עד אז הנקודות ממשיכות להיצבר לך בזירה.
           </p>
         </div>

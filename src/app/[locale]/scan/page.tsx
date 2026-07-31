@@ -8,6 +8,7 @@ import type { SessionState, AnswerType, MovieContext, EasterEggType } from '@/ty
 import quizToasts from '@/data/quiz-toasts.json';
 import posthog from 'posthog-js';
 import RoastReveal from '@/components/roast/RoastReveal';
+import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
 
 interface StartingMovie extends MovieContext {
@@ -57,7 +58,7 @@ const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, 
         <svg className="w-16 h-16 text-zinc-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 4v16M17 4v16M3 8h4m-4 8h4M17 8h4m-4 8h4M14 4H10v16h4V4z" />
         </svg>
-        <span className="text-zinc-600 font-black tracking-[0.3em] text-xs uppercase">CineMind</span>
+        <span className="text-zinc-400 font-black tracking-[0.3em] text-xs uppercase">CineMind</span>
       </div>
     );
   }
@@ -103,6 +104,8 @@ export default function ScanMovieEvaluation() {
   const [loading, setLoading] = useState<boolean>(false);
   const [hoveredStar, setHoveredStar] = useState<number | null>(null);
   const [activeTrailer, setActiveTrailer] = useState<string | null>(null);
+  const trailerCloseRef = useRef<HTMLButtonElement | null>(null);
+  const trailerDialogRef = useRef<HTMLDivElement | null>(null);
   const [combo, setCombo] = useState(0);
   const [animateCard, setAnimateCard] = useState(false);
   const [session, setSession] = useState<SessionState | null>(null);
@@ -417,11 +420,51 @@ export default function ScanMovieEvaluation() {
     return () => clearTimeout(t1);
   }, [session?.isComplete]);
 
+  // Trailer dialog behaviour: Escape closes it, focus moves into it and stays trapped,
+  // focus returns to whatever opened it, and the page behind it stops scrolling.
+  // Without this the modal was a div a keyboard user could tab straight past.
+  useEffect(() => {
+    if (!activeTrailer) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const bodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    trailerCloseRef.current?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setActiveTrailer(null);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusables = trailerDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], iframe, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusables?.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = bodyOverflow;
+      opener?.focus?.();
+    };
+  }, [activeTrailer]);
+
   if (!session) {
     return (
-      <main className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 animate-pulse"><CineMindLogo className="w-20 h-20" /><div className="text-zinc-500 font-bold tracking-widest text-lg">{t('loading_db')}</div></div>
-      </main>
+      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 animate-pulse"><CineMindLogo className="w-20 h-20" /><div className="text-zinc-400 font-bold tracking-widest text-lg">{t('loading_db')}</div></div>
+      </div>
     );
   }
 
@@ -431,9 +474,14 @@ export default function ScanMovieEvaluation() {
   // those dips and also cause the jump-to-100.
   const confidencePercentage = Math.max(1, session.progressPercent ?? Math.round(session.confidenceScore * 100));
   const dynamicPhrase = getDynamicPhrase(session.historyCount);
+  const he = locale === 'he';
+  const trailerDialogLabel = he ? 'טריילר' : 'Trailer';
+  const closeTrailerLabel = he ? 'סגירת הטריילר' : 'Close the trailer';
+  const cardMovie = session.currentQuestion?.movie;
   return (
-    <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
-      
+    <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
+      <SkipLink />
+
       {activeEffect === 'oscar' && (
         <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center overflow-hidden">
           {oscarBits.map((bit, i) => (
@@ -464,10 +512,32 @@ export default function ScanMovieEvaluation() {
       )}
 
       {activeTrailer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-lg p-4 animate-in fade-in duration-300">
-          <div className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl overflow-hidden shadow-[0_0_120px_rgba(225,29,72,0.4)]">
-            <button onClick={() => setActiveTrailer(null)} className="absolute top-6 right-6 z-10 px-6 py-3 bg-black/60 hover:bg-black/90 text-white rounded-full border border-white/20 transition-all font-bold">✕</button>
-            <iframe src={`https://www.youtube.com/embed/${activeTrailer}?autoplay=1&rel=0&modestbranding=1`} className="w-full h-full" allowFullScreen></iframe>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-lg p-4 animate-in fade-in duration-300"
+          onClick={() => setActiveTrailer(null)}
+        >
+          <div
+            ref={trailerDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={trailerDialogLabel}
+            className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl overflow-hidden shadow-[0_0_120px_rgba(225,29,72,0.4)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              ref={trailerCloseRef}
+              onClick={() => setActiveTrailer(null)}
+              aria-label={closeTrailerLabel}
+              className="absolute top-6 end-6 z-10 px-6 py-3 bg-black/60 hover:bg-black/90 text-white rounded-full border border-white/20 transition-all font-bold"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+            <iframe
+              title={trailerDialogLabel}
+              src={`https://www.youtube.com/embed/${activeTrailer}?autoplay=1&rel=0&modestbranding=1`}
+              className="w-full h-full"
+              allowFullScreen
+            ></iframe>
           </div>
         </div>
       )}
@@ -481,11 +551,11 @@ export default function ScanMovieEvaluation() {
 
       <nav className="relative z-20 flex items-center justify-between px-8 py-5 border-b border-white/5 bg-[#070709]">
         <Link href="/" className="text-2xl font-black tracking-tight flex items-center gap-2 hover:opacity-80 transition-opacity"><CineMindLogo className="w-8 h-8" />CineMind</Link>
-        <div className="flex items-center gap-6 text-sm font-medium text-zinc-400"><Link href="/arena" className="hover:text-rose-400 font-bold transition-colors text-base">👾 {tNav('arena')}</Link><span className="text-zinc-600">{t('anonymous')}</span></div>
+        <div className="flex items-center gap-6 text-sm font-medium text-zinc-400"><Link href="/arena" className="hover:text-rose-400 font-bold transition-colors text-base">👾 {tNav('arena')}</Link><span className="text-zinc-400">{t('anonymous')}</span></div>
       </nav>
 
-      <div className="w-full max-w-5xl mx-auto px-4 mt-8 mb-4 flex items-center justify-between">
-        <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden ml-6">
+      <div id="main-content" className="w-full max-w-5xl mx-auto px-4 mt-8 mb-4 flex items-center justify-between">
+        <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden me-6">
           {/* start-anchored so the bar grows from the side the locale reads from: right in Hebrew,
               left in English (it used to be pinned to the physical right in both). */}
           <div className="absolute top-0 start-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
@@ -504,7 +574,7 @@ export default function ScanMovieEvaluation() {
         
         {session.isComplete ? (
           <div className="w-full mt-12 animate-in fade-in zoom-in duration-700">
-            <div className="text-center mb-12"><span className="inline-block px-6 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full text-base font-bold mb-6">✅ {t('perfect_match')}</span><h2 className="text-6xl font-black mb-4">{t('cracked_you')}</h2><p className="text-zinc-400 text-xl">{t('perfect_movie_desc')}</p></div>
+            <div className="text-center mb-12"><span className="inline-block px-6 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full text-base font-bold mb-6">✅ {t('perfect_match')}</span><h1 className="text-6xl font-black mb-4">{t('cracked_you')}</h1><p className="text-zinc-400 text-xl">{t('perfect_movie_desc')}</p></div>
             
             {session.finalMovies?.map((movie) => (
               <div key={movie.id} className="relative bg-[#111113] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col items-center p-8 md:p-12 text-center mb-12 max-w-4xl mx-auto">
@@ -514,9 +584,9 @@ export default function ScanMovieEvaluation() {
                   <div className="w-48 md:w-64 aspect-[2/3] mx-auto relative rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.8)] bg-zinc-900 mb-8">
                     <ImageWithFallback src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
                   </div>
-                  <h3 className="text-4xl md:text-5xl font-black mb-4 text-white" dir={locale === 'he' ? 'rtl' : 'ltr'}>
+                  <h2 className="text-4xl md:text-5xl font-black mb-4 text-white" dir={locale === 'he' ? 'rtl' : 'ltr'}>
                     {isRevealed ? movie.title : `${movie.title.charAt(0)}_______`}
-                  </h3>
+                  </h2>
                   <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-sm font-bold mb-6">
                     {movie.matchScore}% {t('match_perfect')}
                   </div>
@@ -541,7 +611,7 @@ export default function ScanMovieEvaluation() {
                     const Row = ({ label, list }: { label: string; list: { name: string; logo: string }[] }) => (
                       list.length ? (
                         <div className="flex items-center gap-2 flex-wrap justify-center">
-                          <span className="text-xs text-zinc-500 font-bold">{label}</span>
+                          <span className="text-xs text-zinc-400 font-bold">{label}</span>
                           {list.slice(0, 4).map(p => (
                             <span key={p.name} className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg ps-1 pe-2 py-1">
                               <img src={p.logo} alt="" className="w-5 h-5 rounded" />
@@ -592,7 +662,7 @@ export default function ScanMovieEvaluation() {
                           {locale === 'he' ? 'קח מקום מייסד — ₪99' : 'Take a founder seat — ₪99'}
                         </Link>
 
-                        <div className="text-xs text-zinc-500 px-2 text-center leading-relaxed">
+                        <div className="text-xs text-zinc-400 px-2 text-center leading-relaxed">
                           {locale === 'he'
                             ? 'המחיר כולל מע״מ. כשה-200 ייגמרו המחיר עובר ל-₪19 לחודש, ומייסדים ממשיכים ב-₪0.'
                             : 'VAT included. Once the 200 seats are gone the price becomes ₪19/month; founders stay at ₪0.'}
@@ -600,7 +670,7 @@ export default function ScanMovieEvaluation() {
                       </div>
 
                       <div className="mt-8 pt-6 border-t border-white/5">
-                        <p className="text-zinc-500 text-sm">
+                        <p className="text-zinc-400 text-sm">
                           {/* This used to be a button that simply set isRevealed — the paywall was
                               decorative and one click took the paid content for free. It is a link
                               to the real login now, and the reveal happens only for an entitled user. */}
@@ -650,29 +720,36 @@ export default function ScanMovieEvaluation() {
         ) : (
           <div className="w-full flex flex-col items-center">
             
-            <div className={`w-full bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl relative transition-all duration-300 ${animateCard ? 'opacity-0 -translate-x-10 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}>
-              
+            {/* aria-live: the card swaps in place, so without an announcement a screen-reader
+                user rates the same silent card over and over. */}
+            <div
+              aria-live="polite"
+              aria-atomic="true"
+              className={`w-full bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl relative transition-all duration-300 ${animateCard ? 'opacity-0 -translate-x-10 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}
+            >
+
               {/* On a 390x844 phone the poster at 55vh pushed the star row to y=905 — below the
                   fold, so the first thing a mobile visitor saw was a film and no way to answer it.
                   42vh lands the stars inside the first screen; the desktop size is unchanged. */}
               <div className="relative w-full h-[42vh] min-h-[280px] max-h-[550px] md:h-[650px] md:max-h-none bg-zinc-900">
                 <ImageWithFallback
-                  src={session.currentQuestion?.movie?.posterUrl || ''}
-                  alt={session.currentQuestion?.movie?.title || ''}
+                  src={cardMovie?.posterUrl || ''}
+                  alt={cardMovie?.title ? (he ? `כרזת ${cardMovie.title}` : `${cardMovie.title} poster`) : ''}
                   className="absolute inset-0 w-full h-full object-cover object-top opacity-100" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent"></div>
-                {session.currentQuestion?.movie?.trailerId && (
-                  <button onClick={() => setActiveTrailer(session.currentQuestion?.movie?.trailerId || null)} className={`absolute top-6 ${locale === 'he' ? 'right-6' : 'left-6'} bg-red-600/90 text-white text-sm font-bold px-5 py-2.5 rounded-full flex items-center gap-2 backdrop-blur-md hover:bg-red-500 transition-colors z-10 shadow-lg`}>
+                {cardMovie?.trailerId && (
+                  <button onClick={() => setActiveTrailer(cardMovie?.trailerId || null)} className="absolute top-6 start-6 bg-red-600/90 text-white text-sm font-bold px-5 py-2.5 rounded-full flex items-center gap-2 backdrop-blur-md hover:bg-red-500 transition-colors z-10 shadow-lg">
                     ▶ {t('watch_trailer')}
                   </button>
                 )}
-                <div className="absolute bottom-6 left-6 bg-orange-500 text-white text-base font-black px-4 py-1.5 rounded-xl flex items-center gap-1.5 z-10 shadow-[0_0_15px_rgba(249,115,22,0.4)]">
-                  {session.currentQuestion?.movie?.rating} ★
+                <div className="absolute bottom-6 end-6 bg-orange-500 text-white text-base font-black px-4 py-1.5 rounded-xl flex items-center gap-1.5 z-10 shadow-[0_0_15px_rgba(249,115,22,0.4)]">
+                  {/* TMDB hands back 6.661; one decimal is what a rating badge is meant to show. */}
+                  {typeof cardMovie?.rating === 'number' ? cardMovie.rating.toFixed(1) : cardMovie?.rating} ★
                 </div>
               </div>
 
               <div className="px-6 md:px-8 pb-10 relative z-10 -mt-20 md:-mt-24 text-center">
-                <h3 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.title}</h3>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{cardMovie?.title}</h1>
                 <p className="text-xs text-zinc-300 font-mono mb-5 uppercase tracking-[0.2em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.originalDetails}</p>
                 <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
                 
@@ -745,6 +822,6 @@ export default function ScanMovieEvaluation() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

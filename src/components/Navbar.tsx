@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from '@/i18n/routing';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 
@@ -38,16 +38,25 @@ export default function Navbar() {
   };
 
   const t = useTranslations('Navigation');
-  
+  const locale = useLocale();
+  // ponytail: inline copy — messages/*.json is owned by another change right now.
+  const backLabel = locale === 'he' ? 'חזרה לעמוד הקודם' : 'Back to the previous page';
+
   return (
     <nav className="relative z-50 flex items-center justify-between px-4 md:px-8 py-4 border-b border-white/5 bg-[#070709]/80 backdrop-blur-xl sticky top-0 w-full">
       <div className="flex items-center gap-4">
-        <button onClick={() => router.back()} className="text-zinc-500 hover:text-white transition-colors bg-white/5 w-8 h-8 rounded-full items-center justify-center border border-white/10 hidden md:flex">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        <button
+          onClick={() => router.back()}
+          aria-label={backLabel}
+          className="text-zinc-400 hover:text-white transition-colors bg-white/5 w-11 h-11 rounded-full items-center justify-center border border-white/10 hidden md:flex"
+        >
+          <svg className="w-4 h-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         </button>
         <Link href="/" className="text-xl font-black tracking-tight text-white flex items-center gap-2 hover:opacity-80 transition-opacity">
           <CineMindLogo />
-          <span className="hidden sm:block">CineMind</span>
+          {/* sr-only rather than hidden: below sm the wordmark was removed from the tree and the
+              link was left with nothing but an SVG, so it had no accessible name at all. */}
+          <span className="sr-only sm:not-sr-only">CineMind</span>
         </Link>
       </div>
       
@@ -69,13 +78,13 @@ export default function Navbar() {
           </div>
         )}
         <Link href="/pricing" className="hover:text-indigo-400 transition-colors flex items-center gap-1">
-          <span className="text-indigo-500">Premium</span> {t('premium').replace('Premium', '').trim()}
+          <span className="text-indigo-400">Premium</span> {t('premium').replace('Premium', '').trim()}
         </Link>
         <button onClick={handleVibeClick} className="hover:text-white transition-colors group relative hidden lg:block">
           {t('vibe')} 🦇
           {vibeClicked && (
-            <div className="absolute top-full mt-4 -right-4 w-56 p-3 bg-zinc-900 border border-rose-500/50 rounded-xl text-xs text-rose-300 shadow-2xl z-50 whitespace-normal leading-relaxed animate-in fade-in zoom-in duration-200">
-              <div className="absolute -top-2 right-12 w-4 h-4 bg-zinc-900 border-t border-l border-rose-500/50 rotate-45"></div>
+            <div className="absolute top-full mt-4 -end-4 w-56 p-3 bg-zinc-900 border border-rose-500/50 rounded-xl text-xs text-rose-300 shadow-2xl z-50 whitespace-normal leading-relaxed animate-in fade-in zoom-in duration-200">
+              <div className="absolute -top-2 end-12 w-4 h-4 bg-zinc-900 border-t border-s border-rose-500/50 rotate-45"></div>
               <span className="relative z-10 font-bold">עובדים על משהו שישאיר אותך ער עד 4 בבוקר עם עיניים אדומות 👀.</span>
               <br/><br/>
               <span className="relative z-10 text-zinc-400">בינתיים, לך תעשה חידון ותפסיק ללחוץ על כפתורים רנדומליים באקרנצ'יק.</span>

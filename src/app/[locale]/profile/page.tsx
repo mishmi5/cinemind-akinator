@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useLocale } from 'next-intl';
 import Navbar from '@/components/Navbar';
+import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
@@ -18,6 +20,8 @@ export default function UserProfile() {
   const [title, setTitle] = useState(TITLES[0]);
   const [accent, setAccent] = useState(COLORS[0]);
   
+  const locale = useLocale();
+  const dir = locale === 'he' ? 'rtl' : 'ltr';
   const { user: authUser, loading } = useAuth();
   const [xp, setXp] = useState(0);
 
@@ -60,28 +64,31 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <main dir="rtl" className="min-h-screen bg-[#070709] text-white flex items-center justify-center">
+      <div dir={dir} className="min-h-screen bg-[#070709] text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden pb-20">
+    <div dir={dir} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden pb-20">
+      <SkipLink />
       <Navbar />
 
-      <div className="max-w-4xl mx-auto px-4 mt-12">
+      <div id="main-content" className="max-w-4xl mx-auto px-4 mt-12">
         {/* Header Profile */}
         <div className="bg-[#111113] border border-white/5 rounded-[2rem] p-8 md:p-12 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden shadow-2xl mb-8 transition-all duration-500" style={{ boxShadow: `0 20px 40px -10px ${accent.glow}` }}>
           <div className="absolute top-0 right-0 w-64 h-64 blur-[100px] pointer-events-none transition-colors duration-500" style={{ backgroundColor: accent.glow }}></div>
           
           <div className="w-32 h-32 rounded-full border-4 p-1 relative bg-zinc-900 transition-colors duration-500" style={{ borderColor: accent.hex, boxShadow: `0 0 30px ${accent.glow}` }}>
-            <img src={currentAvatar} alt="Avatar" className="w-full h-full rounded-full transition-all duration-500" />
-            <button 
+            {/* Decorative: the avatar art carries no information the name beside it does not. */}
+            <img src={currentAvatar} alt="" className="w-full h-full rounded-full transition-all duration-500" />
+            <button
               onClick={() => setAvatarIndex((prev) => (prev + 1) % avatars.length)}
-              className="absolute bottom-0 right-0 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center font-bold shadow-lg hover:scale-110 transition-transform"
+              aria-label={locale === 'he' ? 'החלפת האווטאר' : 'Change avatar'}
+              className="absolute bottom-0 end-0 w-11 h-11 bg-white text-black rounded-full flex items-center justify-center font-bold shadow-lg hover:scale-110 transition-transform"
             >
-              ↻
+              <span aria-hidden="true">↻</span>
             </button>
           </div>
 
@@ -91,7 +98,7 @@ export default function UserProfile() {
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold mb-2">
               👑 {taste?.isPremium ? 'CineMind Elite' : 'חשבון חינם'}
             </div>
-            <div className="text-xs text-zinc-500 mb-4 font-mono">
+            <div className="text-xs text-zinc-400 mb-4 font-mono">
               {!isFirebaseConfigured ? "אורח זמני" : 
                 (authUser?.isAnonymous ? "אורח זמני" : authUser?.email)}
             </div>
@@ -101,7 +108,7 @@ export default function UserProfile() {
           </div>
 
           <div className="bg-black/50 border border-white/10 rounded-2xl p-6 text-center min-w-[150px] z-10">
-            <div className="text-sm font-bold text-zinc-500 mb-1">XP נצבר</div>
+            <div className="text-sm font-bold text-zinc-400 mb-1">XP נצבר</div>
             <div className="text-4xl font-black drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]" style={{ color: accent.hex }}>{xp}</div>
             <button className="mt-4 text-xs font-bold text-white bg-white/10 hover:bg-white/20 w-full py-2 rounded-lg transition-colors">
               שחק בזירה 👾
@@ -158,7 +165,7 @@ export default function UserProfile() {
               </p>
               {!!taste?.rejected?.length && (
                 <div className="pt-4 mt-2 border-t border-white/5">
-                  <div className="text-xs text-zinc-500 font-bold mb-2">ומה שלא נמליץ לך לעולם:</div>
+                  <div className="text-xs text-zinc-400 font-bold mb-2">ומה שלא נמליץ לך לעולם:</div>
                   <div className="flex flex-wrap gap-2">
                     {taste.rejected.map(({ term }) => (
                       <span key={term} className="text-xs bg-white/5 border border-white/10 text-zinc-400 rounded-lg px-2 py-1">{term}</span>
@@ -224,6 +231,6 @@ export default function UserProfile() {
         </div>
 
       </div>
-    </main>
+    </div>
   );
 }

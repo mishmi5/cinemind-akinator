@@ -112,7 +112,7 @@ export default function DuelLobbyPage() {
 
         <div className="relative flex items-center py-5">
           <div className="flex-grow border-t border-zinc-800"></div>
-          <span className="flex-shrink-0 mx-4 text-zinc-500 text-sm">{t('or')}</span>
+          <span className="flex-shrink-0 mx-4 text-zinc-400 text-sm">{t('or')}</span>
           <div className="flex-grow border-t border-zinc-800"></div>
         </div>
 

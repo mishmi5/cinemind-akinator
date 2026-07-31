@@ -12,7 +12,7 @@ export default function TermsPage() {
       <div className="max-w-3xl mx-auto bg-zinc-900/50 p-8 md:p-12 rounded-3xl border border-zinc-800">
         <h1 className="text-4xl font-black text-white mb-8 text-center bg-gradient-to-l from-rose-500 to-indigo-500 bg-clip-text text-transparent">תקנון ותנאי שימוש (TOS)</h1>
 
-        <p className="text-center text-zinc-500 text-sm mb-8">עודכן לאחרונה: 27 ביולי 2026</p>
+        <p className="text-center text-zinc-400 text-sm mb-8">עודכן לאחרונה: 27 ביולי 2026</p>
 
         <div className="space-y-8 text-sm md:text-base leading-relaxed">
           <section>

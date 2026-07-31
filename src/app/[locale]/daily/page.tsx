@@ -110,7 +110,7 @@ export default function DailyChallengePage() {
         <p className="text-zinc-400 text-lg mb-10">{he ? 'דרגו לפני חצות והשוו את עצמכם לעולם.' : 'Rate before midnight and see how you compare.'}</p>
 
         {!data ? (
-          <div className="animate-pulse text-zinc-500 font-bold py-20">{he ? 'טוען את הסרט של היום...' : "Loading today's film..."}</div>
+          <div className="animate-pulse text-zinc-400 font-bold py-20">{he ? 'טוען את הסרט של היום...' : "Loading today's film..."}</div>
         ) : (
           <div className="bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div className="relative w-full h-[420px] bg-zinc-900">
@@ -138,12 +138,12 @@ export default function DailyChallengePage() {
                   <div className="flex items-center justify-center gap-8 mb-6">
                     <div className="text-center">
                       <div className="text-5xl font-black text-orange-400">{myRating}/5</div>
-                      <div className="text-zinc-500 text-sm font-bold mt-1">{he ? 'אתה' : 'You'}</div>
+                      <div className="text-zinc-400 text-sm font-bold mt-1">{he ? 'אתה' : 'You'}</div>
                     </div>
-                    <div className="text-3xl text-zinc-600 font-black">VS</div>
+                    <div className="text-3xl text-zinc-400 font-black">VS</div>
                     <div className="text-center">
                       <div className="text-5xl font-black text-cyan-400">{worldHalf.toFixed(1)}/5</div>
-                      <div className="text-zinc-500 text-sm font-bold mt-1">{he ? 'העולם' : 'The World'}</div>
+                      <div className="text-zinc-400 text-sm font-bold mt-1">{he ? 'העולם' : 'The World'}</div>
                     </div>
                   </div>
                   <p className="text-zinc-300 font-bold mb-6">
@@ -165,7 +165,7 @@ export default function DailyChallengePage() {
           </div>
         )}
 
-        <p className="text-zinc-600 text-xs font-bold mt-6 uppercase tracking-widest">
+        <p className="text-zinc-400 text-xs font-bold mt-6 uppercase tracking-widest">
           {he ? 'סרט חדש בכל חצות (שעון ישראל)' : 'New film every midnight (Israel time)'}
         </p>
       </div>

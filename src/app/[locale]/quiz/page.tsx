@@ -64,7 +64,7 @@ export default function QuizIntroPage() {
             <div className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
           </Link>
           
-          <p className="mt-4 text-[11px] font-medium text-zinc-600 tracking-wide">
+          <p className="mt-4 text-[11px] font-medium text-zinc-400 tracking-wide">
             {t('disclaimer')}
           </p>
         </div>
