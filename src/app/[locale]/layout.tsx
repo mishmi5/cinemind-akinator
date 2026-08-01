@@ -30,11 +30,12 @@ import { headers } from "next/headers";
 // TODO(owner): set NEXT_PUBLIC_SITE_URL in Netlify (production + previews).
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://cinemind.co.il";
 
-// TODO(owner): create public/og/og-default.png at 1200x630 — that exact path.
-// It is referenced below as the default share image for every page that has none
-// of its own. Until the file exists, WhatsApp/Facebook shares fall back to text.
-// The files under public/icons are square SVGs; those networks ignore them.
-const OG_DEFAULT = "/og/og-default.png";
+// The default share image is generated, not shipped: ./opengraph-image.tsx in this
+// segment. Next's file convention emits og:image + twitter:image (with type, width,
+// height and alt) for every page under /[locale] that has none of its own, and wins over
+// anything listed here, so it is left to do the job alone. Its URL is built from
+// metadataBase in production; in development Next forces it to localhost on purpose
+// (see getSocialImageMetadataBaseFallback in next/dist/lib/metadata/resolvers).
 
 // next-intl's proxy already computes the locale alternates for the current URL and
 // sends them as an HTTP `Link` header. A layout has no access to the pathname, so we
@@ -96,13 +97,11 @@ export async function generateMetadata(props: {
       siteName: "CineMind",
       locale: copy.locale,
       type: "website",
-      images: [{ url: OG_DEFAULT, width: 1200, height: 630, alt: "CineMind" }],
     },
     twitter: {
       card: "summary_large_image",
       title: copy.title,
       description: copy.social,
-      images: [OG_DEFAULT],
     },
     ...staticMetadata,
   };

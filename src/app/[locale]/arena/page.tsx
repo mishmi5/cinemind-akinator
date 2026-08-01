@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { Link } from '@/i18n/routing';
+import { useLocale, useTranslations } from 'next-intl';
 import questionsData from '@/data/arena-questions.json';
 
 // Helper to shuffle array
@@ -16,6 +17,8 @@ const shuffleArray = (array: any[]) => {
 };
 
 export default function ArenaPage() {
+  const locale = useLocale();
+  const t = useTranslations('Arena');
   const [spoilerAccepted, setSpoilerAccepted] = useState(false);
   const [inGame, setInGame] = useState(false);
 
@@ -42,7 +45,7 @@ export default function ArenaPage() {
     if (isAbsurd) {
       newScore = score + 50;
       setScore(newScore);
-      setFeedback("בול! ענית מטורלל! +50 XP 🤑");
+      setFeedback(t('feedback_right'));
 
       // Update XP globally
       const currentXp = parseInt(localStorage.getItem('cinemind_xp') || '0', 10);
@@ -53,7 +56,7 @@ export default function ArenaPage() {
     } else {
       newScore = Math.max(0, score - 20);
       setScore(newScore);
-      setFeedback("אוי לא! ענית עובדה נכונה... יורדים 20 נקודות 🤦‍♂️");
+      setFeedback(t('feedback_wrong'));
     }
 
     // Next question after a short delay
@@ -64,7 +67,7 @@ export default function ArenaPage() {
   };
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden">
+    <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden">
       <Navbar />
       
       {!spoilerAccepted ? (
@@ -73,18 +76,18 @@ export default function ArenaPage() {
           <div className="w-24 h-24 bg-orange-600/20 rounded-full flex items-center justify-center mb-6 border border-orange-500/30 shadow-[0_0_50px_rgba(249,115,22,0.3)]">
             <span className="text-5xl">⚠️</span>
           </div>
-          <h1 className="text-5xl font-black mb-4 uppercase tracking-tighter text-orange-500">אזהרת ספוילרים!</h1>
+          <h1 className="text-5xl font-black mb-4 uppercase tracking-tighter text-orange-500">{t('spoiler_title')}</h1>
           <p className="text-zinc-300 max-w-xl mx-auto mb-8 text-xl leading-relaxed">
-            אנחנו ממש ניסינו שלא, אבל יש מצב שתתקלו פה בספוילרים לסרטים. 
+            {t('spoiler_body_1')}
             <br />
-            שלא תגידו שלא הזהרנו, אנחנו לא משלמים על טיפולים פסיכולוגיים אם נהרוס לכם סרט שרציתם לראות מ-1994!
+            {t('spoiler_body_2')}
           </p>
           
           <button 
             onClick={() => setSpoilerAccepted(true)}
             className="px-10 py-4 bg-orange-600 hover:bg-orange-500 rounded-full font-bold text-xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(234,88,12,0.4)]"
           >
-            קראתי ואני לוקח סיכון 🫣
+            {t('spoiler_cta')}
           </button>
         </div>
       ) : !inGame ? (
@@ -95,9 +98,9 @@ export default function ArenaPage() {
           </div>
           <h1 className="text-5xl font-black mb-4 uppercase tracking-tighter">CineMind Arena</h1>
           <p className="text-zinc-400 max-w-lg mx-auto mb-8 text-lg">
-            ברוך הבא לזירה. משחק טריוויה לשחקן יחיד, וכל תשובה נכונה מוסיפה לך XP.
-            <br/><span className="text-rose-500 font-bold">החוק: 3 תשובות הן עובדות נכונות. רק התשובה המטורללת (השגויה) מעניקה נקודות!</span>
-            <br/><span className="text-zinc-400 text-sm">משחק מול יריב חי עוד לא קיים. נפתח אותו כשהוא יהיה מוכן.</span>
+            {t('lobby_intro')}
+            <br/><span className="text-rose-500 font-bold">{t('lobby_rule')}</span>
+            <br/><span className="text-zinc-400 text-sm">{t('lobby_note')}</span>
           </p>
 
           <div className="flex flex-col gap-4 items-center w-full mt-2">
@@ -105,13 +108,13 @@ export default function ArenaPage() {
               onClick={() => setInGame(true)}
               className="px-12 py-5 bg-gradient-to-r from-rose-500 to-purple-600 rounded-full font-black text-2xl hover:scale-105 transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)]"
             >
-              התחל משחק
+              {t('start')}
             </button>
             <Link 
               href="/arena/leaderboard"
               className="px-8 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full font-bold text-sm text-zinc-300 transition-all hover:text-white"
             >
-              🏆 טבלת המובילים (Leaderboard)
+              {t('leaderboard_link')}
             </Link>
           </div>
         </div>
@@ -122,7 +125,7 @@ export default function ArenaPage() {
           <div className="w-full max-w-4xl flex justify-center items-center mb-12 px-4 md:px-8">
             <div className="flex flex-col items-center">
               <div className="w-16 h-16 bg-blue-500 rounded-full border-4 border-white shadow-lg mb-2 flex items-center justify-center text-2xl">😎</div>
-              <span className="font-bold text-blue-400">אתה</span>
+              <span className="font-bold text-blue-400">{t('you')}</span>
               <span className="text-2xl font-black">{score} pts</span>
             </div>
           </div>
@@ -136,7 +139,7 @@ export default function ArenaPage() {
             )}
 
             <h2 className="text-3xl md:text-4xl font-black mb-4">{questionsData[questionIndex]?.question}</h2>
-            <p className="text-sm text-rose-400 font-bold mb-8">זכור: בחר את התשובה *המטורללת* כדי לנצח!</p>
+            <p className="text-sm text-rose-400 font-bold mb-8">{t('remember')}</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {currentAnswers.map((answer, i) => (

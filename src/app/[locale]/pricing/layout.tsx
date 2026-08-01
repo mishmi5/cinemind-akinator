@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
 
 // ponytail: page.tsx is a client component, so metadata has to live in a layout.
-export const metadata: Metadata = {
-  title: "כמה זה עולה",
-  description:
-    "החידון ושלוש ההמלצות שיוצאות ממנו חינם. משלמים רק אם רוצים שהטעם יישמר וימשיכו להגיע המלצות — ₪99 פעם אחת, בלי חיוב חוזר.",
+// The English locale was served Hebrew titles and descriptions under lang="en", which is
+// what makes Google misread the language of the whole site.
+const COPY = {
+  he: { title: "כמה זה עולה", description: "החידון ושלוש ההמלצות שיוצאות ממנו חינם. משלמים רק אם רוצים שהטעם יישמר וימשיכו להגיע המלצות — ₪99 פעם אחת, בלי חיוב חוזר." },
+  en: { title: "Pricing", description: "The quiz and the three films it produces are free. You pay only to keep your taste profile and keep the recommendations coming — ₪99 once, no recurring charge." },
 };
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ locale: string }> },
+): Promise<Metadata> {
+  const { locale } = await params;
+  return COPY[locale === 'en' ? 'en' : 'he'];
+}
 
 // Keep in sync with the fallback in src/app/[locale]/layout.tsx.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://cinemind.co.il";

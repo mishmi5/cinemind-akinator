@@ -29,7 +29,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const description = isHe
     ? `יצא לו ${card.archetype}. תראו מה CineMind אמר עליו.`
     // Every archetype name already starts with "The" (see ROAST_TEMPLATES), so no article here.
-    : `They came out ${card.archetype}. See what CineMind said.`;
+    : `They're ${card.archetype}. See what CineMind said.`;
 
   return {
     title,

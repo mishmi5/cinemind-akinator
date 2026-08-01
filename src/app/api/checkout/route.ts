@@ -1,26 +1,13 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS } from '@/types/firebase';
-import Stripe from 'stripe';
+import { getStripe } from '@/lib/stripe';
 
 // One paid plan. 'founder' — ₪99 once, lifetime access, capped at 200 seats.
 const VALID_PLAN_TYPES = ['founder'] as const;
 type PlanType = typeof VALID_PLAN_TYPES[number];
 
 const FOUNDER_PRICE_AGOROT = 9900; // ₪99.00, VAT included
-
-// Lazy init: constructing Stripe at module scope throws when STRIPE_SECRET_KEY
-// is unset, which crashes `next build` during page-data collection.
-let stripeClient: Stripe | null = null;
-function getStripe(): Stripe | null {
-  if (!process.env.STRIPE_SECRET_KEY) return null;
-  if (!stripeClient) {
-    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2026-05-27.dahlia',
-    });
-  }
-  return stripeClient;
-}
 
 // The request's own origin wins over the env var: a stale NEXT_PUBLIC_BASE_URL
 // (it is http://localhost:3000 in .env.local) must never send a paying customer
@@ -62,6 +49,10 @@ export async function POST(req: Request) {
 
     // Who is buying. Without this the webhook has nobody to grant access to — the payment lands
     // and no account becomes a founder.
+    // TODO(owner): src/app/[locale]/pricing/page.tsx does NOT send uid today, so every session is
+    // created anonymous and the webhook has nobody to grant to. The success page reconciliation
+    // covers it (it binds the session to the signed-in caller), but the webhook path stays blind
+    // until pricing sends `uid: user.uid`. One line there, and both paths work.
     const uid = typeof body.uid === 'string' && body.uid.length > 0 ? body.uid : undefined;
 
     // THE 200 SEATS ARE A PROMISE, so they have to be enforced somewhere. The pricing page said
@@ -98,7 +89,11 @@ export async function POST(req: Request) {
       ],
       client_reference_id: uid,
       metadata: uid ? { uid } : undefined,
-      success_url: `${baseUrl}/scan?success=true`,
+      // {CHECKOUT_SESSION_ID} is substituted by Stripe. The success page posts it to
+      // /api/checkout/verify, which asks Stripe whether the money actually arrived and grants the
+      // seat if the webhook did not. Without this the success page is a cosmetic string and a
+      // missing webhook means ₪99 taken with nothing granted.
+      success_url: `${baseUrl}/purchase?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/pricing?canceled=true`,
     });
 
