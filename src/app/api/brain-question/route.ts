@@ -454,8 +454,13 @@ export async function POST(req: Request) {
     // One of each is enough. Waiting for two meant a child was shown The Ring at question two,
     // and there is no upside to being slow about this: an adult who happens to love a family film
     // and dislike one thriller loses nothing but a few horror questions.
-    const kidsMode = familyLove >= 1 && scaryReject >= 1
-      && !history.some(h => h.rating >= HI && h.genres.includes('Horror'));
+    // Requiring a REJECTED scary film as well was wrong: once the sweep learned to stop offering
+    // horror, a children's profile never rejected anything scary — and the mode that protects it
+    // switched off, so the run came back recommending Evangelion and Gundam again. The love is the
+    // signal on its own. Two family films rated high, and nothing scary rated high, is a child's
+    // profile; one of each still qualifies when they did reject something.
+    const kidsMode = !history.some(h => h.rating >= HI && h.genres.includes('Horror'))
+      && (familyLove >= 2 || (familyLove >= 1 && scaryReject >= 1));
     const unsafeForKids = (c: { id: string; _genreIds?: number[] }) => {
       if (!kidsMode) return false;
       const t = samplerProbeOf(c.id);
