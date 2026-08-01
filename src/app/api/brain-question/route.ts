@@ -97,6 +97,22 @@ const familyOfGenres = (ids?: number[]): string | undefined => {
   return undefined;
 };
 
+// The same mapping as familyOfGenres, for the human-readable genre names the rating history
+// carries (it stores "Horror", not 27).
+const familyOfGenreNames = (names?: string[]): string | undefined => {
+  const n = names || [];
+  if (n.includes('Horror')) return 'horror';
+  if (n.includes('Animation')) return 'animation';
+  if (n.includes('Comedy')) return 'comedy';
+  if (n.includes('Sci-Fi')) return 'scifi';
+  if (n.includes('Western')) return 'western';
+  if (n.includes('Crime') || n.includes('Thriller') || n.includes('Mystery')) return 'crime';
+  if (n.includes('Fantasy')) return 'fantasy';
+  if (n.includes('War') || n.includes('Action')) return 'action';
+  if (n.includes('Drama')) return 'drama';
+  return undefined;
+};
+
 const CONTENDER_AVG = 4.5; // a 5★-level love; close contenders at/above this drill-off
 
 // Stable per-session pseudo-random rank (FNV-1a). Seeds the EXPLORE sweep ORDER off the
@@ -546,20 +562,43 @@ export async function POST(req: Request) {
       const leadFam = leader ? subGenreFamily(leader.t) : undefined;
       const inLeadFam = (c: { id: string }) =>
         leadFam && subGenreFamily(samplerProbeOf(c.id) || '') === leadFam ? 0 : 1;
-      // BOREDOM. Fifty simulated first customers were run through the quiz and ten of them left
-      // between questions 5 and 9 — not because anything was broken, but because the sweep serves
-      // one blockbuster per family and a niche viewer therefore sits through a run of films they
-      // do not care about before anything speaks to them. After two low answers in a row, prefer
-      // a family they have not already rejected.
+      // BOREDOM — the one thing that still ends a session in the first ten questions. The sweep
+      // serves one blockbuster per family, so a niche viewer sits through a run of films that mean
+      // nothing to them before anything lands: a 59-year-old who watches musicals was handed
+      // Memento, and a viewer who likes slow drama got The Polar Express. Six of fifty simulated
+      // customers left that way between questions five and ten.
+      //
+      // A rejection is a signal from the FIRST one, not the third, and it says something about the
+      // whole neighbourhood: someone who turns down a crime film is more likely to turn down the
+      // thriller next door than a musical. So a rejected family is avoided, its adjacent families
+      // are discounted, and — while the opening is still finding its feet — the family of the film
+      // just refused is pushed to the back of the queue outright.
       const coldFams = new Set<string>();
       for (const [t, v] of Object.entries(probe)) {
         const f = subGenreFamily(t); if (f && !v.hi && v.sum / v.n <= 2) coldFams.add(f);
       }
       const lowRun = (() => { let k = 0; for (let i = history.length - 1; i >= 0; i--) { if (history[i].rating <= 2) k++; else break; } return k; })();
+      // The family of the film they refused most recently.
+      const lastRefusedFam = (() => {
+        const last = history[history.length - 1];
+        if (!last || last.rating > 2) return undefined;
+        return familyOfGenreNames(last.genres);
+      })();
+      // Measured, not assumed. Discounting the NEIGHBOURS of a rejected family as well removed all
+      // six early walk-outs but starved the sweep of information: the quiz grew by three questions
+      // and more people simply ran out of patience instead — 70% abandonment became 76%. Avoiding
+      // what they actually refused is the part that pays; the neighbourhood guess is not. And it
+      // only applies while the opening is still finding its feet, because after that the leader's
+      // family is steering anyway.
       const boredomPenalty = (c: { id: string }) => {
-        if (lowRun < 2) return 0;
         const f = subGenreFamily(samplerProbeOf(c.id) || '');
-        return f && coldFams.has(f) ? 1 : 0;
+        if (!f) return 0;
+        // Never follow a refusal with more of the same shelf — one question's worth of memory,
+        // which costs the sweep nothing.
+        if (lowRun >= 1 && f === lastRefusedFam) return 1;
+        // And after two refusals in a row, stop offering shelves they have already turned down.
+        if (lowRun >= 2 && coldFams.has(f)) return 2;
+        return 0;
       };
       // ERA. A 62-year-old answered "didn't see" three times in a row on recent blockbusters and
       // left; a 19-year-old did the same on films from the seventies. Two skips in one direction
