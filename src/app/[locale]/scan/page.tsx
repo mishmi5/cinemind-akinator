@@ -406,6 +406,13 @@ export default function ScanMovieEvaluation() {
         setLoading(false);
       }, 300);
     } catch (error) {
+      // The vote was swallowed: after two retries the star simply stopped glowing, the same film
+      // stayed on screen, and nothing told the user their answer had not been recorded. They
+      // clicked again into a dead control. Say what happened and let them retry.
+      console.error('[scan] answer failed', error);
+      showToast([locale === 'he'
+        ? 'התשובה לא נשלחה — כנראה החיבור. אפשר ללחוץ שוב על אותו דירוג.'
+        : "That answer didn't reach us — probably the connection. Tap the same rating again."], '📡');
       setLoading(false);
       setAnimateCard(false);
     }
