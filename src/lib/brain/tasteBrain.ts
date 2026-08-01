@@ -229,9 +229,40 @@ sub-genre. tasteSummary must name the precise loved sub-genre.`;
 // models drift into Chinese/French mid-sentence). The model writes ONLY the prose reason
 // over an already-chosen film — it never picks the film, so it can't break the surgical
 // selection. Falls back to a clean template if the model is unavailable.
+// The sub-genre names the engine works in are English, and they were being printed inside Hebrew
+// sentences on the results screen: "בחירה קלאסית ומדויקת בסגנון spaghetti western", "כי אם אתה
+// אוהב found-footage horror". Twenty-three of forty test quizzes ended with a line like that. The
+// engine keeps its English terms; the customer reads Hebrew.
+const HE_TERM: Record<string, string> = {
+  'giallo': "ג'אלו איטלקי", 'slasher': 'סלאשר', 'splatter horror comedy': 'אימה-קומדיה עקובה מדם',
+  'body horror': 'אימת גוף', 'zombie': 'זומבים', 'creature feature': 'מפלצות',
+  'kaiju monster': 'מפלצות ענק', 'cosmic horror': 'אימה קוסמית',
+  'found-footage horror': 'אימה בסגנון תיעוד מצולם', 'psychological horror': 'אימה פסיכולוגית',
+  'supernatural horror': 'אימה על-טבעית', 'cosmic sci-fi epic': 'מד"ב חללי אפי',
+  'hard science fiction': 'מד"ב קשה', 'cyberpunk': 'סייברפאנק', 'time travel': 'מסע בזמן',
+  'space opera': 'אופרת חלל', 'stop-motion animation': 'אנימציית סטופ-מושן',
+  'mecha anime': 'אנימת רובוטים', 'hand-drawn anime': 'אנימה מצוירת ביד',
+  'wuxia': 'ווקסיה', 'martial arts': 'אמנויות לחימה', 'heist': 'סרטי שוד',
+  'war epic': 'אפוס מלחמה', 'superhero': 'גיבורי-על', 'disaster': 'סרטי אסון',
+  'spaghetti western': 'מערבון ספגטי', 'classic film noir': 'פילם נואר קלאסי',
+  'psychological thriller': 'מותחן פסיכולוגי', 'whodunit mystery': 'תעלומת בלשים',
+  'neo-noir': 'ניאו-נואר', 'cerebral spy thriller': 'מותחן ריגול איטי',
+  'action spy thriller': 'מותחן ריגול אקשן', 'courtroom drama': 'דרמה משפטית',
+  'erotic thriller': 'מותחן ארוטי', 'satire': 'סאטירה', 'black comedy': 'קומדיה שחורה',
+  'deadpan comedy': 'קומדיה מאופקת', 'slapstick comedy': 'קומדיית סלפסטיק',
+  'romantic comedy': 'קומדיה רומנטית', 'holiday christmas': 'סרטי חג',
+  'coming-of-age': 'סרטי התבגרות', 'period costume drama': 'דרמה תקופתית',
+  'sports drama': 'דרמת ספורט', 'slow cinema arthouse': 'קולנוע איטי ארטהאוס',
+  'musical': 'מחזמר', 'epic high fantasy': 'פנטזיה אפית',
+  'sword and sorcery fantasy': 'פנטזיית חרב וכישוף',
+};
+export const termInLocale = (term: string, locale: string) =>
+  locale === 'he' ? (HE_TERM[term] || term) : term;
+
 export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string }): Promise<string> {
   const { title, year, term, locale, mock, genres = [], overview = '' } = opts;
-  const fallback = locale === 'he' ? `בחירה קלאסית ומדויקת בסגנון ${term}` : `A canonical ${term} pick`;
+  const heTerm = termInLocale(term, locale);
+  const fallback = locale === 'he' ? `בחירה קלאסית ומדויקת בסגנון ${heTerm}` : `A canonical ${term} pick`;
   if (mock) return fallback;
   const model = tasteModel();
   if (!model) return fallback;
@@ -244,10 +275,10 @@ export async function recReason(opts: { title: string; year?: string; term: stri
   const factsEn = [genres.length ? `Genres: ${genres.join(', ')}` : '', overview ? `Synopsis: ${overview.slice(0, 300)}` : '']
     .filter(Boolean).join(' · ');
   const prompt = locale === 'he'
-    ? `המשתמש אוהב סרטי ${term}. הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
+    ? `המשתמש אוהב סרטי ${heTerm}. הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
 ${facts}
 
-כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה מי שאוהב ${term} יתחבר לסרט הזה.
+כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה מי שאוהב ${heTerm} יתחבר לסרט הזה.
 חוקים: אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב"). התחל במילים "כי" או "אם".
 החזר רק את המשפט עצמו.`
     : `The user loves ${term} films. Facts about "${title}"${year ? ` (${year})` : ''}:
@@ -265,7 +296,9 @@ In ONE short natural sentence, explain why they'll love it. Use ONLY the facts a
     // "spaghetti western" was thrown away and the second and third cards fell back to the
     // template while the first got a real reason. Ignore the term and the title, then check.
     // Splitting on non-alphanumerics means every allowed word is already regex-safe.
-    const allowed = [term, title].join(' ').split(/[^A-Za-z0-9]+/).filter(w => w.length > 1);
+    // Only the film's own NAME may stay Latin. The term used to be whitelisted here too, which is
+    // how the English sub-genre name got a free pass into the Hebrew sentence.
+    const allowed = String(title).split(/[^A-Za-z0-9]+/).filter(w => w.length > 1);
     const stripped = allowed.length ? clean.replace(new RegExp(allowed.join('|'), 'gi'), '') : clean;
     if (locale === 'he' && /[A-Za-z]/.test(stripped)) return fallback;
     return clean.slice(0, 240) || fallback;

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getSession, startSession, saveSession, isVerified } from '@/lib/brain/sessionStore';
-import { recReason, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
+import { recReason, directRecs, termInLocale, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
 import { allSubGenreTerms, fetchCandidatePool, fetchFamilyPool, fetchPoolByHint, fetchSeedCandidates, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
 
@@ -599,7 +599,11 @@ export async function POST(req: Request) {
         // 1. Unasked curated exemplars inside the focus family.
         ['inFam', async () => byCover(gate(samplerAll).filter(c => focusFam && famOf(c) === focusFam))],
         // 2. The focus sub-genre's own canonical films.
-        ['seeds', async () => focusTerm ? gate(await fetchSeedCandidates(focusTerm, seen, 8)) : []],
+        // Only HALF the curated list may be spent on questions. A seventy-question quiz burned all
+        // eight of a term's canonical films as questions, and the recommendation stage then had
+        // nothing of its own left and fell through to the family shelf — a musical fan was handed
+        // Goodfellas at 99%. The other half is the answer, not the question.
+        ['seeds', async () => focusTerm ? gate(await fetchSeedCandidates(focusTerm, seen, 4)) : []],
         // 3. Its sibling sub-genres — same family, still the right shelf.
         ['kinSeeds', async () => {
           if (!focusFam) return [];
@@ -607,7 +611,7 @@ export async function POST(req: Request) {
           for (const t of allSubGenreTerms()) {
             if (out.length >= 8) break;
             if (t === focusTerm || subGenreFamily(t) !== focusFam || disliked.includes(t)) continue;
-            out = out.concat(gate(await fetchSeedCandidates(t, seen, 4)));
+            out = out.concat(gate(await fetchSeedCandidates(t, seen, 2)));
           }
           return out;
         }],
@@ -1037,7 +1041,10 @@ export async function POST(req: Request) {
       matchScore: Math.max(60, Math.round((lockedLove ? 99 : Math.min(95, confidence * 100)) - i * 4)),
       posterUrl: p.posterUrl, trailerId: p.trailerId, overview: p.overview,
       _genreIds: p._genreIds,
-      reason: reasons[i] || (confirmedTerm ? `A canonical ${confirmedTerm} pick` : ''),
+      // The last-resort line was English on a Hebrew screen.
+      reason: reasons[i] || (confirmedTerm
+        ? (locale === 'he' ? `בחירה קלאסית בסגנון ${termInLocale(confirmedTerm, locale)}` : `A canonical ${confirmedTerm} pick`)
+        : ''),
       watch: watch[i] || null, // where to actually watch it in Israel
     }));
 
