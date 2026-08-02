@@ -26,13 +26,13 @@ const COPY = {
     // wraps it the LINES come out in the wrong order too — the sentence read bottom-up. Each line
     // is reversed on its own and stacked in reading order.
     tagline: ['הפסקת לנחש.', 'התחלת לראות.'].map(visual),
-    sub: ['שלוש שאלות, ואתה מקבל', 'את הסרט שבאמת בא לך הערב.'].map(visual),
+    sub: ['מדרגים סרטים שכבר ראיתם, ומקבלים', 'את הסרט שבאמת בא לכם הערב.'].map(visual),
     kicker: visual('מנוע המלצות קולנועי'),
   },
   en: {
     dir: 'ltr' as const,
     tagline: ['Stop guessing.', 'Start watching.'],
-    sub: ['Three questions, and you get', 'the film you actually want tonight.'],
+    sub: ['Rate films you have seen, and get', 'the film you actually want tonight.'],
     kicker: 'Cinematic recommendation engine',
   },
 };

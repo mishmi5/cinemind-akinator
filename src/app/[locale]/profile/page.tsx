@@ -7,7 +7,17 @@ import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
+// The value stored on the profile stays stable in English; only what the user reads is translated.
+// A Hebrew visitor was picking their own title from a list written entirely in Latin script.
 const TITLES = ["Master of Horror", "Space Explorer", "Action Hero", "Comedy Genius", "Drama Queen", "Cinematic Architect"];
+const TITLE_HE: Record<string, string> = {
+  "Master of Horror": "אלוף האימה",
+  "Space Explorer": "חוקר החלל",
+  "Action Hero": "גיבור אקשן",
+  "Comedy Genius": "גאון הקומדיה",
+  "Drama Queen": "מלכת הדרמה",
+  "Cinematic Architect": "אדריכל קולנועי",
+};
 const COLORS = [
   { id: 'indigo', name: 'Cyber Blue', hex: '#6366f1', glow: 'rgba(99,102,241,0.4)', bg: 'bg-indigo-500' },
   { id: 'rose', name: 'Neon Red', hex: '#f43f5e', glow: 'rgba(244,63,94,0.4)', bg: 'bg-rose-500' },
@@ -94,7 +104,7 @@ export default function UserProfile() {
 
           <div className="flex-1 text-center md:text-right z-10">
             <h1 className="text-4xl font-black mb-1">{authUser?.displayName || authUser?.email?.split('@')[0] || (taste?.hasProfile ? 'הפרופיל שלך' : 'אורח')}</h1>
-            <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{title}</div>
+            <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{locale === 'he' ? (TITLE_HE[title] || title) : title}</div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold mb-2">
               👑 {taste?.isPremium ? 'CineMind Elite' : 'חשבון חינם'}
             </div>
@@ -192,7 +202,7 @@ export default function UserProfile() {
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-white/30 transition-colors"
               >
-                {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                {TITLES.map(t => <option key={t} value={t}>{locale === 'he' ? (TITLE_HE[t] || t) : t}</option>)}
               </select>
             </div>
 

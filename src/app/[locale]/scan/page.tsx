@@ -139,6 +139,10 @@ export default function ScanMovieEvaluation() {
   // a new quiz doesn't repeat the last one's movies (cross-quiz variety).
   const recentRef = useRef<string[]>([]);
   const maxProgressRef = useRef(0);
+  // The row the user answers with. Sizing alone cannot guarantee it is on screen — a 1280x720
+  // laptop viewport still ends 100px short of it — so whenever a new film arrives we make sure
+  // the controls are actually visible instead of trusting the layout math.
+  const answerRowRef = useRef<HTMLDivElement | null>(null);
 
   // E2E probe: mirror the FULL live session to window so the persona swarms can read the
   // served question (currentQuestion), the final picks (finalMovies) and the rated clock
@@ -223,6 +227,22 @@ export default function ScanMovieEvaluation() {
       else localStorage.setItem(RESUME_KEY, JSON.stringify({ at: Date.now(), state: session }));
     } catch { /* private mode / quota — resuming is a bonus, never a hard dependency */ }
   }, [session]);
+
+  // KEEP THE ANSWER CONTROLS ON SCREEN. Every viewport that pushed the star row below the fold
+  // turned a rating click into a click on the poster: nothing happened, no request was sent, and
+  // the film just sat there. Shrinking the card fixed the phone, but a 1280x720 laptop still ends
+  // ~100px above the stars, and no fixed size survives every window. So after each new film, if
+  // the row is not fully visible, bring it into view.
+  useEffect(() => {
+    if (!session || session.isComplete) return;
+    const el = answerRowRef.current;
+    if (!el) return;
+    const id = setTimeout(() => {
+      const r = el.getBoundingClientRect();
+      if (r.bottom > window.innerHeight) el.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    }, 350);
+    return () => clearTimeout(id);
+  }, [session?.currentQuestion?.id, session?.isComplete]);
 
   // Keep the local AI (gemma2:9b) loaded the whole time the user is on the quiz: ping the
   // warm endpoint on mount and every 4 min so the model stays resident in VRAM (keep_alive:-1)
@@ -574,7 +594,7 @@ export default function ScanMovieEvaluation() {
         <div className="flex items-center gap-6 text-sm font-medium text-zinc-400"><Link href="/arena" className="hover:text-rose-400 font-bold transition-colors text-base">👾 {tNav('arena')}</Link><span className="text-zinc-400">{t('anonymous')}</span></div>
       </nav>
 
-      <div id="main-content" className="w-full max-w-5xl mx-auto px-4 mt-8 mb-4 flex items-center justify-between">
+      <div id="main-content" className="w-full max-w-5xl mx-auto px-4 mt-4 md:mt-8 mb-2 md:mb-4 flex items-center justify-between">
         <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden me-6">
           {/* start-anchored so the bar grows from the side the locale reads from: right in Hebrew,
               left in English (it used to be pinned to the physical right in both). */}
@@ -583,7 +603,7 @@ export default function ScanMovieEvaluation() {
         <span className="text-rose-500 font-black text-sm">{confidencePercentage}%</span>
       </div>
 
-      <div className="w-full max-w-5xl mx-auto px-4 mb-6 flex justify-between items-center text-sm font-bold">
+      <div className="w-full max-w-5xl mx-auto px-4 mb-3 md:mb-6 flex justify-between items-center text-sm font-bold">
         {combo > 0 ? (
           <div className="text-rose-500 font-black animate-bounce text-base drop-shadow-[0_0_10px_rgba(225,29,72,0.5)]">🔥 Combo {combo}</div>
         ) : <div />}
@@ -748,10 +768,13 @@ export default function ScanMovieEvaluation() {
               className={`w-full bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl relative transition-all duration-300 ${animateCard ? 'opacity-0 -translate-x-10 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}
             >
 
-              {/* On a 390x844 phone the poster at 55vh pushed the star row to y=905 — below the
-                  fold, so the first thing a mobile visitor saw was a film and no way to answer it.
-                  42vh lands the stars inside the first screen; the desktop size is unchanged. */}
-              <div className="relative w-full h-[42vh] min-h-[280px] max-h-[550px] md:h-[650px] md:max-h-none bg-zinc-900">
+              {/* The answer controls must be on the first screen, on every screen. Fixed poster
+                  heights kept pushing them off: 55vh put the star row at y=905 on a 390x844 phone,
+                  42vh still landed it at y=824 on a 375x812 one, and the desktop md:h-[650px] put
+                  it at y=1129 inside a 720px-tall laptop viewport — 409px below the fold, so a
+                  click aimed at a star hit the poster and nothing happened. Both sizes are now
+                  bounded by the viewport, so the poster shrinks before the controls leave. */}
+              <div className="relative w-full h-[34vh] min-h-[200px] max-h-[420px] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-zinc-900">
                 <ImageWithFallback
                   src={cardMovie?.posterUrl || ''}
                   alt={cardMovie?.title ? (he ? `כרזת ${cardMovie.title}` : `${cardMovie.title} poster`) : ''}
@@ -768,18 +791,18 @@ export default function ScanMovieEvaluation() {
                 </div>
               </div>
 
-              <div className="px-6 md:px-8 pb-10 relative z-10 -mt-20 md:-mt-24 text-center">
+              <div className="px-6 md:px-8 pb-5 md:pb-10 relative z-10 -mt-20 md:-mt-24 text-center">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{cardMovie?.title}</h1>
                 <p className="text-xs text-zinc-300 font-mono mb-5 uppercase tracking-[0.2em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.originalDetails}</p>
                 <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
                 
-                <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-5 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[90px] md:min-h-[100px] leading-tight">
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-4 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[72px] md:min-h-[100px] leading-tight">
                   {session.currentQuestion?.text}
                 </div>
               </div>
             </div>
 
-            <div className={`w-full mt-10 flex flex-col items-center transition-opacity duration-300 ${animateCard ? 'opacity-0' : 'opacity-100'}`}>
+            <div ref={answerRowRef} className={`w-full mt-5 md:mt-10 flex flex-col items-center transition-opacity duration-300 ${animateCard ? 'opacity-0' : 'opacity-100'}`}>
               
               {dynamicPhrase && (
                 <div className="text-sm text-zinc-400 flex items-center gap-2 mb-8 animate-in fade-in duration-500 font-medium">
@@ -790,7 +813,7 @@ export default function ScanMovieEvaluation() {
               {/* Labels above, not beside: five 56px stars plus gaps leave ~46px for two words on
                   a 360px phone, and "אוהב" was measured at x=-35 — off screen, hidden silently by
                   overflow-x-hidden. The user saw one label and had to guess the other end. */}
-              <div className="w-full flex flex-col items-center px-4 mb-6">
+              <div className="w-full flex flex-col items-center px-4 mb-3 md:mb-6">
                 <div className="w-full max-w-sm flex justify-between items-center mb-2">
                   <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{t('hate')}</span>
                   <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{t('love')}</span>
@@ -819,7 +842,7 @@ export default function ScanMovieEvaluation() {
                 </div>
               </div>
               
-              <div className="flex gap-4 mt-6">
+              <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-3 md:mt-6">
                 <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                   {t('not_seen')} <span>{locale === 'he' ? '›' : '‹'}</span>
                 </button>

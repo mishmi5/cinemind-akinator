@@ -3,7 +3,10 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import tickerSentences from '@/data/ticker-sentences.json';
+// The banner above the fold used to be Hebrew on the English site — the very first line an
+// English visitor read was in a script they may not know.
+import tickerHe from '@/data/ticker-sentences.json';
+import tickerEn from '@/data/ticker-sentences.en.json';
 
 interface MoviePoster {
   id: number;
@@ -36,6 +39,7 @@ import { useTranslations, useLocale } from 'next-intl';
 export default function LandingPage() {
   const locale = useLocale();
   const t = useTranslations('Index');
+  const tickerSentences = locale === 'en' ? tickerEn : tickerHe;
   const [ticker, setTicker] = useState(tickerSentences[0]);
   const [displayMovies, setDisplayMovies] = useState<MoviePoster[]>([]);
   const [postersLoading, setPostersLoading] = useState(true);
@@ -77,7 +81,7 @@ export default function LandingPage() {
       setTicker(messages[i]);
     }, 9000); // 9 seconds per message so it's easily readable
     return () => clearInterval(interval);
-  }, []);
+  }, [tickerSentences]);
 
   const getNextBackup = useCallback((): MoviePoster | null => {
     if (backupQueue.current.length > 0) {
@@ -106,18 +110,22 @@ export default function LandingPage() {
         <div className="bg-black/40 border border-white/10 rounded-[2rem] p-8 md:p-12 mb-12 w-full max-w-3xl backdrop-blur-md shadow-2xl relative overflow-hidden flex flex-col items-center">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[100px]"></div>
           
-          {/* The subtitle is already the <h2> directly above this card — repeating it here
-              printed the same sentence twice on the landing page. */}
-          <p className="text-zinc-400 leading-relaxed mb-10 relative z-10 text-lg text-center whitespace-pre-wrap">
-            {t('description')}
-          </p>
-          
-          <Link 
+          {/* The button comes BEFORE the riff. Below it, the paragraph ran seven lines on a phone
+              and pushed the only call to action on the landing page to y=867 in an 812px viewport —
+              a visitor's first screen was a wall of text with nothing to press. The copy is
+              unchanged; it now reads as what it is, the pitch under the button. */}
+          <Link
             href="/quiz"
             className="group relative inline-flex items-center justify-center gap-2 px-10 py-5 bg-gradient-to-r from-rose-500 to-red-600 rounded-2xl text-white font-bold text-xl hover:from-rose-400 hover:to-red-500 transition-all duration-300 shadow-[0_0_30px_rgba(225,29,72,0.3)] hover:shadow-[0_0_50px_rgba(225,29,72,0.5)] active:scale-95 z-10"
           >
             <span>{t('cta')}</span>
           </Link>
+
+          {/* The subtitle is already the <h2> directly above this card — repeating it here
+              printed the same sentence twice on the landing page. */}
+          <p className="text-zinc-400 leading-relaxed mt-8 relative z-10 text-lg text-center whitespace-pre-wrap">
+            {t('description')}
+          </p>
         </div>
 
         {/* Dynamic Carousel - Hermetically Protected */}

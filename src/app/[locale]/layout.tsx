@@ -57,17 +57,17 @@ const COPY = {
   he: {
     title: "CineMind — הפסקת לנחש. התחלת לראות.",
     description:
-      "מנוע המלצות קולנועי מבוסס AI שמפענח את ה-DNA הקולנועי שלך תוך 3 שאלות. דיוק כירורגי ברמת מיקרו-ז'אנר.",
+      "מנוע המלצות קולנועי מבוסס AI שקורא את הטעם שלך מסרטים שכבר ראית, ועוצר ברגע שהוא בטוח. דיוק ברמת תת-ז'אנר.",
     social:
-      "מנוע המלצות שמפענח את הטעם הקולנועי שלך תוך שלוש שאלות ומביא לך בדיוק את הסרט הבא.",
+      "מדרגים סרטים שכבר ראיתם, והמנוע עוצר ברגע שהוא בטוח — ומביא בדיוק את הסרט הבא.",
     locale: "he_IL",
   },
   en: {
     title: "CineMind — Stop guessing. Start watching.",
     description:
-      "An AI recommendation engine that reads your cinematic DNA in three questions and answers at micro-genre resolution.",
+      "An AI recommendation engine that reads your taste from films you have already seen, and stops the moment it is sure. Sub-genre resolution.",
     social:
-      "Three questions, and you get the film you actually want to watch tonight.",
+      "Rate films you have already seen. The engine stops when it is sure, and hands you the next one.",
     locale: "en_US",
   },
 } as const;

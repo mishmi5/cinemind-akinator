@@ -135,7 +135,12 @@ function PurchaseInner() {
           {state.kind === 'no-session' && (
             <>
               <h1 className="text-3xl font-black mb-4">אין כאן רכישה לבדוק</h1>
-              <p className="text-zinc-300 mb-6">הגעת לדף הזה בלי מזהה עסקה. אם רכשת ולא קיבלת גישה, כתוב לנו.</p>
+              {/* "כתוב לנו" with nothing to write to: every other branch on this page gives the
+                  address, this one left someone who had paid and had no access at a dead end. */}
+              <p className="text-zinc-300 mb-6">
+                הגעת לדף הזה בלי מזהה עסקה. אם רכשת ולא קיבלת גישה, כתוב לנו ל־
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 underline">{SUPPORT_EMAIL}</a>.
+              </p>
               <Link href="/pricing" className="px-6 py-3 rounded-full border border-zinc-700 inline-block">
                 לעמוד הרכישה
               </Link>
