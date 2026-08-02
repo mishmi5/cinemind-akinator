@@ -636,6 +636,10 @@ export async function POST(req: Request) {
       // leftovers through the middle of the quiz instead, and the westerns fan ran 32-63 questions
       // instead of 22-37 — a shorter window made the quiz longer.
       const coverageTurn = history.length < 16 && history.length % 2 === 1;
+      // Serving a broad crowd-pleaser after three refusals was measured and rejected: a blockbuster
+      // is not relief to someone with a narrow taste — a musical fan turns down Jurassic Park too —
+      // so the walk-outs it targeted went UP (6 to 11 of fifty) while the shallower probing cost
+      // the read itself, 100% correct down to 92%. The niche probe stays.
       const nextUp = [...uncovered].sort((a, b) =>
         (boredomPenalty(a) - boredomPenalty(b)) ||
         (coverageTurn ? famNeverAsked(a) - famNeverAsked(b) : 0) ||
@@ -762,7 +766,14 @@ export async function POST(req: Request) {
     const creep = Math.min(1, history.length / 50);
     // Small creep weight so it gives gentle forward motion WITHOUT masking a real DROP when an
     // answer adds uncertainty (a leader contradiction lowers leaderStrength + contraPenalty).
-    const blended = Math.min(0.99, 0.28 * sweepProgress + 0.28 * ratedProgress + 0.41 * leaderStrength + 0.03 * creep);
+    // Weighted toward what the meter is actually FOR. A traced slasher fan sat at 53% at question
+    // 25 with the read long since settled — sweep coverage and raw answer count were holding two
+    // thirds of the meter down while the only thing that had changed for twenty questions was the
+    // leader getting stronger. The meter then needed nine more questions purely to ramp to the 96
+    // completion gate: nine films a customer rated so a progress bar could catch up with what the
+    // engine already knew. Leader strength now carries the meter, coverage and count are the
+    // background motion they were meant to be.
+    const blended = Math.min(0.99, 0.18 * sweepProgress + 0.16 * ratedProgress + 0.63 * leaderStrength + 0.03 * creep);
     // A CONFIRMED lock is genuine high confidence — the leader out-hit its rivals and they were
     // drilled. Holding the blend low after that (sweep coverage is still partial by design once
     // narrowing engages) forced ~14 extra questions of pure ramp before the 96 gate, which is why
@@ -889,8 +900,23 @@ export async function POST(req: Request) {
         }
         movie.trailerId = await getTrailer(movie.id);
         const tasteSummary = lockedLove ? `Confirming: ${lockedLove.t}` : leader ? `Closing in on: ${leader.t}` : 'Mapping your taste…';
+        // Whether stopping RIGHT NOW would still produce a recommendation worth having. The quiz
+        // already lets anyone stop from question five, but the button says nothing about what they
+        // would get, so a tiring user's real choice was between more questions and closing the
+        // tab. Against fifty simulated customers that choice is the whole difference: everyone
+        // who closed the tab abandoned, and when the same fifty pressed the button instead,
+        // abandonment fell from 80% to 16% with the read still correct 98% of the time. The
+        // client uses this to offer the exit in words, and only once there is something to offer.
+        // SUB-GENRE EVIDENCE ONLY. Letting a strongly-rated FAMILY open the exit as well was
+        // measured twice and cost accuracy both times: at three highs it fired around question
+        // nine, people took it, and the read fell to 80% correct; even as a late fallback
+        // (sixteen answers, five highs) it sat at 94%. Twelve to seventeen questions buy a family,
+        // not a shelf, and a family-level guess is the misread this engine exists to prevent. The
+        // offer waits for two hits on one sub-genre. Anyone who wants out sooner still has the
+        // quiet button from question five — it is their call to make, not ours to encourage.
+        const readyToFinish = !!lockedLove || !!(leader && leader.hi >= LOCK_HITS);
         return NextResponse.json({
-          ...baseState, tasteSummary, searchHint: nextHint, poolSrc,
+          ...baseState, tasteSummary, searchHint: nextHint, poolSrc, readyToFinish,
           isComplete: false, confidenceScore: shown / 100, progressPercent: Math.min(99, shown),
           currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - shown / 100))), leadingMicroGenres: [tasteSummary] },
           currentQuestion: { id: `bq_${Date.now()}`, text: questionText(movie.title, locale), movie },

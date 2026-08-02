@@ -131,6 +131,7 @@ export default function ScanMovieEvaluation() {
   // anyone paying. The founder offer sits under the films as an upsell, not in front of them.
   const [isRevealed] = useState(true);
   const [showSocialProof, setShowSocialProof] = useState(false);
+  const [finishOfferDismissed, setFinishOfferDismissed] = useState(false);
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
   // Titles shown this session — sent to the server so same-title movies
   // (remakes, re-releases) are never served twice in one quiz.
@@ -518,6 +519,25 @@ export default function ScanMovieEvaluation() {
   const trailerDialogLabel = he ? 'טריילר' : 'Trailer';
   const closeTrailerLabel = he ? 'סגירת הטריילר' : 'Close the trailer';
   const cardMovie = session.currentQuestion?.movie;
+  // WHEN TO OFFER THE WAY OUT. Two signals of "this person has had enough", and never before the
+  // engine says it could finish well — offering an exit that produces a poor recommendation would
+  // trade an abandoned quiz for a wrong answer, which is worse. The simulated customers' patience
+  // clusters at 20-26 questions, so 14 lands ahead of the wall rather than at it; the four-in-a-row
+  // rejection test catches the people who tire much earlier than that.
+  const answered = session.historyCount ?? 0;
+  const recentRejects = (session.ratingHistory || []).slice(-3);
+  // Ten, not fourteen. At fourteen the offer arrived after the people it was for had already
+  // gone: eleven of the seventeen who still abandoned ran out of patience between questions 11
+  // and 21, their limits sitting at 10-20. The offer is dismissible in one tap, so showing it a
+  // few questions early to someone who would have kept going costs them a glance, while showing
+  // it late costs the whole session.
+  const tiring = answered >= 10 ||
+    (recentRejects.length === 3 && recentRejects.every(h => typeof h.rating === 'number' && h.rating <= 2));
+  const showFinishOffer = !session.isComplete && !finishOfferDismissed && !loading &&
+    session.readyToFinish === true && answered >= 5 && tiring;
+  // Finished because the user asked, before the engine reached its own certainty. The picks are
+  // still from their confirmed shelf — it is the claim of completeness that has to be softened.
+  const stoppedEarly = !!session.isComplete && confidencePercentage < 90;
   return (
     <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
       <SkipLink />
@@ -600,7 +620,16 @@ export default function ScanMovieEvaluation() {
               left in English (it used to be pinned to the physical right in both). */}
           <div className="absolute top-0 start-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
         </div>
-        <span className="text-rose-500 font-black text-sm">{confidencePercentage}%</span>
+        {/* Someone who stops early gets a real read, not a finished one, and the bar was still
+            printing a bare "55%" beside a headline that said we had cracked them. A percentage is
+            the right thing to show while the engine is still working toward its own certainty; at
+            the end of a quiz the user chose to cut short, what it is based on is the honest
+            number. */}
+        <span className="text-rose-500 font-black text-sm">
+          {stoppedEarly
+            ? (he ? `על בסיס ${session.ratedCount ?? session.historyCount} תשובות` : `Based on ${session.ratedCount ?? session.historyCount} answers`)
+            : `${confidencePercentage}%`}
+        </span>
       </div>
 
       <div className="w-full max-w-5xl mx-auto px-4 mb-3 md:mb-6 flex justify-between items-center text-sm font-bold">
@@ -614,7 +643,20 @@ export default function ScanMovieEvaluation() {
         
         {session.isComplete ? (
           <div className="w-full mt-12 animate-in fade-in zoom-in duration-700">
-            <div className="text-center mb-12"><span className="inline-block px-6 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full text-base font-bold mb-6">✅ {t('perfect_match')}</span><h1 className="text-6xl font-black mb-4">{t('cracked_you')}</h1><p className="text-zinc-400 text-xl">{t('perfect_movie_desc')}</p></div>
+            <div className="text-center mb-12">
+              <span className="inline-block px-6 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full text-base font-bold mb-6">
+                {stoppedEarly ? (he ? '🎬 עצרנו כאן לבקשתך' : '🎬 Stopped here, as you asked') : `✅ ${t('perfect_match')}`}
+              </span>
+              <h1 className="text-6xl font-black mb-4">
+                {stoppedEarly ? (he ? 'הנה מה שכבר קלטנו' : "Here's what we already read") : t('cracked_you')}
+              </h1>
+              <p className="text-zinc-400 text-xl">
+                {stoppedEarly
+                  ? (he ? 'שלושת אלה מגיעים מהטעם שזיהינו עד עכשיו. עוד כמה שאלות היו מחדדות אותו.'
+                        : 'These three come from the taste we read so far. A few more answers would sharpen it.')
+                  : t('perfect_movie_desc')}
+              </p>
+            </div>
             
             {session.finalMovies?.map((movie) => (
               <div key={movie.id} className="relative bg-[#111113] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col items-center p-8 md:p-12 text-center mb-12 max-w-4xl mx-auto">
@@ -627,8 +669,13 @@ export default function ScanMovieEvaluation() {
                   <h2 className="text-4xl md:text-5xl font-black mb-4 text-white" dir={locale === 'he' ? 'rtl' : 'ltr'}>
                     {isRevealed ? movie.title : `${movie.title.charAt(0)}_______`}
                   </h2>
+                  {/* "60% התאמה מושלמת" is a contradiction in three words, and it is exactly what
+                      an early finish printed. A film picked from a shelf we are still reading is
+                      described, not scored. */}
                   <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-full text-sm font-bold mb-6">
-                    {movie.matchScore}% {t('match_perfect')}
+                    {stoppedEarly
+                      ? (he ? 'מהטעם שקראנו עד כה' : 'From the taste we read so far')
+                      : `${movie.matchScore}% ${t('match_perfect')}`}
                   </div>
                   <p className="text-zinc-300 text-base leading-relaxed max-w-xl mx-auto">
                     {isRevealed ? movie.overview : t('hidden_overview')}
@@ -842,11 +889,47 @@ export default function ScanMovieEvaluation() {
                 </div>
               </div>
               
+              {/* THE WAY OUT, IN WORDS. The quiz has let anyone stop from question five for a
+                  while, but the button never said what stopping would GET them, so a tiring user's
+                  real choice was between answering more films and closing the tab — and against
+                  fifty simulated customers they closed the tab: 80% abandoned. The same fifty,
+                  pressing the button instead, abandoned 16% of the time with the read still right
+                  98% of the time. So once the engine can actually finish well, and the person is
+                  showing they have had enough, we say so plainly. Once — dismissing it leaves the
+                  quiet button in the row below. */}
+              {showFinishOffer && (
+                <div className="w-full max-w-md mx-auto mb-4 px-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/[0.07] p-4 text-center shadow-[0_0_25px_rgba(16,185,129,0.15)]">
+                    <p className="text-emerald-300 font-bold mb-3 text-base leading-snug">
+                      {locale === 'he' ? 'כבר קלטנו את הטעם שלך. רוצה את שלושת הסרטים עכשיו?' : 'We have your taste. Want your three films now?'}
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <button
+                        disabled={loading}
+                        onClick={() => submitAnswer('NOT_SEEN', true)}
+                        className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black text-base font-black transition-all active:scale-95"
+                      >
+                        {locale === 'he' ? 'כן, תראה לי 🎬' : 'Yes, show me 🎬'}
+                      </button>
+                      <button
+                        disabled={loading}
+                        onClick={() => setFinishOfferDismissed(true)}
+                        className="px-5 py-2.5 rounded-full border border-white/15 hover:bg-white/5 text-sm font-bold text-zinc-400 transition-all"
+                      >
+                        {locale === 'he' ? 'אמשיך לענות' : 'Keep going'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-3 md:mt-6">
                 <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                   {t('not_seen')} <span>{locale === 'he' ? '›' : '‹'}</span>
                 </button>
-                {(session.historyCount ?? 0) >= 5 && (
+                {/* Hidden while the offer above is on screen — two buttons that do the same thing,
+                    one loud and one quiet, read as two different things. */}
+                {(session.historyCount ?? 0) >= 5 && !showFinishOffer && (
                   <button
                     disabled={loading}
                     onClick={() => submitAnswer('NOT_SEEN', true)}

@@ -62,6 +62,10 @@ export interface SessionState {
   genreStats?: Record<string, { n: number; s: number }>;
   /** Count of REAL 1–5★ ratings only (NOT_SEEN never counts) — the completion clock. */
   ratedCount?: number;
+  /** True once stopping now would still produce a recommendation worth having. Lets the quiz
+   *  offer the exit in words to a tiring user instead of leaving "close the tab" as the only
+   *  obvious way out. */
+  readyToFinish?: boolean;
   /** Accumulated Fisher information of the taste estimate; SE=1/√(1+infoSum). */
   infoSum?: number;
   /** v12 raw per-genre observations {n,sum,sq} — basis for consistency confidence. */
