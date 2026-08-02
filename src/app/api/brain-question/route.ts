@@ -378,6 +378,14 @@ export async function POST(req: Request) {
     // with their other exemplar — but only after every term has had a first look, and only inside
     // the focus families, so the quiz stays bounded.
     const ambiguous = (t: string) => { const p = probe[t]; return !!p && p.n < 2 && p.hi === 0 && p.lo < 2; };
+    // A family nobody has ever been asked about is not a family they rejected — it is a family we
+    // never offered. The focus narrows the sweep to the leader's family the moment a leader
+    // appears, and that used to drop every untouched family with it: a westerns-and-noir viewer
+    // rated a few crime films 4, the focus closed on crime at Q10, and across 38 questions he was
+    // never shown a single western. He finished as "Loves action spy thriller" without ever having
+    // rated one film 5. The focus still governs families we have real evidence about; a family at
+    // zero observations stays askable until it has been offered at least once.
+    const probedFams = new Set(Object.keys(probe).map(t => subGenreFamily(t) || '').filter(Boolean));
     const firstLook: typeof samplerAll = [];
     const secondChance: typeof samplerAll = [];
     for (const c of samplerAll) {
@@ -385,7 +393,7 @@ export async function POST(req: Request) {
       if (!t || disliked.includes(t)) continue;
       const fam = subGenreFamily(t) || '';
       if (rejectedFamilies.includes(fam)) continue; // never ask about a family they keep rejecting
-      if (focusFams && !focusFams.has(fam)) continue;
+      if (focusFams && !focusFams.has(fam) && probedFams.has(fam)) continue;
       if (!probe[t]) firstLook.push(c);
       else if (ambiguous(t)) secondChance.push(c);
     }
@@ -611,9 +619,27 @@ export async function POST(req: Request) {
         if (oldSkips >= 2 && recentSkips === 0 && y < 1990) return 1;
         return 0;
       };
+      // COVERAGE FIRST, BRIEFLY. Keeping untouched families askable is not enough on its own:
+      // the lead-family preference below sank them to the back of the queue, so the westerns fan
+      // did reach his shelf — at question 56, twenty questions past the point he would have left.
+      // For the opening only, a family we have never asked about outranks the current lead, so
+      // every family gets its first look while the quiz is still young and cheap. After that the
+      // lead family takes over again and the quiz narrows as before.
+      const famNeverAsked = (c: { id: string }) =>
+        probedFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || '') ? 1 : 0;
+      // Every OTHER question in the opening, not every one. Running the coverage flat-out put
+      // seven films a focused fan does not care about back to back, and the walk-outs from plain
+      // boredom doubled — the quiz read everyone correctly and lost them doing it. Alternating
+      // keeps a film from their own shelf between the probes, so the dull run never builds, and
+      // nine families still get their first look inside the opening.
+      // 16, measured: at 12 the coverage does not finish inside the opening, the sweep drags the
+      // leftovers through the middle of the quiz instead, and the westerns fan ran 32-63 questions
+      // instead of 22-37 — a shorter window made the quiz longer.
+      const coverageTurn = history.length < 16 && history.length % 2 === 1;
       const nextUp = [...uncovered].sort((a, b) =>
-        (inLeadFam(a) - inLeadFam(b)) ||
         (boredomPenalty(a) - boredomPenalty(b)) ||
+        (coverageTurn ? famNeverAsked(a) - famNeverAsked(b) : 0) ||
+        (inLeadFam(a) - inLeadFam(b)) ||
         (eraPenalty(a) - eraPenalty(b)) ||
         (samplerTier(a.id) - samplerTier(b.id)) ||
         (seededRank(sessionId + a.id) - seededRank(sessionId + b.id)));
@@ -902,6 +928,16 @@ export async function POST(req: Request) {
     for (const g of lovedGenres) {
       if ((lovedGenreHits[g] || 0) > (hatedGenreHits[g] || 0)) hatedGenres.delete(g);
     }
+    // A genre rejected again and again and never once rated highly is not ambiguous, and pairing
+    // it with a genre they DO like must not launder it. The old rule forgave any hated genre as
+    // long as the film also carried a loved one, which is how a horror-hating time-travel fan was
+    // handed Final Destination: Horror was hated, Thriller was loved, and the film carried both.
+    // Three rejections with zero likes is the line — a giallo fan who rates mainstream horror low
+    // still rates their own giallo 5s, so Horror keeps a loved hit and stays allowed for them.
+    const HARD_REJECT_HITS = 3;
+    const hardRejectedGenres = new Set(
+      [...hatedGenres].filter(g => (lovedGenreHits[g] || 0) === 0 && (hatedGenreHits[g] || 0) >= HARD_REJECT_HITS),
+    );
     // Per-genre filtering SELF-CANCELS for a franchise: someone who hates Marvel but likes Action
     // clears "Action" from hatedGenres, so Guardians of the Galaxy slipped through. So also record
     // the full genre COMBINATION of each rejected film — a candidate carrying every genre of a
@@ -925,6 +961,9 @@ export async function POST(req: Request) {
       if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
       if (tokens(m.title).some(w => hatedTokens.has(w))) return true;
       const names = genreNames(m._genreIds || []);
+      // Checked before the on-taste exemption: a hard-rejected genre outranks every other reason
+      // to keep a candidate, including its own locked sub-genre.
+      if (names.some(n => hardRejectedGenres.has(n))) return true;
       if (onTaste) return false;
       if (names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) return true;
       // The same safety signal applies to what we finally recommend, not only to what we ask.
@@ -1028,6 +1067,7 @@ export async function POST(req: Request) {
         const m = await movieById(c.id, locale);
         if (!m || resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
         const names = genreNames(m._genreIds || []);
+        if (names.some(n => hardRejectedGenres.has(n))) continue;
         if (names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) continue;
         if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) continue;
         resolved.push(m);
