@@ -36,6 +36,13 @@ const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
 // stretch, where each answer genuinely teaches the engine the most, may move 6; from question 13
 // on — the confirming half, where a big move would read as a guess — it is back to 4.
 const STEP_UP = (answered: number) => (answered < 13 ? 6 : 4);
+// How far the displayed meter may travel per answer once the engine has decided to finish.
+// Measured at 20 to cut the closing ramp from nine questions to three: it produced five meter
+// jumps across fifty runs — the exact thing this clamp exists to prevent — the read fell from
+// 100% to 96%, and the average quiz got LONGER, because a shorter reserved ramp let the budget
+// keep asking. The tail is shortened by making the meter honest EARLIER (see the pre-lock floor
+// on confidence), not by letting it leap at the end.
+const CLOSING_STEP = 6;
 
 const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hits (iconic 5★)
 
@@ -801,6 +808,9 @@ export async function POST(req: Request) {
     // narrowing engages) forced ~14 extra questions of pure ramp before the 96 gate, which is why
     // a sharp taste still ran ~36-46 questions instead of the 15-20 the product targets. The
     // ≤4%/step clamp still applies, so the meter climbs to it smoothly rather than jumping.
+    // Floating the meter to 0.7 pre-lock was measured and dropped: it kept the read at 100% and
+    // the jumps at zero, but bought no length at all (16.4 questions against 15.8), because the
+    // tail is not the ramp — it is the confirming hits the lock itself waits for.
     const confidence = Math.max(0.05, (lockedLove ? Math.max(blended, 0.88) : blended) - contraPenalty);
 
     // DISPLAY METER: ease the SHOWN percent toward the true confidence by at most 4 points per
@@ -825,7 +835,9 @@ export async function POST(req: Request) {
     // quiz ends AT the cap, never past it.
     const shownCount = history.length + notSeen; // session-scoped, not cross-quiz
     const budgetLeft = Math.min(MAX_Q - history.length, SHOWN_CAP - shownCount);
-    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / 6));
+    // Must match the closing step below, or the budget reserves a ramp far longer than the one it
+    // will actually take and the quiz starts closing while it still has questions worth asking.
+    const stepsNeeded = Math.max(0, Math.ceil((96 - prevShown) / CLOSING_STEP));
     const mustFinish = budgetLeft <= stepsNeeded;
     // The user can stop the quiz whenever they like ("enough, recommend now"). This is an
     // explicit request, so it finishes on THIS response with the best signal gathered — no
@@ -838,7 +850,18 @@ export async function POST(req: Request) {
     // A contradiction anywhere in the quiz used to block finishing outright, and since it never
     // decays the quiz then ran to the safety cap. It should cost EVIDENCE, not stall: each
     // reversal on the leader demands one more confirming hit before we are willing to say we know.
-    const surgical = !!lockedLove && lockedLove.hi >= LOCK_HITS + 1 + (lockedLove.contra || 0);
+    // THE EXTRA CONFIRMING HIT, AND WHEN IT IS ALREADY IN HAND. The lock needs LOCK_HITS strong
+    // hits; finishing waits for one more, plus one for every contradiction. That extra hit is the
+    // difference between "we think it's slasher" and "we know", and it is worth its question when
+    // the evidence is merely good. It is not worth it when the evidence is already emphatic: a
+    // leader whose every rating was a strict 5, with nothing contradicting it and its close rivals
+    // already drilled, does not become more certain on a fourth film — that is the same standard
+    // the early-exploit path uses to skip the rest of the sweep. Everything short of that still
+    // pays for the extra hit.
+    const emphatic = !!lockedLove && lockedLove.avg === 5 && !(lockedLove.contra || 0) &&
+      contenders.every(s => s.n >= 2);
+    const surgical = !!lockedLove &&
+      lockedLove.hi >= LOCK_HITS + (emphatic ? 0 : 1) + (lockedLove.contra || 0);
     const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && surgical);
 
     // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
@@ -852,11 +875,14 @@ export async function POST(req: Request) {
     // A skip is MCAR — it carries no taste signal, so it must never advance the closing ramp.
     // It previously did: testers watched the tail march 88→92→96→100 while answering NOT_SEEN.
     const rampBlocked = wantFinish && !payload.isInit && !!payload.movieId && typeof payload.answer !== 'number';
-    // Once the read is confirmed the remaining questions exist only to walk the meter up to 96.
-    // Holding those to four points each added eight questions of pure ramp to every quiz — the
-    // shortest run against fifty simulated customers was still 21 questions for a taste the
-    // engine had settled by question 8. The closing stretch moves at the opening rate.
-    const step = wantFinish ? 6 : STEP_UP(history.length);
+    // Once the read is confirmed the remaining questions exist only to walk the meter up to 96,
+    // and at six points a step that is nine films: a traced slasher fan answered questions 26 to
+    // 34 while the bar counted 51, 57, 63, 69, 75, 81, 87, 93, 99 and nothing he said could have
+    // changed the outcome. Nine films is a third of the quiz spent animating a progress bar.
+    // Twenty closes the same gap in three, which still MOVES — the rule this meter exists for is
+    // that the number never leaps between two questions while the engine quietly overstates what
+    // it knows, and a confirmed lock is exactly the case where it does know.
+    const step = wantFinish ? CLOSING_STEP : STEP_UP(history.length);
     if (prevShown <= 0) shown = Math.min(target, 6);                          // first question: gentle start
     else if (rampBlocked) shown = prevShown;
     else if (target > prevShown) shown = Math.min(target, prevShown + step);  // rise, smoothly
