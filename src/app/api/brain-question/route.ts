@@ -224,7 +224,18 @@ export async function POST(req: Request) {
     if (!checkRateLimit('brain:' + ip, 60, 60_000)) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
-    const payload = await req.json();
+    // A body that is not JSON is the caller's mistake, not ours: `{oops` threw inside the handler
+    // and came back as a 500, which reads as "the server is broken" to a monitor and to anyone
+    // probing the API. It is a 400, and it says nothing else.
+    let payload: Record<string, unknown> & { [k: string]: any };
+    try {
+      payload = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Malformed JSON body' }, { status: 400 });
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 });
+    }
     const locale = req.headers.get('x-locale') || 'he';
     // These headers come from the browser and were parsed with a bare JSON.parse: a header of
     // `not-json`, `{}` or `5` crashed the route with a 500 that echoed the exception text back to
@@ -268,6 +279,20 @@ export async function POST(req: Request) {
     if (stored && !payload.isInit && payload.movieId && !stored.served.includes(String(payload.movieId))) {
       payload.answer = undefined;
     }
+    // SAME NAME, DIFFERENT ID. Dedup ran on TMDB ids only, so a remake — a different id carrying
+    // the identical Hebrew title — came round a second time and read as the quiz repeating itself.
+    // The owner hit it live and a driven run reproduced it ("היצור" twice in one quiz). The client
+    // already sent askedTitles for exactly this and the server never read them; the server now
+    // keeps its own list, and the client's is the fallback after a cold start. Used for the films
+    // we ASK about and the films we RECOMMEND — a recommendation the user just rated is worse.
+    const titleKey = (t?: string) => (t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const clientTitles: string[] = Array.isArray(payload.askedTitles)
+      ? payload.askedTitles.filter((t: unknown): t is string => typeof t === 'string').map(titleKey)
+      : [];
+    const usedTitles = new Set<string>(
+      [...(stored?.servedTitles || []), ...clientTitles, ...history.map(h => titleKey(h.title))].filter(Boolean),
+    );
+
     // The hint that produced the movie just answered (round-tripped from the prior response).
     const activeHint = typeof payload.searchHint === 'string' ? payload.searchHint.trim() : '';
     // SESSION-scoped count of "didn't see" answers (round-trips in the body). The completion
@@ -290,15 +315,31 @@ export async function POST(req: Request) {
     }
     if (!payload.isInit && payload.movieId && typeof payload.answer === 'number') {
       if (!askedMovieIds.includes(payload.movieId)) askedMovieIds.push(payload.movieId);
-      history = [...history, {
+      // ONE ANSWER PER FILM. Guarding on "was this film ever served" was not enough: a film we
+      // served once could be answered again and again, and posting the same answer twenty times
+      // wrote twenty entries — twenty ratings of one film, a taste model built on a single title
+      // and a completion clock a script could run down without ever taking the quiz.
+      // Replacing instead of appending also makes the Back button honest: going back and giving a
+      // film a different rating now updates that film's answer rather than recording both.
+      const entry = {
         id: String(payload.movieId),
-        title: payload.title || 'Unknown',
+        // The title is whatever the client says it is, and it is kept in server memory for the
+        // life of the session. A 100k-character title is not a film name. It is not an injection
+        // risk — nothing renders it as HTML — but there is no reason to store it.
+        title: String(payload.title || 'Unknown').slice(0, 200),
         year: payload.year || undefined,
         genres: genreNames(payload.genreIds || []),
         rating: payload.answer,
-      }];
+      };
+      const already = history.findIndex(h => h.id === entry.id);
+      history = already >= 0
+        ? history.map((h, i) => (i === already ? entry : h))
+        : [...history, entry];
       const term = termOf(String(payload.movieId), activeHint);
-      if (term) {
+      // Only the FIRST answer for a film scores its sub-genre. Without this the replay above
+      // still counted twenty times here — history held one entry while the probe held twenty
+      // hits, which is the number the lock and the meter actually read.
+      if (term && already < 0) {
         const cur = probe[term] || { sum: 0, n: 0, hi: 0, lo: 0, contra: 0 };
         // CONTRADICTION: this rating reverses an established signal for the same sub-genre.
         // If the term was already LOVED (a strong hit, avg ≥ HI) and the user now rates a
@@ -930,23 +971,26 @@ export async function POST(req: Request) {
       // where the card had nothing to read. Prefer a candidate that has one; only fall back to a
       // synopsis-less film if nothing else is left.
       let bare: Awaited<ReturnType<typeof movieById>> = null;
-      for (const cand of shuffled.slice(0, 6)) {
+      for (const cand of shuffled.slice(0, 8)) {
         const m = await movieById(cand.id, locale);
         if (!m) continue;
+        if (usedTitles.has(titleKey(m.title))) continue;
         if (m.overview && m.overview.trim()) { movie = m; break; }
         bare = bare || m;
       }
       movie = movie || bare;
       if (!movie) {
         for (const cand of await fetchCandidatePool(seen, locale, 10)) {
-          movie = await movieById(cand.id, locale);
-          if (movie) break;
+          const m = await movieById(cand.id, locale);
+          if (!m || usedTitles.has(titleKey(m.title))) continue;
+          movie = m; break;
         }
       }
       if (movie) {
         // Remember what we asked, so the next request can be checked against it.
         if (stored) {
           stored.served = [...stored.served, movie.id].slice(-200);
+          stored.servedTitles = [...stored.servedTitles, titleKey(movie.title)].slice(-200);
           stored.history = history; stored.probe = probe; stored.notSeen = notSeen;
           stored.skipYears = skipYears; stored.shown = shown;
           saveSession(sessionKey, stored);
@@ -1038,6 +1082,9 @@ export async function POST(req: Request) {
     // its franchise, still blocks it.
     const isBad = (m: Rec, onTaste = false) => {
       if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
+      // Recommending a film under a name they were just asked about reads as the engine forgetting
+      // the last twenty minutes, whether or not TMDB considers it the same title.
+      if (usedTitles.has(titleKey(m.title))) return true;
       if (tokens(m.title).some(w => hatedTokens.has(w))) return true;
       const names = genreNames(m._genreIds || []);
       // Checked before the on-taste exemption: a hard-rejected genre outranks every other reason

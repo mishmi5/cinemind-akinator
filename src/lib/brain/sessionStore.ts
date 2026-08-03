@@ -29,6 +29,9 @@ export interface BrainSession {
   shown: number;
   /** Movie ids the server has actually asked about. An answer for anything else is not an answer. */
   served: string[];
+  /** Normalised titles already put on screen. Ids are not enough: a remake carries a different
+   *  TMDB id and the same Hebrew name, so the same card came round twice in one quiz. */
+  servedTitles: string[];
   /** The id of the question currently on screen. */
   pending?: string;
   touched: number;
@@ -59,7 +62,7 @@ export function getSession(id: string): BrainSession | undefined {
 
 export function startSession(id: string): BrainSession {
   sweep();
-  const s: BrainSession = { history: [], probe: {}, notSeen: 0, skipYears: [], shown: 0, served: [], touched: Date.now() };
+  const s: BrainSession = { history: [], probe: {}, notSeen: 0, skipYears: [], shown: 0, served: [], servedTitles: [], touched: Date.now() };
   store.set(id, s);
   return s;
 }
