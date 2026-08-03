@@ -854,7 +854,7 @@ export default function ScanMovieEvaluation() {
                   it at y=1129 inside a 720px-tall laptop viewport — 409px below the fold, so a
                   click aimed at a star hit the poster and nothing happened. Both sizes are now
                   bounded by the viewport, so the poster shrinks before the controls leave. */}
-              <div className="relative w-full h-[34vh] min-h-[200px] max-h-[420px] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-zinc-900">
+              <div className="relative w-full h-[30vh] min-h-[190px] max-h-[400px] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-zinc-900">
                 <ImageWithFallback
                   src={cardMovie?.posterUrl || ''}
                   alt={cardMovie?.title ? (he ? `כרזת ${cardMovie.title}` : `${cardMovie.title} poster`) : ''}
@@ -872,9 +872,17 @@ export default function ScanMovieEvaluation() {
               </div>
 
               <div className="px-6 md:px-8 pb-5 md:pb-10 relative z-10 -mt-20 md:-mt-24 text-center">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{cardMovie?.title}</h1>
+                {/* A title that wraps to two lines costs 53px, which is the difference between the
+                    "didn't see" row sitting at 806 and at 859 on a 375x812 phone — "סיפורי נרניה"
+                    was the card that fell off. Slightly smaller on a phone, unchanged from sm up. */}
+                {/* One line on a phone. A title that wraps costs 53px a line, and that is the
+                    difference between the "didn't see" row sitting on the first screen and off it:
+                    "מלחמת הכוכבים: פרק…" pushed it to 843 in an 812px viewport. Nothing is lost —
+                    the full title is in the question sentence directly below, and the original
+                    title sits under it. Unclamped from sm up, where there is room. */}
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black mb-2 text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] truncate sm:whitespace-normal sm:overflow-visible">{cardMovie?.title}</h1>
                 <p className="text-xs text-zinc-300 font-mono mb-5 uppercase tracking-[0.2em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.originalDetails}</p>
-                <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
+                <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-4 md:mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
                 
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-4 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[72px] md:min-h-[100px] leading-tight">
                   {session.currentQuestion?.text}
@@ -885,7 +893,7 @@ export default function ScanMovieEvaluation() {
             <div ref={answerRowRef} className={`w-full mt-5 md:mt-10 flex flex-col items-center transition-opacity duration-300 ${animateCard ? 'opacity-0' : 'opacity-100'}`}>
               
               {dynamicPhrase && (
-                <div className="text-sm text-zinc-400 flex items-center gap-2 mb-8 animate-in fade-in duration-500 font-medium">
+                <div className="text-sm text-zinc-400 flex items-center gap-2 mb-3 md:mb-8 animate-in fade-in duration-500 font-medium">
                   <span className="text-rose-500 text-lg">✓</span> {dynamicPhrase}
                 </div>
               )}
@@ -893,7 +901,7 @@ export default function ScanMovieEvaluation() {
               {/* Labels above, not beside: five 56px stars plus gaps leave ~46px for two words on
                   a 360px phone, and "אוהב" was measured at x=-35 — off screen, hidden silently by
                   overflow-x-hidden. The user saw one label and had to guess the other end. */}
-              <div className="w-full flex flex-col items-center px-4 mb-3 md:mb-6">
+              <div className="w-full flex flex-col items-center px-4 mb-2 md:mb-6">
                 <div className="w-full max-w-sm flex justify-between items-center mb-2">
                   <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{t('hate')}</span>
                   <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{t('love')}</span>
@@ -991,7 +999,10 @@ export default function ScanMovieEvaluation() {
                 </div>
               )}
 
-              <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-3 md:mt-6">
+              {/* Every gap here is measured against a 375x812 phone: with the old spacing the
+                  "didn't see" row — a primary answer, not a footnote — ended at y=867, and a
+                  visitor had to scroll to say they had not seen the film. */}
+              <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-2 md:mt-6">
                 <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                   {t('not_seen')} <span>{locale === 'he' ? '›' : '‹'}</span>
                 </button>

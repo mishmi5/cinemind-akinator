@@ -65,15 +65,20 @@ const FAMILY_ADJ: Record<string, string[]> = {
   western: ['action', 'drama'], animation: [], fantasy: ['scifi', 'action'],
 };
 
+// The "(1 = hate, 5 = love)" tail used to ride along here. The star row already carries those two
+// words as labels directly above it, so the parenthetical said nothing new — and it cost three
+// lines instead of two on a phone with a long Hebrew title, which pushed the whole answer row to
+// y=870 in an 812px viewport. Measured on a live card: the question block was 109px tall against
+// a 72px minimum, purely from that suffix.
 function questionText(title: string, locale: string): string {
   const he = [
-    `כמה כוכבים תיתן ל"${title}"? (1 = שונא, 5 = אוהב)`,
+    `כמה כוכבים תיתן ל"${title}"?`,
     `"${title}" — בקטע שלך או פספוס מוחלט?`,
     `נתקלת ב"${title}". מה הדירוג שלך?`,
     `עד כמה "${title}" מדבר אליך?`,
   ];
   const en = [
-    `How many stars for "${title}"? (1 = hate, 5 = love)`,
+    `How many stars for "${title}"?`,
     `"${title}" — your thing or a total miss?`,
     `You run into "${title}". Your rating?`,
     `How much does "${title}" speak to you?`,
