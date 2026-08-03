@@ -223,6 +223,18 @@ export async function POST(req: Request) {
     };
     const askedMovieIds: string[] = idList(req.headers.get('x-asked-ids'));
     const recentIds: string[] = idList(req.headers.get('x-recent-ids'));
+    // DIRECTIONS THE USER NAMED. Nine of fifty simulated customers left at question five or six
+    // after five films in a row they did not care about, and no amount of reordering fixes that:
+    // someone with one narrow taste meets eight families they will refuse before they meet their
+    // own, and the opening has to offer all nine to avoid the misread that cost the westerns fan
+    // his read. When the quiz has clearly missed, it stops guessing and asks. What they pick is
+    // not a rating — it is a place to look — so it steers the sweep without ever counting as
+    // taste evidence the recommendation is built on.
+    const FAMILIES = new Set(['horror', 'scifi', 'animation', 'action', 'western', 'crime', 'comedy', 'drama', 'fantasy']);
+    const directions: string[] = Array.isArray(payload.directions)
+      ? payload.directions.filter((f: unknown): f is string => typeof f === 'string' && FAMILIES.has(f)).slice(0, 9)
+      : [];
+    const chosenFams = new Set(directions);
     // ── WHOSE STATE IS IT. The quiz used to run entirely on what the browser sent back, and the
     //    server signed that as proof of a completed quiz — so an invented ratingHistory earned a
     //    valid token and the tokens/XP that come with it. The server now keeps its own copy of
@@ -392,8 +404,13 @@ export async function POST(req: Request) {
       const t = samplerProbeOf(c.id);
       if (!t || disliked.includes(t)) continue;
       const fam = subGenreFamily(t) || '';
-      if (rejectedFamilies.includes(fam)) continue; // never ask about a family they keep rejecting
-      if (focusFams && !focusFams.has(fam) && probedFams.has(fam)) continue;
+      // A family they pointed at outranks every reason we had to stop offering it: the refusals
+      // that made it look cold were of OTHER shelves, and the whole point of asking was to be
+      // told where to look instead.
+      if (!chosenFams.has(fam)) {
+        if (rejectedFamilies.includes(fam)) continue; // never ask about a family they keep rejecting
+        if (focusFams && !focusFams.has(fam) && probedFams.has(fam)) continue;
+      }
       if (!probe[t]) firstLook.push(c);
       else if (ambiguous(t)) secondChance.push(c);
     }
@@ -640,7 +657,12 @@ export async function POST(req: Request) {
       // is not relief to someone with a narrow taste — a musical fan turns down Jurassic Park too —
       // so the walk-outs it targeted went UP (6 to 11 of fifty) while the shallower probing cost
       // the read itself, 100% correct down to 92%. The niche probe stays.
+      // What they asked for comes first — ahead of the boredom memory, which is about shelves they
+      // refused, not the one they named.
+      const notChosen = (c: { id: string }) =>
+        chosenFams.size === 0 ? 0 : (chosenFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || '') ? 0 : 1);
       const nextUp = [...uncovered].sort((a, b) =>
+        (notChosen(a) - notChosen(b)) ||
         (boredomPenalty(a) - boredomPenalty(b)) ||
         (coverageTurn ? famNeverAsked(a) - famNeverAsked(b) : 0) ||
         (inLeadFam(a) - inLeadFam(b)) ||

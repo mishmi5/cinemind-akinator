@@ -132,6 +132,9 @@ export default function ScanMovieEvaluation() {
   const [isRevealed] = useState(true);
   const [showSocialProof, setShowSocialProof] = useState(false);
   const [finishOfferDismissed, setFinishOfferDismissed] = useState(false);
+  // Families the user pointed at after the quiz kept missing. Round-trips on every request.
+  const [directions, setDirections] = useState<string[]>([]);
+  const [directionsDismissed, setDirectionsDismissed] = useState(false);
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
   // Titles shown this session — sent to the server so same-title movies
   // (remakes, re-releases) are never served twice in one quiz.
@@ -306,7 +309,10 @@ export default function ScanMovieEvaluation() {
     submitAnswer(star);
   };
 
-  const submitAnswer = async (answer: AnswerType, finishNow = false) => {
+  // overrideDirections: a direction chosen THIS turn has not reached state yet, so it is passed
+  // straight through — otherwise the request that is supposed to act on the choice still carries
+  // the old (empty) list and the user watches one more wrong film go by.
+  const submitAnswer = async (answer: AnswerType, finishNow = false, overrideDirections?: string[]) => {
     setLoading(true);
     setAnimateCard(true);
 
@@ -358,6 +364,7 @@ export default function ScanMovieEvaluation() {
           notSeen: (session as any)!.notSeen || 0, // session-scoped shown-cap counter (round-trips)
           skipYears: (session as any)!.skipYears || [], // years of films they had not seen — era steering
           finishNow, // user pressed "enough, recommend now" — finish on this response
+          directions: overrideDirections ?? directions, // families they pointed at after we kept missing
           title: session!.currentQuestion!.movie?.title,
           year: yearMatch ? yearMatch[1] : undefined,
           // Same-title repeats (remakes/re-releases) feel like duplicates — let the
@@ -538,6 +545,32 @@ export default function ScanMovieEvaluation() {
   // Finished because the user asked, before the engine reached its own certainty. The picks are
   // still from their confirmed shelf — it is the claim of completeness that has to be softened.
   const stoppedEarly = !!session.isComplete && confidencePercentage < 90;
+  // WHEN THE QUIZ HAS CLEARLY MISSED, ASK. Nine of fifty simulated customers left at question five
+  // or six after a run of films they did not care about — the cost of an opening that must offer
+  // all nine families to avoid misreading a narrow taste. Three refusals in a row is the engine
+  // admitting it is lost, and a person who is about to leave would rather point than keep rating.
+  const lastThree = (session.ratingHistory || []).slice(-3);
+  const missing = lastThree.length === 3 &&
+    lastThree.every(h => typeof h.rating === 'number' && h.rating <= 2);
+  const showDirections = !session.isComplete && !loading && missing &&
+    directions.length === 0 && !directionsDismissed;
+  const DIRECTIONS: { key: string; he: string; en: string; emoji: string }[] = [
+    { key: 'horror', he: 'אימה', en: 'Horror', emoji: '👻' },
+    { key: 'comedy', he: 'קומדיה', en: 'Comedy', emoji: '😂' },
+    { key: 'action', he: 'אקשן', en: 'Action', emoji: '💥' },
+    { key: 'drama', he: 'דרמה', en: 'Drama', emoji: '🎭' },
+    { key: 'scifi', he: 'מדע בדיוני', en: 'Sci-fi', emoji: '🚀' },
+    { key: 'crime', he: 'פשע ומתח', en: 'Crime & thriller', emoji: '🔎' },
+    { key: 'fantasy', he: 'פנטזיה', en: 'Fantasy', emoji: '🐉' },
+    { key: 'animation', he: 'אנימציה', en: 'Animation', emoji: '🎨' },
+    { key: 'western', he: 'מערבונים', en: 'Westerns', emoji: '🤠' },
+  ];
+  const pickDirection = (key: string) => {
+    const next = [key];
+    setDirections(next);
+    // Not a rating — they told us where to look, so the current film is simply skipped.
+    submitAnswer('NOT_SEEN', false, next);
+  };
   return (
     <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
       <SkipLink />
@@ -897,6 +930,41 @@ export default function ScanMovieEvaluation() {
                   98% of the time. So once the engine can actually finish well, and the person is
                   showing they have had enough, we say so plainly. Once — dismissing it leaves the
                   quiet button in the row below. */}
+              {/* Shown before the finish offer: someone we have not read yet needs a direction,
+                  not an exit. */}
+              {showDirections && (
+                <div className="w-full max-w-md mx-auto mb-4 px-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="rounded-2xl border border-indigo-500/40 bg-indigo-500/[0.07] p-4 text-center shadow-[0_0_25px_rgba(99,102,241,0.15)]">
+                    <p className="text-indigo-300 font-bold mb-1 text-base leading-snug">
+                      {he ? 'עוד לא קלענו לך.' : "We haven't hit it yet."}
+                    </p>
+                    <p className="text-zinc-400 text-sm mb-3">
+                      {he ? 'לאן ללכת? נמשיך משם.' : 'Point us somewhere and we’ll go from there.'}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {DIRECTIONS.map(d => (
+                        <button
+                          key={d.key}
+                          disabled={loading}
+                          onClick={() => pickDirection(d.key)}
+                          className="px-2 py-3 rounded-xl border border-white/10 hover:border-indigo-400/60 hover:bg-indigo-500/10 text-sm font-bold text-zinc-200 transition-all active:scale-95"
+                        >
+                          <span className="block text-xl mb-0.5">{d.emoji}</span>
+                          {he ? d.he : d.en}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      disabled={loading}
+                      onClick={() => setDirectionsDismissed(true)}
+                      className="mt-3 text-sm font-bold text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                      {he ? 'תמשיכו לנחש' : 'Keep guessing'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {showFinishOffer && (
                 <div className="w-full max-w-md mx-auto mb-4 px-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/[0.07] p-4 text-center shadow-[0_0_25px_rgba(16,185,129,0.15)]">
