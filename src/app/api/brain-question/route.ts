@@ -70,6 +70,26 @@ const FAMILY_ADJ: Record<string, string[]> = {
 // lines instead of two on a phone with a long Hebrew title, which pushed the whole answer row to
 // y=870 in an 812px viewport. Measured on a live card: the question block was 109px tall against
 // a 72px minimum, purely from that suffix.
+// A client-supplied film title, made safe to store and to echo back. Length is bounded because a
+// 100k-character "title" is not a film name. The invisible characters matter more: on an RTL site
+// a bidi override reverses the text AROUND it, so a crafted "title" can rewrite how the rest of a
+// Hebrew line reads. Filtered by CODE POINT rather than with a character class, because a regex
+// literal for these is a row of invisible characters in the editor — the very trap being guarded
+// against here.
+const isBidiOrControl = (code: number) =>
+  (code >= 0x202a && code <= 0x202e) || // the bidi overrides and embeddings
+  (code >= 0x2066 && code <= 0x2069) || // the bidi isolates
+  (code >= 0x200b && code <= 0x200f) || // zero-width space/joiners, LRM, RLM
+  code <= 0x001f || code === 0x007f;    // C0 controls and DEL
+function cleanTitle(raw: unknown): string {
+  const t = [...String(raw ?? "")]
+    .filter(ch => !isBidiOrControl(ch.codePointAt(0) ?? 0))
+    .join("")
+    .trim()
+    .slice(0, 200);
+  return t || "Unknown";
+}
+
 function questionText(title: string, locale: string): string {
   const he = [
     `כמה כוכבים תיתן ל"${title}"?`,
@@ -324,9 +344,11 @@ export async function POST(req: Request) {
       const entry = {
         id: String(payload.movieId),
         // The title is whatever the client says it is, and it is kept in server memory for the
-        // life of the session. A 100k-character title is not a film name. It is not an injection
-        // risk — nothing renders it as HTML — but there is no reason to store it.
-        title: String(payload.title || 'Unknown').slice(0, 200),
+        // life of the session and echoed back. A 100k-character title is not a film name, and on
+        // an RTL site a U+202E in one is not harmless: the override reverses the text AROUND it,
+        // so a crafted "title" can rewrite how the rest of a Hebrew line reads. Bidi overrides,
+        // zero-width joiners and C0 control characters are stripped; the length is bounded.
+        title: cleanTitle(payload.title),
         year: payload.year || undefined,
         genres: genreNames(payload.genreIds || []),
         rating: payload.answer,
