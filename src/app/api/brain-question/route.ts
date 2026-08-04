@@ -1272,6 +1272,11 @@ export async function POST(req: Request) {
       // understood. The badge now says what the engine actually believes.
       matchScore: Math.max(60, Math.round((lockedLove ? 99 : Math.min(95, confidence * 100)) - i * 4)),
       posterUrl: p.posterUrl, trailerId: p.trailerId, overview: p.overview,
+      // The quiz card shows "ORIGINAL TITLE · YEAR" under every film; the results card showed the
+      // Hebrew name alone. "הצלצול" is either the 1998 Japanese film or the 2002 American one, and
+      // the person is meant to go and watch it tonight — they have to know which one they were
+      // handed. The data was already on the pick and simply was not passed on.
+      originalDetails: p.originalDetails,
       _genreIds: p._genreIds,
       // The last-resort line was English on a Hebrew screen.
       reason: reasons[i] || (confirmedTerm

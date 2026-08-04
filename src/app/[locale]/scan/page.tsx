@@ -699,9 +699,17 @@ export default function ScanMovieEvaluation() {
                   <div className="w-48 md:w-64 aspect-[2/3] mx-auto relative rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.8)] bg-zinc-900 mb-8">
                     <ImageWithFallback src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
                   </div>
-                  <h2 className="text-4xl md:text-5xl font-black mb-4 text-white" dir={locale === 'he' ? 'rtl' : 'ltr'}>
+                  <h2 className="text-4xl md:text-5xl font-black mb-2 text-white" dir={locale === 'he' ? 'rtl' : 'ltr'}>
                     {isRevealed ? movie.title : `${movie.title.charAt(0)}_______`}
                   </h2>
+                  {/* Which film, exactly. Every quiz card carries "ORIGINAL TITLE · YEAR" and the
+                      results card carried the Hebrew name alone — but "הצלצול" is the 1998 Japanese
+                      film or the 2002 American one, and this is the screen someone acts on tonight. */}
+                  {isRevealed && (movie as { originalDetails?: string }).originalDetails && (
+                    <p className="text-xs text-zinc-400 font-mono mb-4 uppercase tracking-[0.2em]" dir="ltr">
+                      {(movie as { originalDetails?: string }).originalDetails}
+                    </p>
+                  )}
                   {/* "60% התאמה מושלמת" is a contradiction in three words, and it is exactly what
                       an early finish printed. A film picked from a shelf we are still reading is
                       described, not scored. */}

@@ -14,6 +14,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Every response announced "x-powered-by: Next.js". It buys an attacker a free hint about which
+  // CVEs to try and buys us nothing.
+  poweredByHeader: false,
   // Needed by src/app/global-not-found.tsx — the only root layout lives under
   // the dynamic [locale] segment, so unmatched URLs have no layout to render inside.
   experimental: {
