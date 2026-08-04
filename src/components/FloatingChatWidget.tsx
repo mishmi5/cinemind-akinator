@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocale } from 'next-intl';
 
 export default function FloatingChatWidget() {
+  const locale = useLocale();
+  const he = locale !== 'en';
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
@@ -124,11 +127,15 @@ export default function FloatingChatWidget() {
       )}
 
       {/* Toggle Button */}
-      <button 
+      {/* An emoji is not a name. To a screen reader this was an unlabelled button on every single
+          page of the site — the one control that follows the visitor everywhere. */}
+      <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={he ? (isOpen ? 'סגירת הצ׳אט' : 'פתיחת הצ׳אט') : (isOpen ? 'Close the chat' : 'Open the chat')}
+        aria-expanded={isOpen}
         className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-rose-600 rounded-full flex items-center justify-center text-white text-2xl shadow-[0_5px_20px_rgba(225,29,72,0.4)] hover:scale-110 active:scale-95 transition-transform"
       >
-        💬
+        <span aria-hidden="true">💬</span>
       </button>
     </div>
   );

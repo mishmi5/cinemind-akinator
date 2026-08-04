@@ -75,7 +75,9 @@ export default function QuizIntroPage() {
           <div className="flex items-start gap-3">
             <span className="text-red-500 text-lg mt-0.5">⚠️</span>
             <div>
-              <h4 className="text-red-500 text-sm font-bold mb-2">{t('good_to_know')}</h4>
+              {/* h2, not h4: this is the only other section on the page and it followed the h1
+                  directly, so a screen-reader user heard the outline skip two levels. */}
+              <h2 className="text-red-500 text-sm font-bold mb-2">{t('good_to_know')}</h2>
               <p className="text-xs md:text-sm text-zinc-400 leading-relaxed font-medium">
                 {t('good_to_know_text')}
               </p>

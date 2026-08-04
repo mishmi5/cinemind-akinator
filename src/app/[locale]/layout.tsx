@@ -216,6 +216,9 @@ export default async function RootLayout({
                 <nav className="flex gap-2 sm:gap-4">
                   <a href="/terms" className="min-h-[44px] min-w-[44px] flex items-center justify-center px-3 py-2 hover:text-zinc-300 transition-colors rounded-lg active:bg-white/5">{locale === 'he' ? 'תנאי שימוש' : 'Terms of Service'}</a>
                   <a href="/privacy" className="min-h-[44px] min-w-[44px] flex items-center justify-center px-3 py-2 hover:text-zinc-300 transition-colors rounded-lg active:bg-white/5">{locale === 'he' ? 'מדיניות פרטיות' : 'Privacy Policy'}</a>
+                  {/* The link an accessibility inspection looks for first, and the route a visitor
+                      who cannot use the site needs before anything else. */}
+                  <a href="/accessibility" className="min-h-[44px] min-w-[44px] flex items-center justify-center px-3 py-2 hover:text-zinc-300 transition-colors rounded-lg active:bg-white/5">{locale === 'he' ? 'הצהרת נגישות' : 'Accessibility'}</a>
                 </nav>
               </div>
             </footer>
