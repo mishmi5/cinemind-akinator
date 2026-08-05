@@ -1239,12 +1239,34 @@ export async function POST(req: Request) {
     // week-cached, so this usually succeeds even mid-outage) before we give up.
     if (!resolved.length) {
       await new Promise(r => setTimeout(r, 400));
-      for (const term of (lovedTerms.length ? lovedTerms : [confirmedTerm].filter(Boolean))) {
+      // A user the engine never read at all — "Eclectic taste" — has no loved terms AND no
+      // confirmed term, so this loop used to iterate over an empty array and do nothing. That is
+      // exactly the person most likely to reach it: someone who rejected or skipped every film.
+      // A driven run reproduced the empty results screen once in two attempts. Broad terms give
+      // the retry something to look through when the taste model has nothing to offer.
+      const terms = lovedTerms.length ? lovedTerms
+        : confirmedTerm ? [confirmedTerm]
+        : ['psychological thriller', 'coming-of-age', 'heist'];
+      for (const term of terms) {
         if (resolved.length >= 3) break;
         for (const m of await recommendBySubGenre(term, [], locale, 5)) {
           if (resolved.length >= 3) break;
           if (!resolved.some(x => x.id === m.id) && !hatedIds.has(m.id)) resolved.push(m);
         }
+      }
+    }
+
+    // THE FLOOR. Every tier above can legitimately come back empty for someone who rejected or
+    // skipped everything they were shown: the pools exclude what they have seen, and what is left
+    // is what they rated low. At that point the honest thing is a well-known film they never
+    // actually turned down — the popular pool WITHOUT the seen-exclusion, filtered only by the
+    // films they rated low themselves. An empty results screen after sixty-eight questions is the
+    // one outcome this product must never produce.
+    if (!resolved.length) {
+      for (const c of await fetchCandidatePool([], locale, 40)) {
+        if (resolved.length >= 3) break;
+        const m = await movieById(c.id, locale);
+        if (m && !hatedIds.has(m.id) && !resolved.some(x => x.id === m.id)) resolved.push(m);
       }
     }
 

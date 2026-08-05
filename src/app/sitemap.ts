@@ -5,11 +5,13 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://cinemind.co.il";
 
 // Public, indexable routes only. Left out on purpose: /admin and /profile (private),
 // /login (no content), /duel/[id]/play (private session), /cards/[id] (user-generated,
-// unbounded, and only meaningful to whoever got the link).
+// unbounded, and only meaningful to whoever got the link), and /scan — the quiz screen
+// itself, which renders a session that does not exist until someone starts one. It has no
+// stable content to rank, and arriving there from a search result drops a visitor into the
+// middle of a quiz with no idea what the product is. /quiz is the page that explains it.
 const PAGES: Array<{ path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }> = [
   { path: "", priority: 1, changeFrequency: "weekly" },
   { path: "/quiz", priority: 0.9, changeFrequency: "weekly" },
-  { path: "/scan", priority: 0.8, changeFrequency: "monthly" },
   { path: "/daily", priority: 0.8, changeFrequency: "daily" },
   { path: "/pulse", priority: 0.7, changeFrequency: "daily" },
   { path: "/arena", priority: 0.7, changeFrequency: "weekly" },

@@ -147,6 +147,9 @@ export default function ScanMovieEvaluation() {
   // laptop viewport still ends 100px short of it — so whenever a new film arrives we make sure
   // the controls are actually visible instead of trusting the layout math.
   const answerRowRef = useRef<HTMLDivElement | null>(null);
+  // Was the last answer given with a keyboard? Decides whether focus is restored after the card
+  // swaps — see the effect below.
+  const keyboardRef = useRef(false);
 
   // E2E probe: mirror the FULL live session to window so the persona swarms can read the
   // served question (currentQuestion), the final picks (finalMovies) and the rated clock
@@ -244,6 +247,14 @@ export default function ScanMovieEvaluation() {
     const id = setTimeout(() => {
       const r = el.getBoundingClientRect();
       if (r.bottom > window.innerHeight) el.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      // AND KEEP THE KEYBOARD WHERE IT WAS. Answering re-renders the card, which drops focus to
+      // <body> — so someone using a keyboard had to tab from the top of the page again for every
+      // single film. Twenty films, twenty journeys through the nav. Focus returns to the rating
+      // row, but only for the person who was already using the keyboard: moving it for a mouse or
+      // touch user would yank the page around for no reason.
+      if (keyboardRef.current && document.activeElement === document.body) {
+        el.querySelector<HTMLButtonElement>('.stars-container button')?.focus();
+      }
     }, 350);
     return () => clearTimeout(id);
   }, [session?.currentQuestion?.id, session?.isComplete]);
@@ -862,7 +873,11 @@ export default function ScanMovieEvaluation() {
                   it at y=1129 inside a 720px-tall laptop viewport — 409px below the fold, so a
                   click aimed at a star hit the poster and nothing happened. Both sizes are now
                   bounded by the viewport, so the poster shrinks before the controls leave. */}
-              <div className="relative w-full h-[30vh] min-h-[190px] max-h-[400px] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-zinc-900">
+              {/* The min-height is what breaks a SHORT screen: on an iPhone SE (375x667) the poster
+                  sat at its 190px floor and pushed "didn't see it" to y=719, 52px past the bottom.
+                  Viewport width was never the problem — height is. Below 700px tall the floor comes
+                  down so the answer row stays reachable. */}
+              <div className="relative w-full h-[30vh] min-h-[190px] max-h-[400px] [@media(max-height:700px)]:min-h-[140px] [@media(max-height:700px)]:h-[22vh] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-zinc-900">
                 <ImageWithFallback
                   src={cardMovie?.posterUrl || ''}
                   alt={cardMovie?.title ? (he ? `כרזת ${cardMovie.title}` : `${cardMovie.title} poster`) : ''}
@@ -892,7 +907,7 @@ export default function ScanMovieEvaluation() {
                 <p className="text-xs text-zinc-300 font-mono mb-5 uppercase tracking-[0.2em] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{session.currentQuestion?.movie?.originalDetails}</p>
                 <p className="text-sm md:text-base text-zinc-200 leading-relaxed mb-4 md:mb-8 min-h-[2.5rem] md:min-h-[3rem] line-clamp-2 max-w-lg mx-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] font-medium">{session.currentQuestion?.movie?.overview}</p>
                 
-                <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-4 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[72px] md:min-h-[100px] leading-tight">
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-white bg-white/[0.04] py-4 px-6 md:py-6 md:px-8 rounded-3xl border border-white/10 shadow-inner flex items-center justify-center mx-2 min-h-[72px] [@media(max-height:700px)]:min-h-[56px] [@media(max-height:700px)]:py-2 md:min-h-[100px] leading-tight">
                   {session.currentQuestion?.text}
                 </div>
               </div>
@@ -928,7 +943,9 @@ export default function ScanMovieEvaluation() {
                       onMouseLeave={() => setHoveredStar(null)} 
                       onFocus={() => setHoveredStar(star)}
                       onBlur={() => setHoveredStar(null)}
-                      onClick={() => handleStarClick(star as AnswerType)} 
+                      // A click carries coordinates; a keyboard-fired one does not. That is how we
+                      // tell whether focus needs to be put back after the card swaps.
+                      onClick={(e) => { keyboardRef.current = e.detail === 0; handleStarClick(star as AnswerType); }} 
                       aria-label={locale === 'he' ? `דירוג ${star} מתוך 5` : `Rate ${star} out of 5`}
                       className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                     >
