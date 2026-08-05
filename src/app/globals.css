@@ -79,3 +79,29 @@ h1, h2, h3, h4, h5, h6, p, span, div {
   scrollbar-width: none;
 }
 
+
+/* REDUCED MOTION.
+ *
+ * The quiz is motion-heavy by design: the card slides out on every answer, the meter animates,
+ * and a five-star rating can fire a full-screen effect (falling Oscars, a blood splatter, a
+ * Matrix rain). For someone with a vestibular disorder that is not decoration — it is nausea,
+ * twenty times in one session, on the one screen the product asks them to concentrate on.
+ *
+ * The operating system already carries their answer. Nothing here checked it. Transitions and
+ * animations collapse to an instant state change rather than being removed, so every control
+ * still shows its hover, focus and pressed states — only the travel is gone. scroll-behavior
+ * returns to auto so the scroll-into-view on the answer row jumps instead of gliding. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}

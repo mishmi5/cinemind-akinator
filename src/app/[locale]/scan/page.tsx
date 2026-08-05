@@ -292,9 +292,15 @@ export default function ScanMovieEvaluation() {
     if (!session || !session.currentQuestion || session.isComplete || loading) return;
 
     if (star === 5) {
-      // Random visual effect
+      // A five-star answer throws a full-screen effect: falling Oscars, a blood splatter, Matrix
+      // rain. Someone who has asked their operating system for reduced motion has told us that
+      // this makes them ill, and the CSS can only flatten the animation — the overlay would still
+      // sweep the screen. For them the effect simply does not fire; the toast still does, so the
+      // answer is still acknowledged.
+      const wantsCalm = typeof window !== 'undefined'
+        && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       const effects: EasterEggType[] = ['oscar', 'blood', 'wazzap', 'matrix'];
-      setActiveEffect(effects[Math.floor(Math.random() * effects.length)]);
+      if (!wantsCalm) setActiveEffect(effects[Math.floor(Math.random() * effects.length)]);
       
       showToast(quizToasts.fiveStarToasts, '✨');
       

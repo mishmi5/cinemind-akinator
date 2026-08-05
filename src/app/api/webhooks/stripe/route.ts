@@ -110,7 +110,12 @@ Email: ${session.customer_details?.email || 'unknown'} — grant manually.`);
         await sendTelegramAlert(
           `🛒 <b>Abandoned Cart Detected</b>\nA customer reached the checkout page but didn't finish.\nEmail: ${abandonedSession.customer_details?.email || 'Not provided'}`
         );
-        // TODO: Integrate Resend to send "Hey, you left your Premium upgrade!"
+        // No "you left your upgrade" email is sent here, and that is a decision rather than a gap.
+        // Someone who reached the checkout and walked away has given us an address for a purchase
+        // they did not make — not consent to be marketed to. Under the Communications Law an
+        // unsolicited commercial message of that kind needs prior consent, must be labelled
+        // "פרסומת", and carries a statutory penalty per message. The Telegram alert above tells
+        // the owner it happened, which is the part that needs no permission.
         break;
       }
 
