@@ -238,15 +238,28 @@ export async function POST(req: Request) {
   try {
     // The endpoint had no limit at all: thirty concurrent finish-requests took fifty seconds each,
     // because every one of them fans out into TMDB lookups and three LLM calls, and a fresh
-    // sessionId defeats every cache. A quiz is one answer every few seconds; sixty a minute is
-    // already generous for a human.
+    // sessionId defeats every cache.
+    //
+    // The limit used to be sixty a minute PER IP, and that punishes the wrong person. One quiz is
+    // twenty to forty answers, so a single visitor fits — but an office, a household, and above
+    // all a mobile carrier's CGNAT put hundreds or thousands of unrelated people behind one
+    // address. On a launch with any concurrent traffic from one carrier, real visitors would have
+    // been cut off mid-quiz with a 429. It is not a hypothetical: this suite exhausted the budget
+    // and watched a quiz die at question 16.
+    //
+    // So the tight limit now lives where the abuse actually is — a single SESSION answering faster
+    // than a person can read a film card. The per-IP number stays as a crude flood ceiling, high
+    // enough that a shared address is not collateral damage. A flooder who rotates session ids to
+    // dodge the session limit still meets the IP ceiling.
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-    if (!checkRateLimit('brain:' + ip, 60, 60_000)) {
+    if (!checkRateLimit('brain-ip:' + ip, 600, 60_000)) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
+
     // A body that is not JSON is the caller's mistake, not ours: `{oops` threw inside the handler
     // and came back as a 500, which reads as "the server is broken" to a monitor and to anyone
-    // probing the API. It is a 400, and it says nothing else.
+    // probing the API. It is a 400, and it says nothing else. Parsed here, before the per-session
+    // limit below, so the body is read exactly once.
     let payload: Record<string, unknown> & { [k: string]: any };
     try {
       payload = await req.json();
@@ -255,6 +268,16 @@ export async function POST(req: Request) {
     }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       return NextResponse.json({ error: 'Body must be a JSON object' }, { status: 400 });
+    }
+
+    // The tight limit, on the thing that actually identifies a quiz. Ninety a minute, not forty:
+    // forty is one answer every 1.5 seconds, and someone who recognises every film on sight
+    // genuinely answers that fast — they are the most engaged visitor the product has, and cutting
+    // them off mid-quiz would be the worst possible reading of "abuse". Ninety still means a
+    // machine, since a replay flood fires hundreds in the same window.
+    const rlSessionId = typeof payload.sessionId === 'string' ? payload.sessionId.slice(0, 128) : '';
+    if (rlSessionId && !checkRateLimit('brain-session:' + rlSessionId, 90, 60_000)) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
     const locale = req.headers.get('x-locale') || 'he';
     // These headers come from the browser and were parsed with a bare JSON.parse: a header of
@@ -489,7 +512,19 @@ export async function POST(req: Request) {
       if (!probe[t]) firstLook.push(c);
       else if (ambiguous(t)) secondChance.push(c);
     }
-    const uncovered = firstLook.length ? firstLook : secondChance;
+    // A NAMED FAMILY KEEPS ITS SECOND CHANCE. secondChance is normally held back until every term
+    // in the catalogue has had a first look, which is right while the engine is still exploring —
+    // but it broke the one promise the direction panel makes. Westerns are a single sub-genre term:
+    // point at them, get exactly one western, then forty questions of everything else, because the
+    // family had no unprobed candidate left and its second exemplar was behind a queue of
+    // forty-six other terms. Measured on the production build: one western in twelve questions.
+    // A family the user asked for jumps that queue; nothing else does.
+    const chosenSecondChance = chosenFams.size
+      ? secondChance.filter(c => chosenFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || ''))
+      : [];
+    const uncovered = firstLook.length || chosenSecondChance.length
+      ? [...chosenSecondChance, ...firstLook]
+      : secondChance;
     const sweepDone = uncovered.length === 0;
     // EARLY-STOP (adaptive length): if the leader is a PERFECT 5★ love AND its whole family
     // has been explored — so every close neighbour was compared and the drill-off settled —
@@ -750,6 +785,23 @@ export async function POST(req: Request) {
       pool = [nextUp.find(c => !rejectsUser(c)) || nextUp[0]];
       poolSrc = 'sweep';
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
+
+      // WHEN THE CURATED SHELF RUNS OUT, GO TO THE REAL ONE. The sampler holds a couple of
+      // exemplars per sub-genre, and westerns are a single sub-genre — so someone who pointed at
+      // westerns got two films and then nothing, while the sweep moved on to musicals. Two films
+      // is not "we'll go from there". Once a family the user NAMED has nothing left in the curated
+      // set, the next question comes from that family's genre shelf on TMDB, which does not run
+      // out. Only for families they asked for; the ordinary sweep is untouched.
+      const headFam = subGenreFamily(samplerProbeOf(pool[0]?.id || '') || '') || '';
+      if (chosenFams.size && !chosenFams.has(headFam)) {
+        const wanted = [...chosenFams][0];
+        const famPool = (await fetchFamilyPool(wanted, seen, locale, 12)).filter(c => !rejectsUser(c));
+        if (famPool.length) {
+          pool = [famPool[Math.floor(Math.random() * famPool.length)]];
+          poolSrc = 'chosen-family';
+          nextHint = wanted;
+        }
+      }
     } else {
       // POST-SWEEP: every remaining question belongs to the taste we have already found. The
       // sources are tried in order of how surely they are still "the right shelf", and each one
@@ -1324,12 +1376,28 @@ export async function POST(req: Request) {
     // A token is only issued for a quiz THIS server ran. A session reconstructed from whatever
     // the client sent — a cold start, a redeploy, or a forgery — still gets its recommendations,
     // but it cannot be exchanged for XP or Popcorn Tokens at /api/user/bootstrap.
-    const proofToken = isVerified(sessionKey) ? signSessionState({
-      sessionId,
-      totalAnswers: history.length, // real ratings only — NOT_SEEN never counts
-      affinities: subGenreVector,
-      completedAt: Date.now(),
-    }) : undefined;
+    //
+    // AND IF WE CANNOT SIGN, THE FILMS STILL SHIP. The signer throws in production when
+    // SESSION_SECRET is unset, which is the correct answer for the SECRET — never fall back to a
+    // known string — but it was the whole response's answer too: a run against the production
+    // build died with a 500 at question 35, after the person had answered thirty-five films. The
+    // token is a receipt for XP; the recommendation is the product. Failing to mint the receipt
+    // must not destroy the thing it is a receipt for. No token still means no grant downstream,
+    // so nothing is loosened; the misconfiguration is logged loudly instead of silently.
+    let proofToken: string | undefined;
+    if (isVerified(sessionKey)) {
+      try {
+        proofToken = signSessionState({
+          sessionId,
+          totalAnswers: history.length, // real ratings only — NOT_SEEN never counts
+          affinities: subGenreVector,
+          completedAt: Date.now(),
+        });
+      } catch (e) {
+        console.error('[brain] could not sign the completion token — the quiz still returns its ' +
+          'films, but this session cannot earn XP. Set SESSION_SECRET.', e);
+      }
+    }
 
     return NextResponse.json({
       ...baseState, tasteSummary,
