@@ -236,7 +236,7 @@ export async function POST(req: Request) {
         seed,
         isComplete: false, confidenceScore: 0.01, historyCount: 0,
         askedMovieIds, userAffinities: {},
-        currentVectorState: { possibleMoviesRemaining: 85432, leadingMicroGenres: [locale === 'en' ? 'Initializing global scan...' : 'מאתחל סריקה גלובלית...'] },
+        currentVectorState: { leadingMicroGenres: [locale === 'en' ? 'Initializing global scan...' : 'מאתחל סריקה גלובלית...'] },
         currentQuestion: { id: `init_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected }
       }, { status: 200 });
     }
@@ -386,20 +386,33 @@ export async function POST(req: Request) {
         return { movie: m, score: s };
       });
       
+      // The picks are kept with their scores, not stripped down to the films. The badge on the
+      // results card used to read 99% for every pick of every user — a number nobody computed.
+      // The scores that ranked these three are right here; a match figure derived from them and
+      // from the confidence the quiz actually reached is a measurement rather than a decoration.
+      const top3scored: { movie: MovieContext; score: number }[] = [];
       const top3: MovieContext[] = [];
       const pool = [...scoredRecs];
       while (top3.length < 3 && pool.length) {
         pool.sort((a, b) =>
           (b.score + diversityPenalty(b.movie, top3, userAffinities)) - (a.score + diversityPenalty(a.movie, top3, userAffinities))
         );
-        top3.push(pool.shift()!.movie);
+        const next = pool.shift()!;
+        top3scored.push(next);
+        top3.push(next.movie);
       }
-      
+
       for (const match of top3) {
         if (!match.trailerId) match.trailerId = await getTrailerForMovieId(match.id);
       }
-      finalMoviesResult = top3.map(bestMatch => ({
-        id: `res_${bestMatch.id}`, title: bestMatch.title, matchScore: 99, 
+      // Relative to the best pick, so the second and third read as slightly weaker matches — which
+      // is what they are — and scaled by the confidence the quiz reached, so a person who stopped
+      // early is not told the read was as sure as a completed one. Floored at 60 because a figure
+      // below that would be telling someone we recommended a film we do not believe in.
+      const bestScore = Math.max(1, top3scored[0]?.score ?? 1);
+      finalMoviesResult = top3scored.map(({ movie: bestMatch, score }) => ({
+        id: `res_${bestMatch.id}`, title: bestMatch.title,
+        matchScore: Math.max(60, Math.round(Math.min(1, score / bestScore) * Math.max(newConfidence, 0.6) * 100)),
         posterUrl: bestMatch.posterUrl, trailerId: bestMatch.trailerId, overview: bestMatch.overview,
         _microTags: bestMatch._microTags || [],
         _genreIds: bestMatch._genreIds || []
@@ -407,7 +420,11 @@ export async function POST(req: Request) {
     }
 
     // 👑 Sales Psychology: Dramatic reduction in remaining movies to build massive FOMO
-    const remainingMovies = isComplete ? 1 : Math.max(2, Math.floor(85432 * Math.pow(1 - newConfidence, 4.5)));
+    // `possibleMoviesRemaining` used to be emitted here as 85432 × (1-confidence)^4.5 — a count of
+    // films "still in play" derived from the progress bar rather than from any pool this engine
+    // holds. Nothing in the interface ever rendered it, so it was a fabricated number kept alive
+    // for no reader at all. The field is gone from both responses; the coaching line below is what
+    // the screen actually shows, and it says how the read is going without quoting a fake count.
     
     let psychologicalMessage = locale === 'en' ? 'Catching your vibe...' : 'קולט את הווייב שלך...';
     if (newConfidence > 0.8) psychologicalMessage = locale === 'en' ? 'Wow, you have a very specific taste. Only a few movies match...' : 'אוקיי, יש לך טעם ממש מיוחד. נשארו סרטים בודדים שיכולים להתאים...';
@@ -435,7 +452,7 @@ export async function POST(req: Request) {
       seed,
       isComplete, confidenceScore: isComplete ? 1.0 : newConfidence,
       historyCount: currentCount + 1, askedMovieIds, userAffinities, seenMovieIds,
-      currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: [psychologicalMessage] },
+      currentVectorState: { leadingMicroGenres: [psychologicalMessage] },
       currentQuestion: isComplete ? null : nextMovie,
       finalMovies: finalMoviesResult,
       proofToken

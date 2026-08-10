@@ -11,9 +11,10 @@ import RoastReveal from '@/components/roast/RoastReveal';
 import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
 
-interface StartingMovie extends MovieContext {
-  dynamicQuestion: string;
-}
+// The offline fallback film. Its title, synopsis and question used to sit here as Hebrew string
+// literals, so an /en visitor met the very first card of the quiz in Hebrew. Everything a person
+// reads now comes from the message catalogue, keyed by the TMDB id below.
+type StartingMovie = Omit<MovieContext, 'title' | 'overview'>;
 
 // Engine switch. The DETERMINISTIC sub-genre brain is now the DEFAULT for every user
 // (surgical sub-genre resolution, adaptive length). Opt OUT to the legacy v12 formula
@@ -68,32 +69,42 @@ const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, 
 };
 
 const STARTING_POOL: StartingMovie[] = [
-  { id: "155", title: "האביר האפל", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/3KAtr9OX8Bq2FAvZtrjYcdUuBYp.jpg", overview: "באטמן מתמודד עם הג'וקר, פושע פסיכופתי...", trailerId: "EXeTwQWrcwY", dynamicQuestion: "האם היית רוצה לראות מאבק פסיכולוגי בין גיבור לא נחמד לנבל גאון?", easterEgg: { type: 'oscar' }, _genreIds: [28, 80] },
-  { id: "27205", title: "התחלה", originalDetails: "Inception · 2010", rating: 8.8, posterUrl: "/api/poster?path=/nPO8aNT4uGtDAY0bZZZACfP66Lo.jpg", overview: "גנב מקצועי נכנס לחלומות של אנשים...", trailerId: "YoHD9XEInc0", dynamicQuestion: "מד\"ב מתוחכם על חלומות ומציאות מדומה נשמע טוב?",easterEgg: { type: 'oscar' }, _genreIds: [28, 878] },
-  { id: "680", title: "ספרות זולה", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/hBS14aC5tyUasDhMGy0ihvp8hTB.jpg", overview: "סיפוריהם של פושעים בלוס אנג'לס...", trailerId: "s7EdQ4FqbhY", dynamicQuestion: "עד כמה אתה מתחבר לדיאלוגים שנונים, דם, וקפיצות בזמן?",easterEgg: { type: 'wazzap' }, _genreIds: [80] },
-  { id: "348", title: "הנוסע השמיני", originalDetails: "Alien · 1979", rating: 8.5, posterUrl: "/api/poster?path=/odmhIedIOFZXj98yLcXRBl5UrNq.jpg", overview: "צוות חללית נתקל ביצור חייזרי קטלני...", trailerId: "LjLamj-b0I8", dynamicQuestion: "קלאסיקת אימה בחלל עם מפלצת בלתי ניתנת לעצירה - כן או לא?",easterEgg: { type: 'blood' }, _genreIds: [27, 878] },
-  { id: "603", title: "מטריקס", originalDetails: "The Matrix · 1999", rating: 8.7, posterUrl: "/api/poster?path=/xC1MsxS9wJ3EcBjIRJv8PkhFtzJ.jpg", overview: "העולם שאנחנו מכירים הוא בעצם אשליה.", trailerId: "vKQi3bBA1y8", dynamicQuestion: "האם מציאות מדומה, סייברפאנק וקרבות קונג-פו עושים לך את זה?",easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
-  { id: "98", title: "גלדיאטור", originalDetails: "Gladiator · 2000", rating: 8.2, posterUrl: "/api/poster?path=/zJjf7dAIBBHsJjK6L38D3bzOWek.jpg", overview: "גנרל רומי נבגד והופך לגלדיאטור...", trailerId: "owK1qxDselE", dynamicQuestion: "אפוס היסטורי ענק עם קרבות חרבות עד המוות - מדבר אליך?",easterEgg: { type: 'oscar' }, _genreIds: [28, 12] },
-  { id: "157336", title: "בין כוכבים", originalDetails: "Interstellar · 2014", rating: 8.6, posterUrl: "/api/poster?path=/9W7qYnmi1W3648YXVJvpjk82MUf.jpg", overview: "מסע אפי בחלל להצלת האנושות...", trailerId: "zSWdZVtXT7E", dynamicQuestion: "מסע חלל מרהיב שגורם לך לחשוב על משמעות החיים - איך זה נשמע?",easterEgg: { type: 'oscar' }, _genreIds: [878, 12] },
-  { id: "4232", title: "צעקה", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/lr9ZIrmuwVmZhpZuTCW8D9g0ZJe.jpg", overview: "רוצח סדרתי במסכה רודף אחרי קבוצת בני נוער.", trailerId: "AWm_mkbdpCA", dynamicQuestion: "האם מתאים לך רוצח בשר ודם שמחסל בני נוער אחד אחד (סלאשר)?",easterEgg: { type: 'wazzap' }, _genreIds: [27] },
-  { id: "22970", title: "בקתה ביער", originalDetails: "The Cabin in the Woods · 2011", rating: 8.0, posterUrl: "/api/poster?path=/zZZe5wn0udlhMtdlDjN4NB72R6e.jpg", overview: "חמישה חברים נוסעים לבקתה מבודדת ומגלים שהכל חלק מניסוי מטורף.", trailerId: "NsIilFNNmkY", dynamicQuestion: "האם היית רוצה סרט שמפרק את כל חוקי האימה בצורה קומית וגאונית?",easterEgg: { type: 'blood' }, _genreIds: [27, 35] },
-  { id: "11036", title: "היומן", originalDetails: "The Notebook · 2004", rating: 8.0, posterUrl: "/api/poster?path=/s4kMNZZwJ0LXnR6iHpDMfuehhHe.jpg", overview: "סיפור אהבה מרגש חוצה עשורים מעבר להבדלי מעמדות.", trailerId: "FC6biTjEyZw", dynamicQuestion: "בא לך סיפור אהבה קלאסי סוחף ורומנטי שיגרום לך לבכות?", easterEgg: { type: 'oscar' }, _genreIds: [10749, 18] },
-  { id: "862", title: "צעצוע של סיפור", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/oLII3pJFSfeLFDKCZbaUIAXEqqz.jpg", overview: "צעצועים קמים לתחייה כשבני האדם לא מסתכלים.", trailerId: "v-PjgYDrg70", dynamicQuestion: "היית זורם על הרפתקת אנימציה מופלאה ומחממת לב לכל המשפחה?", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
+  { id: "155", originalDetails: "The Dark Knight · 2008", rating: 9.0, posterUrl: "/api/poster?path=/3KAtr9OX8Bq2FAvZtrjYcdUuBYp.jpg", trailerId: "EXeTwQWrcwY", easterEgg: { type: 'oscar' }, _genreIds: [28, 80] },
+  { id: "27205", originalDetails: "Inception · 2010", rating: 8.8, posterUrl: "/api/poster?path=/nPO8aNT4uGtDAY0bZZZACfP66Lo.jpg", trailerId: "YoHD9XEInc0", easterEgg: { type: 'oscar' }, _genreIds: [28, 878] },
+  { id: "680", originalDetails: "Pulp Fiction · 1994", rating: 8.9, posterUrl: "/api/poster?path=/hBS14aC5tyUasDhMGy0ihvp8hTB.jpg", trailerId: "s7EdQ4FqbhY", easterEgg: { type: 'wazzap' }, _genreIds: [80] },
+  { id: "348", originalDetails: "Alien · 1979", rating: 8.5, posterUrl: "/api/poster?path=/odmhIedIOFZXj98yLcXRBl5UrNq.jpg", trailerId: "LjLamj-b0I8", easterEgg: { type: 'blood' }, _genreIds: [27, 878] },
+  { id: "603", originalDetails: "The Matrix · 1999", rating: 8.7, posterUrl: "/api/poster?path=/xC1MsxS9wJ3EcBjIRJv8PkhFtzJ.jpg", trailerId: "vKQi3bBA1y8", easterEgg: { type: 'matrix' }, _genreIds: [878, 28] },
+  { id: "98", originalDetails: "Gladiator · 2000", rating: 8.2, posterUrl: "/api/poster?path=/zJjf7dAIBBHsJjK6L38D3bzOWek.jpg", trailerId: "owK1qxDselE", easterEgg: { type: 'oscar' }, _genreIds: [28, 12] },
+  { id: "157336", originalDetails: "Interstellar · 2014", rating: 8.6, posterUrl: "/api/poster?path=/9W7qYnmi1W3648YXVJvpjk82MUf.jpg", trailerId: "zSWdZVtXT7E", easterEgg: { type: 'oscar' }, _genreIds: [878, 12] },
+  { id: "4232", originalDetails: "Scream · 1996", rating: 8.4, posterUrl: "/api/poster?path=/lr9ZIrmuwVmZhpZuTCW8D9g0ZJe.jpg", trailerId: "AWm_mkbdpCA", easterEgg: { type: 'wazzap' }, _genreIds: [27] },
+  { id: "22970", originalDetails: "The Cabin in the Woods · 2011", rating: 8.0, posterUrl: "/api/poster?path=/zZZe5wn0udlhMtdlDjN4NB72R6e.jpg", trailerId: "NsIilFNNmkY", easterEgg: { type: 'blood' }, _genreIds: [27, 35] },
+  { id: "11036", originalDetails: "The Notebook · 2004", rating: 8.0, posterUrl: "/api/poster?path=/s4kMNZZwJ0LXnR6iHpDMfuehhHe.jpg", trailerId: "FC6biTjEyZw", easterEgg: { type: 'oscar' }, _genreIds: [10749, 18] },
+  { id: "862", originalDetails: "Toy Story · 1995", rating: 8.3, posterUrl: "/api/poster?path=/oLII3pJFSfeLFDKCZbaUIAXEqqz.jpg", trailerId: "v-PjgYDrg70", easterEgg: { type: 'oscar' }, _genreIds: [16, 10751, 35] }
 ];
 
 // The in-progress quiz, so a refresh resumes instead of wiping twenty answered questions.
 const RESUME_KEY = 'cinemind_active_session';
 
+// Neither quiz request had a deadline, and a hung connection does not fail — it waits. On the
+// first question that left a pulsing logo on screen with nothing behind it and no way back; in
+// the middle of a quiz it swallowed the answer, because the promise that would have shown the
+// error never settled. Six seconds is the point past which a visitor has already decided the
+// product is broken. Init falls back to the local pool, mid-quiz surfaces the retry toast.
+const QUIZ_FETCH_TIMEOUT_MS = 6000;
+
 const SOUNDS = {
   // Dead Google Sounds API removed to prevent CORB / Uncaught promise errors
 };
 
-const getDynamicPhrase = (count: number) => {
-  if (count < 2) return null; 
-  if (count === 2 || count === 3) return "🧠 המערכת מזהה דפוס מעניין בטעם שלך...";
-  if (count === 4 || count === 5) return "🎯 מצמצמים מ-50,000 סרטים ל-Top 1%...";
-  if (count === 6 || count === 7) return "⚡ ה-DNA הקולנועי שלך כמעט מפוענח לחלוטין.";
-  return "🔥 קרובים לשלמות. רק המדויקים ביותר שרדו את הסינון.";
+// The running commentary under the stars. It was four Hebrew literals, so an /en visitor was
+// coached in Hebrew from their second answer on; the translator is passed in because this runs
+// outside the component.
+const getDynamicPhrase = (count: number, t: (key: string) => string) => {
+  if (count < 2) return null;
+  if (count <= 3) return t('coach_pattern');
+  if (count <= 5) return t('coach_narrowing');
+  if (count <= 7) return t('coach_almost');
+  return t('coach_final');
 };
 
 export default function ScanMovieEvaluation() {
@@ -187,10 +198,16 @@ export default function ScanMovieEvaluation() {
       try {
         const raw = localStorage.getItem(RESUME_KEY);
         if (!raw) return false;
-        const saved = JSON.parse(raw) as { at: number; state: SessionState };
+        const saved = JSON.parse(raw) as { at: number; locale?: string; state: SessionState };
         // A day-old quiz is not worth resuming — the user has moved on.
         if (!saved?.state || !saved.state.currentQuestion || Date.now() - saved.at > 864e5) return false;
         if (saved.state.isComplete) return false;
+        // The films, their synopses and the question text are all fetched in the language the quiz
+        // started in, and they live inside this snapshot. Resuming it after the visitor switched
+        // language handed an English reader a Hebrew title, a Hebrew synopsis and a Hebrew question
+        // on an otherwise English page — seen in the browser. Snapshots written before this field
+        // existed carry no locale, so they are treated as the default language rather than dropped.
+        if ((saved.locale || 'he') !== locale) return false;
         setSession(saved.state);
         return true;
       } catch { return false; }
@@ -209,7 +226,8 @@ export default function ScanMovieEvaluation() {
             'x-locale': locale,
             ...eng.brainHeaders,
           },
-          body: JSON.stringify({ sessionId: `session_${Date.now()}`, isInit: true })
+          body: JSON.stringify({ sessionId: `session_${Date.now()}`, isInit: true }),
+          signal: AbortSignal.timeout(QUIZ_FETCH_TIMEOUT_MS),
         });
         if (res.ok) {
           const data: SessionState = await res.json();
@@ -231,7 +249,7 @@ export default function ScanMovieEvaluation() {
     if (!session) return;
     try {
       if (session.isComplete) localStorage.removeItem(RESUME_KEY);
-      else localStorage.setItem(RESUME_KEY, JSON.stringify({ at: Date.now(), state: session }));
+      else localStorage.setItem(RESUME_KEY, JSON.stringify({ at: Date.now(), locale, state: session }));
     } catch { /* private mode / quota — resuming is a bonus, never a hard dependency */ }
   }, [session]);
 
@@ -274,10 +292,15 @@ export default function ScanMovieEvaluation() {
     let availableStarts = STARTING_POOL.filter(m => !localAsked.includes(m.id));
     if (availableStarts.length === 0) availableStarts = STARTING_POOL; 
     const randomStart = availableStarts[Math.floor(Math.random() * availableStarts.length)];
+    const movie: MovieContext = {
+      ...randomStart,
+      title: t(`fallback.${randomStart.id}.title`),
+      overview: t(`fallback.${randomStart.id}.overview`),
+    };
     setSession({
       sessionId: `session_${Date.now()}`, isComplete: false, confidenceScore: 0.01, historyCount: 0,
       askedMovieIds: [randomStart.id], currentVectorState: { possibleMoviesRemaining: 15000, leadingMicroGenres: [] },
-      currentQuestion: { id: `init_${Date.now()}`, text: randomStart.dynamicQuestion, movie: randomStart },
+      currentQuestion: { id: `init_${Date.now()}`, text: t(`fallback.${randomStart.id}.question`), movie },
       userAffinities: {}
     });
   };
@@ -333,7 +356,7 @@ export default function ScanMovieEvaluation() {
     setLoading(true);
     setAnimateCard(true);
 
-    // שמירה בהיסטוריה כדי לאפשר "אחורה"
+    // Snapshot the current state so the "back" button has somewhere to return to.
     setHistoryState(prev => [...prev, session!]);
     const currentTitle = session!.currentQuestion?.movie?.title;
     if (currentTitle && !seenTitlesRef.current.includes(currentTitle)) {
@@ -388,7 +411,8 @@ export default function ScanMovieEvaluation() {
           // server exclude them. Body (not header) because Hebrew titles aren't
           // valid ISO-8859-1 header values.
           askedTitles: seenTitlesRef.current.slice(-60)
-        })
+        }),
+        signal: AbortSignal.timeout(QUIZ_FETCH_TIMEOUT_MS),
       });
 
       let response = await doFetch();
@@ -455,6 +479,10 @@ export default function ScanMovieEvaluation() {
       // stayed on screen, and nothing told the user their answer had not been recorded. They
       // clicked again into a dead control. Say what happened and let them retry.
       console.error('[scan] answer failed', error);
+      // The answer never landed, so the snapshot pushed above is not a step the user took. Left
+      // in place it duplicates the current question in the back stack, and "back" appears to do
+      // nothing the first time it is pressed.
+      setHistoryState(prev => prev.slice(0, -1));
       showToast([locale === 'he'
         ? 'התשובה לא נשלחה — כנראה החיבור. אפשר ללחוץ שוב על אותו דירוג.'
         : "That answer didn't reach us — probably the connection. Tap the same rating again."], '📡');
@@ -527,7 +555,7 @@ export default function ScanMovieEvaluation() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
+      <div className="min-h-screen bg-surface-0 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 animate-pulse"><CineMindLogo className="w-20 h-20" /><div className="text-zinc-400 font-bold tracking-widest text-lg">{t('loading_db')}</div></div>
       </div>
     );
@@ -538,7 +566,7 @@ export default function ScanMovieEvaluation() {
   // on uncertain/contradicting ones). No monotonic max: a forced "never go back" would hide
   // those dips and also cause the jump-to-100.
   const confidencePercentage = Math.max(1, session.progressPercent ?? Math.round(session.confidenceScore * 100));
-  const dynamicPhrase = getDynamicPhrase(session.historyCount);
+  const dynamicPhrase = getDynamicPhrase(session.historyCount, t);
   const he = locale === 'he';
   const trailerDialogLabel = he ? 'טריילר' : 'Trailer';
   const closeTrailerLabel = he ? 'סגירת הטריילר' : 'Close the trailer';
@@ -589,7 +617,7 @@ export default function ScanMovieEvaluation() {
     submitAnswer('NOT_SEEN', false, next);
   };
   return (
-    <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] text-white font-sans overflow-x-hidden pb-20 relative">
+    <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-surface-0 text-white font-sans overflow-x-hidden pb-20 relative">
       <SkipLink />
 
       {activeEffect === 'oscar' && (
@@ -631,7 +659,7 @@ export default function ScanMovieEvaluation() {
             role="dialog"
             aria-modal="true"
             aria-label={trailerDialogLabel}
-            className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl overflow-hidden shadow-[0_0_120px_rgba(225,29,72,0.4)]"
+            className="relative w-full max-w-6xl aspect-video bg-black rounded-card overflow-hidden shadow-raise"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -653,13 +681,13 @@ export default function ScanMovieEvaluation() {
       )}
 
       {activeToast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-zinc-900 border border-rose-500/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 max-w-sm text-center">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-4 bg-surface-2 border border-accent/50 rounded-control shadow-raise animate-in slide-in-from-bottom-5 fade-in duration-300 max-w-sm text-center">
           <span className="text-3xl mb-2 block">{activeToast.emoji}</span>
           <span className="text-rose-300 font-bold text-base leading-tight">{activeToast.text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')}</span>
         </div>
       )}
 
-      <nav className="relative z-20 flex items-center justify-between px-8 py-5 border-b border-white/5 bg-[#070709]">
+      <nav className="relative z-20 flex items-center justify-between px-8 py-5 border-b border-white/5 bg-surface-0">
         <Link href="/" className="text-2xl font-black tracking-tight flex items-center gap-2 hover:opacity-80 transition-opacity"><CineMindLogo className="w-8 h-8" />CineMind</Link>
         <div className="flex items-center gap-6 text-sm font-medium text-zinc-400"><Link href="/arena" className="hover:text-rose-400 font-bold transition-colors text-base">👾 {tNav('arena')}</Link><span className="text-zinc-400">{t('anonymous')}</span></div>
       </nav>
@@ -668,7 +696,7 @@ export default function ScanMovieEvaluation() {
         <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden me-6">
           {/* start-anchored so the bar grows from the side the locale reads from: right in Hebrew,
               left in English (it used to be pinned to the physical right in both). */}
-          <div className="absolute top-0 start-0 h-full bg-gradient-to-l from-rose-600 to-orange-500 transition-all duration-700 shadow-[0_0_10px_rgba(244,63,94,0.5)]" style={{ width: `${confidencePercentage}%` }}></div>
+          <div className="absolute top-0 start-0 h-full bg-gradient-to-l from-accent-strong to-accent-soft transition-all duration-700" style={{ width: `${confidencePercentage}%` }}></div>
         </div>
         {/* Someone who stops early gets a real read, not a finished one, and the bar was still
             printing a bare "55%" beside a headline that said we had cracked them. A percentage is
@@ -684,20 +712,24 @@ export default function ScanMovieEvaluation() {
 
       <div className="w-full max-w-5xl mx-auto px-4 mb-3 md:mb-6 flex justify-between items-center text-sm font-bold">
         {combo > 0 ? (
-          <div className="text-rose-500 font-black animate-bounce text-base drop-shadow-[0_0_10px_rgba(225,29,72,0.5)]">🔥 Combo {combo}</div>
+          <div className="text-accent font-black animate-bounce text-base">🔥 Combo {combo}</div>
         ) : <div />}
-        <div className="text-orange-500 flex items-center gap-2 text-base"><span>⚡</span> {t('brain_scan')}</div>
+        <div className="text-zinc-400 flex items-center gap-2 text-base"><span>⚡</span> {t('brain_scan')}</div>
       </div>
 
-      <div className="max-w-2xl mx-auto flex flex-col items-center">
-        
+      {/* px-4: the column had no horizontal padding, so on a phone the results headline and the
+          cards under it ran into both edges of the screen. */}
+      <div className="max-w-2xl mx-auto px-4 flex flex-col items-center">
+
         {session.isComplete ? (
           <div className="w-full mt-12 animate-in fade-in zoom-in duration-700">
             <div className="text-center mb-12">
               <span className="inline-block px-6 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full text-base font-bold mb-6">
                 {stoppedEarly ? (he ? '🎬 עצרנו כאן לבקשתך' : '🎬 Stopped here, as you asked') : `✅ ${t('perfect_match')}`}
               </span>
-              <h1 className="text-6xl font-black mb-4">
+              {/* A flat 60px headline is wider than a phone: "הנה מה שכבר קלטנו" overflowed the
+                  viewport on the one screen the whole quiz was building up to. */}
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black mb-4">
                 {stoppedEarly ? (he ? 'הנה מה שכבר קלטנו' : "Here's what we already read") : t('cracked_you')}
               </h1>
               <p className="text-zinc-400 text-xl">
@@ -709,11 +741,11 @@ export default function ScanMovieEvaluation() {
             </div>
             
             {session.finalMovies?.map((movie) => (
-              <div key={movie.id} className="relative bg-[#111113] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col items-center p-8 md:p-12 text-center mb-12 max-w-4xl mx-auto">
+              <div key={movie.id} className="relative bg-surface-1 border border-white/10 rounded-card overflow-hidden shadow-raise flex flex-col items-center p-8 md:p-12 text-center mb-12 max-w-4xl mx-auto">
                 
                 {/* Blurred Content Container */}
                 <div className={`transition-all duration-1000 ${isRevealed ? 'opacity-100 blur-none' : 'opacity-30 blur-[15px] select-none pointer-events-none'} w-full`}>
-                  <div className="w-48 md:w-64 aspect-[2/3] mx-auto relative rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.8)] bg-zinc-900 mb-8">
+                  <div className="w-48 md:w-64 aspect-[2/3] mx-auto relative rounded-control overflow-hidden shadow-raise bg-surface-2 mb-8">
                     <ImageWithFallback src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
                   </div>
                   <h2 className="text-4xl md:text-5xl font-black mb-2 text-white" dir={locale === 'he' ? 'rtl' : 'ltr'}>
@@ -777,8 +809,8 @@ export default function ScanMovieEvaluation() {
 
                 {/* Paywall Overlay */}
                 {!isRevealed && (
-                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-t from-[#0a0a0c] via-[#0a0a0c]/60 to-transparent p-4 sm:p-8">
-                    <div className="bg-zinc-900/95 backdrop-blur-3xl border border-rose-500/40 rounded-[2rem] p-6 sm:p-10 max-w-lg w-full text-center shadow-[0_0_80px_rgba(225,29,72,0.25)] animate-in slide-in-from-bottom-10 fade-in duration-700">
+                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-t from-surface-0 via-surface-0/60 to-transparent p-4 sm:p-8">
+                    <div className="bg-surface-2/95 backdrop-blur-3xl border border-accent/40 rounded-panel p-6 sm:p-10 max-w-lg w-full text-center shadow-raise animate-in slide-in-from-bottom-10 fade-in duration-700">
                       <div className="text-5xl mb-6">🤫</div>
                       <h4 className="text-3xl font-black text-white mb-4">{t('your_movie_waits')}</h4>
                       {/* Personalized hook: the user's MEASURED taste axes — real data
@@ -802,7 +834,7 @@ export default function ScanMovieEvaluation() {
                         <Link
                           href="/pricing"
                           onClick={() => posthog.capture('paywall_click_starter')}
-                          className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black text-xl transition-all shadow-[0_0_30px_rgba(225,29,72,0.4)] hover:scale-[1.02] flex items-center justify-center gap-2"
+                          className="w-full py-4 bg-accent-strong hover:bg-accent text-white rounded-control font-black text-xl transition-all shadow-accent hover:scale-[1.02] flex items-center justify-center gap-2"
                         >
                           {locale === 'he' ? 'קח מקום מייסד — ₪99' : 'Take a founder seat — ₪99'}
                         </Link>
@@ -827,7 +859,7 @@ export default function ScanMovieEvaluation() {
                 )}
                 
                 {isRevealed && movie.trailerId && (
-                  <button onClick={() => setActiveTrailer(movie.trailerId)} className="mt-8 px-8 py-3 bg-rose-600/90 hover:bg-rose-500 text-white rounded-full flex items-center justify-center gap-2 font-bold transition-all shadow-[0_0_20px_rgba(225,29,72,0.5)] hover:scale-105 z-30">
+                  <button onClick={() => setActiveTrailer(movie.trailerId)} className="mt-8 px-8 py-3 bg-accent-strong/90 hover:bg-accent text-white rounded-full flex items-center justify-center gap-2 font-bold transition-all hover:scale-105 z-30">
                     ▶ {t('watch_trailer')}
                   </button>
                 )}
@@ -835,13 +867,15 @@ export default function ScanMovieEvaluation() {
             ))}
             
             {isRevealed && (
-              <div className="mt-12 bg-gradient-to-r from-rose-500/10 to-indigo-500/10 border border-indigo-500/30 rounded-[2rem] p-8 text-center max-w-3xl mx-auto shadow-[0_0_30px_rgba(99,102,241,0.15)] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-500 to-indigo-500"></div>
+              <div className="mt-12 bg-gradient-to-r from-accent/10 to-indigo-500/10 border border-indigo-500/30 rounded-panel p-8 text-center max-w-3xl mx-auto relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-accent to-indigo-500"></div>
                 <h3 className="text-2xl font-black mb-3 text-white">{t('liked_recommendation')}</h3>
                 <p className="text-zinc-300 text-base mb-6 leading-relaxed">
                   {t('keep_enjoying')}
                 </p>
-                <Link href="/pricing" className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:scale-105 active:scale-95">
+                {/* The one glow left on this screen: it is the only thing here we are asking
+                    anybody to press. */}
+                <Link href="/pricing" className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-control font-bold transition-all shadow-[0_0_30px_rgba(99,102,241,0.35)] hover:scale-105 active:scale-95">
                   {t('upgrade_elite')}
                 </Link>
               </div>
@@ -853,7 +887,7 @@ export default function ScanMovieEvaluation() {
 
             {/* FOMO Social Proof Toast */}
             {showSocialProof && (
-              <div className="fixed bottom-28 right-6 bg-zinc-900/95 border border-emerald-500/30 shadow-[0_10px_40px_rgba(16,185,129,0.2)] p-4 rounded-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-500">
+              <div className="fixed bottom-28 right-6 bg-surface-2/95 border border-white/10 shadow-raise p-4 rounded-control z-50 flex items-center gap-4 animate-in slide-in-from-bottom-10 fade-in duration-500">
                 <div className="w-3 h-3 bg-emerald-500 rounded-full animate-ping relative">
                   <div className="absolute inset-0 bg-emerald-500 rounded-full opacity-50"></div>
                 </div>
@@ -870,7 +904,7 @@ export default function ScanMovieEvaluation() {
             <div
               aria-live="polite"
               aria-atomic="true"
-              className={`w-full bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl relative transition-all duration-300 ${animateCard ? 'opacity-0 -translate-x-10 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}
+              className={`w-full bg-surface-1 border border-white/5 rounded-card overflow-hidden shadow-raise relative transition-all duration-300 ${animateCard ? 'opacity-0 -translate-x-10 scale-95' : 'opacity-100 translate-x-0 scale-100'}`}
             >
 
               {/* The answer controls must be on the first screen, on every screen. Fixed poster
@@ -883,18 +917,22 @@ export default function ScanMovieEvaluation() {
                   sat at its 190px floor and pushed "didn't see it" to y=719, 52px past the bottom.
                   Viewport width was never the problem — height is. Below 700px tall the floor comes
                   down so the answer row stays reachable. */}
-              <div className="relative w-full h-[30vh] min-h-[190px] max-h-[400px] [@media(max-height:700px)]:min-h-[140px] [@media(max-height:700px)]:h-[22vh] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-zinc-900">
+              <div className="relative w-full h-[30vh] min-h-[190px] max-h-[400px] [@media(max-height:700px)]:min-h-[140px] [@media(max-height:700px)]:h-[22vh] md:h-[46vh] md:min-h-[280px] md:max-h-[560px] bg-surface-2">
                 <ImageWithFallback
                   src={cardMovie?.posterUrl || ''}
                   alt={cardMovie?.title ? (he ? `כרזת ${cardMovie.title}` : `${cardMovie.title} poster`) : ''}
                   className="absolute inset-0 w-full h-full object-cover object-top opacity-100" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111113] via-transparent to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-surface-1 via-transparent to-transparent"></div>
+                {/* The same control as the one on the results card, which was rose while this one
+                    was red — two reds for one action, on two screens of the same product. */}
                 {cardMovie?.trailerId && (
-                  <button onClick={() => setActiveTrailer(cardMovie?.trailerId || null)} className="absolute top-6 start-6 bg-red-600/90 text-white text-sm font-bold px-5 py-2.5 rounded-full flex items-center gap-2 backdrop-blur-md hover:bg-red-500 transition-colors z-10 shadow-lg">
+                  <button onClick={() => setActiveTrailer(cardMovie?.trailerId || null)} className="absolute top-6 start-6 bg-accent-strong/90 text-white text-sm font-bold px-5 py-2.5 rounded-full flex items-center gap-2 backdrop-blur-md hover:bg-accent transition-colors z-10 shadow-lg">
                     ▶ {t('watch_trailer')}
                   </button>
                 )}
-                <div className="absolute bottom-6 end-6 bg-orange-500 text-white text-base font-black px-4 py-1.5 rounded-xl flex items-center gap-1.5 z-10 shadow-[0_0_15px_rgba(249,115,22,0.4)]">
+                {/* The public score, not a control — it was the loudest orange on a screen whose
+                    only accent is rose, and nothing happens when you press it. */}
+                <div className="absolute bottom-6 end-6 bg-black/70 border border-white/15 backdrop-blur-md text-white text-base font-black px-4 py-1.5 rounded-xl flex items-center gap-1.5 z-10">
                   {/* TMDB hands back 6.661; one decimal is what a rating badge is meant to show. */}
                   {typeof cardMovie?.rating === 'number' ? cardMovie.rating.toFixed(1) : cardMovie?.rating} ★
                 </div>
@@ -953,9 +991,9 @@ export default function ScanMovieEvaluation() {
                       // tell whether focus needs to be put back after the card swaps.
                       onClick={(e) => { keyboardRef.current = e.detail === 0; handleStarClick(star as AnswerType); }} 
                       aria-label={locale === 'he' ? `דירוג ${star} מתוך 5` : `Rate ${star} out of 5`}
-                      className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                      className="p-1 sm:p-2 group transition-transform hover:scale-110 active:scale-90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                     >
-                      <svg className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-200 ${(hoveredStar !== null && star <= hoveredStar) ? 'text-orange-500 fill-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.8)] scale-110' : 'text-zinc-700 fill-transparent stroke-current stroke-1'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
+                      <svg className={`w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-200 ${(hoveredStar !== null && star <= hoveredStar) ? 'text-accent fill-accent drop-shadow-[0_0_15px_rgba(244,63,94,0.8)] scale-110' : 'text-zinc-700 fill-transparent stroke-current stroke-1'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
                     </button>
                   ))}
                 </div>
@@ -973,7 +1011,7 @@ export default function ScanMovieEvaluation() {
                   not an exit. */}
               {showDirections && (
                 <div className="w-full max-w-md mx-auto mb-4 px-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="rounded-2xl border border-indigo-500/40 bg-indigo-500/[0.07] p-4 text-center shadow-[0_0_25px_rgba(99,102,241,0.15)]">
+                  <div className="rounded-control border border-indigo-500/40 bg-indigo-500/[0.07] p-4 text-center">
                     <p className="text-indigo-300 font-bold mb-1 text-base leading-snug">
                       {he ? 'עוד לא קלענו לך.' : "We haven't hit it yet."}
                     </p>
@@ -1006,7 +1044,7 @@ export default function ScanMovieEvaluation() {
 
               {showFinishOffer && (
                 <div className="w-full max-w-md mx-auto mb-4 px-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/[0.07] p-4 text-center shadow-[0_0_25px_rgba(16,185,129,0.15)]">
+                  <div className="rounded-control border border-signal/40 bg-signal/[0.07] p-4 text-center">
                     <p className="text-emerald-300 font-bold mb-3 text-base leading-snug">
                       {locale === 'he' ? 'כבר קלטנו את הטעם שלך. רוצה את שלושת הסרטים עכשיו?' : 'We have your taste. Want your three films now?'}
                     </p>
@@ -1014,7 +1052,7 @@ export default function ScanMovieEvaluation() {
                       <button
                         disabled={loading}
                         onClick={() => submitAnswer('NOT_SEEN', true)}
-                        className="px-6 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black text-base font-black transition-all active:scale-95"
+                        className="px-6 py-2.5 rounded-full bg-signal hover:bg-emerald-400 text-black text-base font-black transition-all active:scale-95"
                       >
                         {locale === 'he' ? 'כן, תראה לי 🎬' : 'Yes, show me 🎬'}
                       </button>
@@ -1034,7 +1072,9 @@ export default function ScanMovieEvaluation() {
                   "didn't see" row — a primary answer, not a footnote — ended at y=867, and a
                   visitor had to scroll to say they had not seen the film. */}
               <div className="flex flex-wrap justify-center gap-3 md:gap-4 mt-2 md:mt-6">
-                <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                {/* The hover glow here was 5% white over a near-black page: it rendered nothing,
+                    on hardware where it rendered at all. The border carries the hover instead. */}
+                <button disabled={loading} onClick={() => submitAnswer('NOT_SEEN')} className="px-8 py-3 rounded-full border border-white/10 hover:border-white/25 hover:bg-white/10 text-base font-bold text-zinc-400 transition-all">
                   {t('not_seen')} <span>{locale === 'he' ? '›' : '‹'}</span>
                 </button>
                 {/* Hidden while the offer above is on screen — two buttons that do the same thing,
@@ -1043,13 +1083,13 @@ export default function ScanMovieEvaluation() {
                   <button
                     disabled={loading}
                     onClick={() => submitAnswer('NOT_SEEN', true)}
-                    className="px-6 py-3 rounded-full border border-emerald-500/30 hover:bg-emerald-500/10 text-base font-bold text-emerald-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                    className="px-6 py-3 rounded-full border border-signal/40 hover:bg-signal/10 text-base font-bold text-emerald-400 transition-all"
                   >
                     {locale === 'he' ? 'מספיק, תמליץ לי עכשיו 🎬' : 'Enough — recommend now 🎬'}
                   </button>
                 )}
                 {historyState.length > 0 && (
-                  <button disabled={loading} onClick={handleBack} className="px-6 py-3 rounded-full border border-rose-500/30 hover:bg-rose-500/10 text-base font-bold text-rose-400 transition-all shadow-lg hover:shadow-[0_0_15px_rgba(225,29,72,0.2)]">
+                  <button disabled={loading} onClick={handleBack} className="px-6 py-3 rounded-full border border-accent/40 hover:bg-accent/10 text-base font-bold text-accent-soft transition-all">
                     <span>{locale === 'he' ? '‹' : '›'}</span> {t('back')}
                   </button>
                 )}

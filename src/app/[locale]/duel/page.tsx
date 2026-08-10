@@ -102,6 +102,19 @@ export default function DuelLobbyPage() {
           </div>
         )}
 
+        {/* A duel needs two identified players, and sign-in is not wired yet — every control on
+            /login is deliberately disabled. So for every visitor today, pressing "create" only
+            produced a red error box. A control that can never succeed reads as broken rather than
+            as unfinished, so we say plainly that it is not open yet and hide the controls until
+            authentication ships. Nothing links here; this page is reachable only by direct URL. */}
+        {!user ? (
+          <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-sm text-zinc-300 leading-relaxed">
+            {locale === 'he'
+              ? 'דו-קרב טעמים עוד לא פתוח. הוא דורש שני שחקנים מזוהים, וההתחברות עדיין לא עלתה לאוויר. עד אז — השאלון עצמו עובד במלואו ואינו דורש חשבון.'
+              : 'Taste duels are not open yet. A duel needs two identified players, and sign-in is not live. The quiz itself works in full and needs no account.'}
+          </div>
+        ) : (
+        <>
         <button
           onClick={handleCreateDuel}
           disabled={loading}
@@ -133,6 +146,8 @@ export default function DuelLobbyPage() {
             {t('join_button')}
           </button>
         </form>
+        </>
+        )}
       </motion.div>
       </div>
     </div>

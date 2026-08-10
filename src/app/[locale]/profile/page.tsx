@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLocale } from 'next-intl';
+import { Link } from '@/i18n/routing';
 import Navbar from '@/components/Navbar';
 import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
@@ -56,6 +57,7 @@ export default function UserProfile() {
     loved: { term: string; score: number }[];
     rejected: { term: string; score: number }[];
     totalTerms?: number;
+    economy?: { xp?: number; streak?: number } | null;
   } | null>(null);
   useEffect(() => {
     if (!authUser) return;
@@ -64,7 +66,13 @@ export default function UserProfile() {
       try {
         const token = await authUser.getIdToken();
         const res = await fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok && !cancelled) setTaste(await res.json());
+        if (res.ok && !cancelled) {
+          const body = await res.json();
+          setTaste(body);
+          // The server is the one that awards XP, so it is the one that knows the total. This page
+          // used to read localStorage only, which meant a user the server had paid 100 XP was shown 0.
+          if (typeof body?.economy?.xp === 'number') setXp(body.economy.xp);
+        }
       } catch { /* leave the empty state — never block the page on this */ }
     })();
     return () => { cancelled = true; };
@@ -106,7 +114,7 @@ export default function UserProfile() {
             <h1 className="text-4xl font-black mb-1">{authUser?.displayName || authUser?.email?.split('@')[0] || (taste?.hasProfile ? 'הפרופיל שלך' : 'אורח')}</h1>
             <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{locale === 'he' ? (TITLE_HE[title] || title) : title}</div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold mb-2">
-              👑 {taste?.isPremium ? 'CineMind Elite' : 'חשבון חינם'}
+              👑 {taste?.isPremium ? 'מקום מייסד' : 'חשבון חינם'}
             </div>
             <div className="text-xs text-zinc-400 mb-4 font-mono">
               {!isFirebaseConfigured ? "אורח זמני" : 
@@ -120,9 +128,12 @@ export default function UserProfile() {
           <div className="bg-black/50 border border-white/10 rounded-2xl p-6 text-center min-w-[150px] z-10">
             <div className="text-sm font-bold text-zinc-400 mb-1">XP נצבר</div>
             <div className="text-4xl font-black drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]" style={{ color: accent.hex }}>{xp}</div>
-            <button className="mt-4 text-xs font-bold text-white bg-white/10 hover:bg-white/20 w-full py-2 rounded-lg transition-colors">
+            <Link
+              href="/arena"
+              className="mt-4 block text-xs font-bold text-white bg-white/10 hover:bg-white/20 w-full py-2 rounded-lg transition-colors"
+            >
               שחק בזירה 👾
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -156,9 +167,15 @@ export default function UserProfile() {
                 </div>
               ))}
             </div>
-            <button className="mt-8 w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold text-sm text-zinc-300 transition-colors border border-white/5">
-              איפוס וכיול מחדש
-            </button>
+            {/* This said "reset and recalibrate" and did nothing at all — no handler, no endpoint.
+                Answering the quiz again IS the recalibration, so the button now says that and goes
+                there. A true delete-my-profile control belongs with the privacy request flow. */}
+            <Link
+              href="/scan"
+              className="mt-8 block text-center w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold text-sm text-zinc-300 transition-colors border border-white/5"
+            >
+              לענות על השאלון מחדש
+            </Link>
           </div>
 
           {/* היסטוריית סריקות (Top 3 Matches) */}

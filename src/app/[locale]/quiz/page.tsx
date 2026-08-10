@@ -19,9 +19,12 @@ export default function QuizIntroPage() {
       {/* Content */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center pt-12 pb-20 px-4 max-w-3xl mx-auto text-center">
         
+        {/* The badge used to repeat the h1 word for word, 32px above it. It now carries the two
+            facts a visitor weighs before starting: how long this takes, and that nothing is asked
+            of them first. */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-rose-900/50 bg-rose-950/20 text-rose-400 text-xs font-bold mb-8 shadow-[0_0_15px_rgba(225,29,72,0.1)]">
           <span>🧠</span>
-          <span>{t('title_span1')} {t('title_span2')}</span>
+          <span>{t('badge')}</span>
         </div>
 
         <h1 className="text-5xl md:text-6xl font-black tracking-tighter leading-tight mb-6">

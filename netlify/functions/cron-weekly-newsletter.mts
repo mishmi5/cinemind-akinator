@@ -14,6 +14,10 @@ export default async () => {
     headers: secret ? { Authorization: `Bearer ${secret}` } : {},
   });
   console.log(`[cron weekly-newsletter] ${res.status} ${res.statusText}`);
+  // The route answers 503 with the reasons when the mail could not be lawful (missing advertiser
+  // details, an unsubscribe link pointing at localhost). Without the body, that arrives here as a
+  // bare 503 and the reason never reaches whoever reads the function log.
+  if (!res.ok) console.error(`[cron weekly-newsletter] ${await res.text()}`);
 };
 
 export const config: Config = {

@@ -98,7 +98,14 @@ function PurchaseInner() {
                   לפרופיל שלי
                 </Link>
               </div>
+              {/* The buyer used to leave here with no record of the payment at all. Say where the
+                  invoice comes from, so an inbox without one is a known problem and not a doubt. */}
               <p className="text-zinc-500 text-sm mt-8">
+                החשבונית נשלחת אליך במייל מ-Stripe, לכתובת שהזנת בתשלום. אם היא לא הגיעה תוך כמה דקות,
+                תבדוק בספאם, ואם גם שם אין — כתוב ל־
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 underline">{SUPPORT_EMAIL}</a> עם מספר העסקה ונשלח אותה שוב.
+              </p>
+              <p className="text-zinc-500 text-sm mt-2">
                 מספר העסקה: <span className="font-mono">{sessionId}</span> — שמור אותו, הוא מזהה את הרכישה מול התמיכה.
               </p>
               <p className="text-zinc-500 text-sm mt-2">

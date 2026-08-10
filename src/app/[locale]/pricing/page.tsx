@@ -16,6 +16,7 @@ const FOUNDER_SEATS = 200;
 
 export default function PricingPage() {
   const [loading, setLoading] = useState(false);
+  const [soldOut, setSoldOut] = useState(false);
   const searchParams = useSearchParams();
   const locale = useLocale();
   const t = useTranslations('Pricing');
@@ -39,6 +40,15 @@ export default function PricingPage() {
       });
 
       const data = await response.json();
+
+      // Running out of seats is the offer working, not a failure. Checkout answers 409 with
+      // soldOut, and the generic catch below turned that into "נסה שוב בעוד רגע" — an alert that
+      // would repeat forever, since retrying can never bring a seat back.
+      if (response.status === 409 && data.soldOut) {
+        setSoldOut(true);
+        setLoading(false);
+        return;
+      }
 
       if (data.url) {
         // Secure hand-off to Stripe's payment page
@@ -106,15 +116,22 @@ export default function PricingPage() {
 
             <button
               onClick={handleCheckout}
-              disabled={loading}
-              className="mt-auto w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-black transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] disabled:opacity-50"
+              disabled={loading || soldOut}
+              className="mt-auto w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-black transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] disabled:opacity-50 disabled:hover:bg-indigo-600"
             >
-              {loading ? t('loading') : t('founder_cta')}
+              {soldOut ? t('sold_out_cta') : loading ? t('loading') : t('founder_cta')}
             </button>
+            {/* The block below the cards already says what happens after the 200; this only points
+                at it, so a buyer who arrived one seat too late is not left guessing. */}
+            {soldOut && <p className="text-indigo-200/70 text-sm mt-3">{t('sold_out_note')}</p>}
+            {/* There were three badges here. One rendered as the single word "Pay" — the Apple logo
+                glyph in front of it had been lost somewhere, leaving a nonsense chip on the card
+                that asks for money. Both wallet badges are gone rather than repaired: Stripe only
+                offers Apple Pay and Google Pay once the domain is registered with Stripe, so until
+                that is done the badges promise a payment method the checkout may not actually
+                present. Card is the one we can state without qualification. */}
             <div className="flex justify-center gap-4 mt-4 opacity-50">
               <span className="text-xs border border-white/20 px-2 py-1 rounded">{t('pay_card')}</span>
-              <span className="text-xs border border-white/20 px-2 py-1 rounded"> Pay</span>
-              <span className="text-xs border border-white/20 px-2 py-1 rounded">G Pay</span>
             </div>
           </div>
 

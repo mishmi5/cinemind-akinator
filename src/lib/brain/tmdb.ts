@@ -162,6 +162,24 @@ const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
   { term: 'musical', titles: ['La La Land', 'Les Misérables'] },
   { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', 'The Hobbit: An Unexpected Journey'] },
   { term: 'sword and sorcery fantasy', titles: ['Conan the Barbarian', 'Krull'] },
+  // Romance as its own family. Until now the only romance term was 'romantic comedy', filed under
+  // comedy — so someone who loves Casablanca and In the Mood for Love had no term to land on and
+  // was read as a comedy or a drama viewer.
+  { term: 'bittersweet romance', titles: ['In the Mood for Love', 'Eternal Sunshine of the Spotless Mind'] },
+  { term: 'sweeping romance', titles: ['Casablanca', 'Titanic'] },
+  // World cinema. A Hebrew-first product could not recommend a single Israeli film, and a Wong
+  // Kar-wai viewer was handed Tarkovsky because 'slow cinema arthouse' was the only non-Hollywood
+  // term in the catalogue. Each region is a taste of its own, not a footnote to arthouse.
+  { term: 'israeli cinema', titles: ['Waltz with Bashir', 'Footnote'] },
+  { term: 'east asian drama', titles: ['Parasite', 'Oldboy'] },
+  { term: 'european arthouse', titles: ['Amélie', 'Cinema Paradiso'] },
+  { term: 'latin american cinema', titles: ['City of God', 'Amores perros'] },
+  { term: 'indian cinema', titles: ['RRR', '3 Idiots'] },
+  // Crime epic — the mob saga was missing entirely, so a Godfather viewer scored as neo-noir.
+  { term: 'crime epic', titles: ['The Godfather', 'Goodfellas'] },
+  // Western had exactly ONE term, so the family emptied after two questions.
+  { term: 'classic western', titles: ['The Searchers', 'High Noon'] },
+  { term: 'documentary feature', titles: ['Free Solo', 'Man on Wire'] },
 ];
 // Each sub-genre's broad FAMILY — used by the engine's early-stop: once a confirmed 5★
 // leader's WHOLE family has been explored (so all its close neighbours were compared), it
@@ -178,6 +196,10 @@ const FAMILY_OF: Record<string, string> = {
   'satire': 'comedy', 'black comedy': 'comedy', 'deadpan comedy': 'comedy', 'slapstick comedy': 'comedy', 'romantic comedy': 'comedy', 'holiday christmas': 'comedy',
   'coming-of-age': 'drama', 'period costume drama': 'drama', 'sports drama': 'drama', 'slow cinema arthouse': 'drama', 'musical': 'drama',
   'epic high fantasy': 'fantasy', 'sword and sorcery fantasy': 'fantasy',
+  'bittersweet romance': 'romance', 'sweeping romance': 'romance',
+  'israeli cinema': 'world', 'east asian drama': 'world', 'european arthouse': 'world',
+  'latin american cinema': 'world', 'indian cinema': 'world',
+  'crime epic': 'crime', 'classic western': 'western', 'documentary feature': 'documentary',
 };
 export function subGenreFamily(term: string): string | undefined { return FAMILY_OF[term]; }
 /** Every sub-genre term the engine knows, for callers that need to walk a family. */
@@ -225,6 +247,15 @@ const POPULAR_OPENERS: { term: string; titles: string[] }[] = [
   { term: 'sports drama', titles: ['Rocky', 'The Blind Side', 'Coach Carter', 'Remember the Titans', 'Moneyball', 'Rush', 'Million Dollar Baby', 'Ford v Ferrari'] },
   { term: 'musical', titles: ['La La Land', 'The Greatest Showman', 'Mamma Mia!', 'Les Misérables', 'Chicago', 'Grease', 'Moulin Rouge!', 'A Star Is Born'] },
   { term: 'hand-drawn anime', titles: ['Spirited Away', 'Your Name', 'Princess Mononoke', 'My Neighbor Totoro', "Howl's Moving Castle", 'Demon Slayer: Kimetsu no Yaiba the Movie: Mugen Train', 'Akira', 'Weathering with You'] },
+  // The families added below had no opener at all, so their terms only ever surfaced in the late
+  // niche tier — a romance viewer met eight blockbusters they did not care about first.
+  { term: 'sweeping romance', titles: ['Titanic', 'The Notebook', 'Casablanca', 'Ghost', 'The Fault in Our Stars', 'A Star Is Born'] },
+  { term: 'bittersweet romance', titles: ['Eternal Sunshine of the Spotless Mind', 'Her', 'Lost in Translation', 'Before Sunrise', '500 Days of Summer'] },
+  { term: 'crime epic', titles: ['The Godfather', 'Goodfellas', 'Scarface', 'The Departed', 'Casino', 'American Gangster', 'The Irishman', 'Once Upon a Time in America'] },
+  { term: 'east asian drama', titles: ['Parasite', 'Oldboy', 'Memories of Murder', 'Burning', 'Shoplifters'] },
+  { term: 'classic western', titles: ['Unforgiven', 'Dances with Wolves', '3:10 to Yuma', 'High Noon', 'The Searchers', 'Rio Bravo'] },
+  { term: 'documentary feature', titles: ['Free Solo', 'March of the Penguins', 'An Inconvenient Truth', 'Bowling for Columbine', 'Icarus', 'Man on Wire'] },
+  { term: 'european arthouse', titles: ['Amélie', 'Cinema Paradiso', 'The Lives of Others', 'Life Is Beautiful', 'Pan\'s Labyrinth'] },
 ];
 
 let samplerCache: BrainCandidate[] | null = null;
@@ -355,6 +386,16 @@ const SUBGENRE_RECS: Record<string, string[]> = {
   'musical': ['La La Land', 'Les Misérables', 'The Greatest Showman', 'Chicago', 'Moulin Rouge!', 'West Side Story', 'Mamma Mia!', 'Hairspray'],
   'epic high fantasy': ['The Lord of the Rings: The Fellowship of the Ring', 'The Hobbit: An Unexpected Journey', 'The Lord of the Rings: The Two Towers', 'Willow', 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'Stardust', 'Eragon', 'The Lord of the Rings: The Return of the King'],
   'sword and sorcery fantasy': ['Conan the Barbarian', 'Krull', 'The Beastmaster', 'Dragonslayer', 'Red Sonja', 'Conan the Destroyer', 'The Sword and the Sorcerer', 'Hawk the Slayer'],
+  'bittersweet romance': ['In the Mood for Love', 'Eternal Sunshine of the Spotless Mind', 'Before Sunrise', 'Lost in Translation', 'Her', 'Blue Valentine', 'Past Lives', 'Chungking Express'],
+  'sweeping romance': ['Casablanca', 'Titanic', 'Gone with the Wind', 'Out of Africa', 'The English Patient', 'Doctor Zhivago', 'Cold War (2018)', 'The Notebook'],
+  'israeli cinema': ['Waltz with Bashir', 'Footnote', 'Beaufort', "The Band's Visit", 'Zero Motivation', 'Late Marriage', 'Gett: The Trial of Viviane Amsalem', 'Big Bad Wolves'],
+  'east asian drama': ['Parasite', 'Oldboy', 'Burning', 'Drive My Car', 'Shoplifters', 'Memories of Murder', 'Tokyo Story', 'Still Walking'],
+  'european arthouse': ['Amélie', 'Cinema Paradiso', 'The Lives of Others', 'La Dolce Vita', 'Persona', '8½', 'The 400 Blows', 'Toni Erdmann'],
+  'latin american cinema': ['City of God', 'Amores perros', 'Roma', 'The Secret in Their Eyes', 'Y tu mamá también', 'Central Station', 'Wild Tales', 'The Motorcycle Diaries'],
+  'indian cinema': ['RRR', '3 Idiots', 'Lagaan', 'Dangal', 'Gangs of Wasseypur', 'Pather Panchali', 'Andhadhun', 'Devdas'],
+  'crime epic': ['The Godfather', 'Goodfellas', 'The Godfather Part II', 'Once Upon a Time in America', 'Casino', 'Scarface', 'The Departed', 'Carlito\'s Way'],
+  'classic western': ['The Searchers', 'High Noon', 'Shane', 'Stagecoach', 'Rio Bravo', 'The Man Who Shot Liberty Valance', 'Unforgiven', 'Red River'],
+  'documentary feature': ['Free Solo', 'Man on Wire', 'Searching for Sugar Man', 'The Act of Killing', 'Grizzly Man', 'Icarus', "Won't You Be My Neighbor?", '20 Feet from Stardom'],
 };
 export function subGenreRecTitles(term: string): string[] { return SUBGENRE_RECS[term] || []; }
 
@@ -362,9 +403,13 @@ export function subGenreRecTitles(term: string): string[] { return SUBGENRE_RECS
 // of curated material. A one-term family (western) or a two-term one (fantasy) genuinely empties
 // around question 25, and before this the quiz fell through to whatever was trending — which is
 // how a locked western fan was asked about Harold & Kumar.
+// Romance, Documentary, History, Music and Family had no entry at all, so five whole shelves of
+// TMDB were unreachable to the top-up: a romance family would have fallen straight through to
+// whatever was trending.
 const FAMILY_GENRES: Record<string, number[]> = {
-  horror: [27], animation: [16], comedy: [35], scifi: [878], western: [37],
-  crime: [80, 53, 9648], fantasy: [14], action: [28, 12, 10752], drama: [18],
+  horror: [27], animation: [16, 10751], comedy: [35], scifi: [878], western: [37],
+  crime: [80, 53, 9648], fantasy: [14], action: [28, 12, 10752], drama: [18, 36, 10402],
+  romance: [10749], documentary: [99], world: [18, 36],
 };
 
 /** Quality films from a family's TMDB genres — the deep bench when curated material runs out. */
@@ -406,28 +451,81 @@ export async function fetchSeedCandidates(term: string, seenIds: string[], n = 8
   return out;
 }
 
-/** Deterministically recommend up to `n` real, unseen films squarely inside a CONFIRMED
- *  sub-genre, from the curated canonical seeds. Surgical: no LLM title drift, no keyword
- *  noise. Returns full MovieContexts (grounded). `seenIds` excludes already-rated films. */
+/** An unbiased shuffle. The previous sort key, (i+1)*(1+Math.random()), spans [i+1, 2i+2] — and
+ *  those ranges never overlap far enough to reorder the head, so the first title of every list
+ *  outranked the second in virtually every draw. Each sub-genre therefore recommended the same
+ *  canonical film every single quiz, which is why two different sessions felt identical. */
+function shuffle<T>(arr: readonly T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Films TMDB itself considers close to a given one. This is what turns eight curated titles per
+ *  sub-genre into a real shelf; it is best-effort, and an empty result simply leaves the curated
+ *  list to do the job it did before. */
+async function relatedIds(id: string, locale: string): Promise<string[]> {
+  if (!KEY || !/^\d+$/.test(id)) return [];
+  const out: string[] = [];
+  for (const kind of ['similar', 'recommendations']) {
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/${kind}?api_key=${KEY}&language=${langOf(locale)}&page=1`, { next: { revalidate: 604800 } });
+      if (!res.ok) continue;
+      const d = await res.json();
+      for (const m of d.results || []) {
+        if (m.id && m.poster_path && m.overview && m.adult !== true) out.push(String(m.id));
+      }
+    } catch { /* the curated list below is the fallback */ }
+  }
+  return out;
+}
+
+/** Recommend up to `n` real, unseen films squarely inside a CONFIRMED sub-genre. The curated
+ *  canonical list is the SEED, not the whole shelf: twelve quizzes across twelve different tastes
+ *  surfaced only 233 distinct films, because eight fixed titles per term is all there ever was. A
+ *  curated title anchors the sub-genre, TMDB's own similar/recommended films widen it, and the
+ *  rest of the curated list still carries the result when TMDB is unreachable.
+ *  Returns full MovieContexts (grounded). `seenIds` excludes already-rated films. */
 export async function recommendBySubGenre(term: string, seenIds: string[], locale = 'he', n = 3): Promise<MovieContext[]> {
   const titles = SUBGENRE_RECS[term];
   if (!titles || !titles.length) return [];
   const seen = new Set(seenIds);
-  // Shuffle so successive quizzes of the same taste surface different (still on-genre) picks.
-  const order = titles.map((t, i) => ({ t, k: (i + 1) * (1 + Math.random()) })).sort((a, b) => a.k - b.k).map(x => x.t);
+  const order = shuffle(titles);
   const out: MovieContext[] = [];
-  for (const title of order) {
+  // The curated seed name is the readable fallback when BOTH the localized and the original title
+  // are CJK (e.g. Mobile Suit Gundam) and a Hebrew results card would otherwise show 機動戦士ガンダム.
+  const curatedName = new Map<string, string>();
+  const anchors: string[] = [];
+  for (const title of order.slice(0, 2)) {
+    const cand = await candidateByTitle(title);
+    if (!cand) continue;
+    anchors.push(cand.id);
+    curatedName.set(cand.id, title.replace(/\s*\(\d{4}\)\s*$/, ''));
+  }
+  const widened = shuffle((await Promise.all(anchors.map(id => relatedIds(id, locale)))).flat());
+  const queue = [...anchors, ...widened].filter((id, i, a) => a.indexOf(id) === i);
+  const push = async (id: string) => {
+    if (seen.has(id) || out.some(m => m.id === id)) return;
+    const m = await movieById(id, locale);
+    if (!m) return;
+    const curated = curatedName.get(id);
+    if (curated && /[　-鿿가-힯]/.test(m.title)) m.title = curated;
+    out.push(m);
+  };
+  for (const id of queue) {
+    if (out.length >= n) break;
+    await push(id);
+  }
+  // The rest of the curated list — the answer when TMDB's related endpoints gave us nothing.
+  for (const title of order.slice(2)) {
     if (out.length >= n) break;
     const cand = await candidateByTitle(title);
-    if (!cand || seen.has(cand.id) || out.some(m => m.id === cand.id)) continue;
-    const m = await movieById(cand.id, locale);
-    // When BOTH the localized and the original title are CJK (e.g. Mobile Suit Gundam), the
-    // earlier guard has nothing Latin to fall back to and a Hebrew results card ends up showing
-    // 機動戦士ガンダム. The curated seed name we searched for is the readable fallback.
-    if (m) {
-      if (/[　-鿿가-힯]/.test(m.title)) m.title = title.replace(/\s*\(\d{4}\)\s*$/, '');
-      out.push(m);
-    }
+    if (!cand) continue;
+    curatedName.set(cand.id, title.replace(/\s*\(\d{4}\)\s*$/, ''));
+    await push(cand.id);
   }
   return out;
 }

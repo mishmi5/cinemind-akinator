@@ -1,12 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Rubik, Geist_Mono } from "next/font/google";
 import "../globals.css";
 import FloatingChatWidget from "@/components/FloatingChatWidget";
 import Script from "next/script";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Hebrew is the product's primary language and Geist carries no Hebrew glyphs, so every
+// Hebrew word was rendered in whatever face the device happened to have, with the 900 weight
+// synthesised on top of a face that does not own one. Rubik ships a real Hebrew subset and a
+// variable weight axis up to 900, and it is the same family the share-image routes already
+// draw with (public/fonts/Rubik-Bold.ttf) — so the OG card and the page it links to finally
+// match. Geist Mono stays for the Latin year/details line, where the contrast is deliberate.
+const rubik = Rubik({
+  variable: "--font-rubik",
+  subsets: ["hebrew", "latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -167,7 +174,7 @@ export default async function RootLayout({
     <html
       lang={locale}
       dir={dir}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${rubik.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {/* Organization + WebSite. Only claims that are true: name, URL, logo, language.

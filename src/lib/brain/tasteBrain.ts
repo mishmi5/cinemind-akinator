@@ -255,14 +255,46 @@ const HE_TERM: Record<string, string> = {
   'sports drama': 'דרמת ספורט', 'slow cinema arthouse': 'קולנוע איטי ארטהאוס',
   'musical': 'מחזמר', 'epic high fantasy': 'פנטזיה אפית',
   'sword and sorcery fantasy': 'פנטזיית חרב וכישוף',
+  'bittersweet romance': 'רומן מריר-מתוק', 'sweeping romance': 'רומן סוחף',
+  'israeli cinema': 'קולנוע ישראלי', 'east asian drama': 'דרמה מזרח-אסייתית',
+  'european arthouse': 'ארטהאוס אירופי', 'latin american cinema': 'קולנוע לטינו-אמריקאי',
+  'indian cinema': 'קולנוע הודי', 'crime epic': 'אפוס פשע',
+  'classic western': 'מערבון קלאסי', 'documentary feature': 'סרט תיעודי',
 };
 export const termInLocale = (term: string, locale: string) =>
   locale === 'he' ? (HE_TERM[term] || term) : term;
 
-export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string }): Promise<string> {
-  const { title, year, term, locale, mock, genres = [], overview = '' } = opts;
-  const heTerm = termInLocale(term, locale);
-  const fallback = locale === 'he' ? `בחירה קלאסית ומדויקת בסגנון ${heTerm}` : `A canonical ${term} pick`;
+/** The written reason when the model is unavailable, times out, or comes back unusable.
+ *  It names the user's OWN highest-rated film wherever we have one, so even the fallback says
+ *  something about this person rather than only about the film. Exported because the caller needs
+ *  the same sentence to replace a reason that came back too short or identical to another one.
+ *  The seam this fixes: the caller used to pass the Hebrew words "הסגנון שלך" as the `term` for a
+ *  film with no resolved sub-genre, and the template wrapped it in "בסגנון ...", so a real
+ *  recommendation shipped reading "בחירה קלאסית ומדויקת בסגנון הסגנון שלך". An empty term now
+ *  selects a sentence that does not have the word in it at all. */
+export function recReasonFallback(opts: { title: string; term?: string; locale: string; loved?: string[] }): string {
+  const { title, term = '', locale, loved = [] } = opts;
+  const anchor = loved.find(t => t && t.trim());
+  const heTerm = term ? termInLocale(term, locale) : '';
+  if (locale === 'he') {
+    if (anchor) return `אם אהבת את "${anchor}", ${title} יושב כמעט באותו מקום.`;
+    if (heTerm) return `בחירה קלאסית בסגנון ${heTerm}, מהסוג שהדירוגים שלך הצביעו עליו.`;
+    return `הבחירה הזאת יושבת על מה שדירגת הכי גבוה לאורך השאלון.`;
+  }
+  if (anchor) return `If "${anchor}" worked for you, ${title} lands in much the same place.`;
+  if (term) return `A canonical ${term} pick, straight from what you rated highest.`;
+  return `This one sits squarely on what you rated highest during the quiz.`;
+}
+
+export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string; loved?: string[]; hated?: string[] }): Promise<string> {
+  const { title, year, term, locale, mock, genres = [], overview = '', loved = [], hated = [] } = opts;
+  const heTerm = term ? termInLocale(term, locale) : '';
+  // The films THIS person rated highest, and the ones they rejected. Without them the model knew
+  // the film and nothing about the reader, so every reason was a description of the movie that
+  // would have read the same for any two customers.
+  const lovedTop = loved.filter(t => t && t.trim()).slice(0, 4);
+  const hatedTop = hated.filter(t => t && t.trim()).slice(0, 3);
+  const fallback = recReasonFallback({ title, term, locale, loved: lovedTop });
   if (mock) return fallback;
   const model = tasteModel();
   if (!model) return fallback;
@@ -275,16 +307,21 @@ export async function recReason(opts: { title: string; year?: string; term: stri
   const factsEn = [genres.length ? `Genres: ${genres.join(', ')}` : '', overview ? `Synopsis: ${overview.slice(0, 300)}` : '']
     .filter(Boolean).join(' · ');
   const prompt = locale === 'he'
-    ? `המשתמש אוהב סרטי ${heTerm}. הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
+    ? `${heTerm ? `המשתמש אוהב סרטי ${heTerm}. ` : ''}הסרטים שהוא דירג הכי גבוה: ${lovedTop.join(', ') || '(אין)'}.${hatedTop.length ? `\nסרטים שהוא דחה: ${hatedTop.join(', ')}.` : ''}
+הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
 ${facts}
 
-כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה מי שאוהב ${heTerm} יתחבר לסרט הזה.
-חוקים: אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב"). התחל במילים "כי" או "אם".
+כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה דווקא האדם הזה יתחבר לסרט הזה.
+חוקים: הזכר בשם לפחות אחד מהסרטים שהוא דירג גבוה, וקשר אותו לסרט המומלץ. אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. אל תזכיר סרט שהוא דחה. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב"). התחל במילים "כי" או "אם".
 החזר רק את המשפט עצמו.`
-    : `The user loves ${term} films. Facts about "${title}"${year ? ` (${year})` : ''}:
+    : `${term ? `The user loves ${term} films. ` : ''}The films they rated highest: ${lovedTop.join(', ') || '(none)'}.${hatedTop.length ? `\nFilms they rejected: ${hatedTop.join(', ')}.` : ''}
+Facts about "${title}"${year ? ` (${year})` : ''}:
 ${factsEn}
 
-In ONE short natural sentence, explain why they'll love it. Use ONLY the facts above — do not invent scenes, battles or details that are not there. Return just the sentence.`;
+In ONE short natural sentence, explain why THIS person will love it. Name at least one of the
+films they rated highest and connect it to this one. Use ONLY the facts above — do not invent
+scenes, battles or details that are not there, and never mention a film they rejected. Return
+just the sentence.`;
   try {
     const { text } = await generateText({ model, prompt, temperature: 0.6, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
@@ -298,10 +335,17 @@ In ONE short natural sentence, explain why they'll love it. Use ONLY the facts a
     // Splitting on non-alphanumerics means every allowed word is already regex-safe.
     // Only the film's own NAME may stay Latin. The term used to be whitelisted here too, which is
     // how the English sub-genre name got a free pass into the Hebrew sentence.
-    const allowed = String(title).split(/[^A-Za-z0-9]+/).filter(w => w.length > 1);
+    // The user's own film titles join the whitelist: the prompt asks the model to name one of
+    // them, and many of those titles are English, so the guard would have thrown away precisely
+    // the sentences it had just asked for.
+    const allowed = [String(title), ...lovedTop].join(' ').split(/[^A-Za-z0-9]+/).filter(w => w.length > 1);
     const stripped = allowed.length ? clean.replace(new RegExp(allowed.join('|'), 'gi'), '') : clean;
     if (locale === 'he' && /[A-Za-z]/.test(stripped)) return fallback;
-    return clean.slice(0, 240) || fallback;
+    // Two things the sentence has to earn its place with: enough of it to be a reason at all, and
+    // a film of the user's own. The fallback satisfies both, so failing here costs nothing.
+    if (clean.length < 40) return fallback;
+    if (lovedTop.length && !lovedTop.some(t => clean.includes(t))) return fallback;
+    return clean.slice(0, 240);
   } catch { return fallback; }
 }
 

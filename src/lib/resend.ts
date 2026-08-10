@@ -17,21 +17,52 @@ export const isResendConfigured =
  * ₪1,000 statutory damages per message, no proof of harm needed. So both cron
  * senders go through composeMarketingEmail() below — there is no second path.
  *
- * TODO(owner): put the real registered business name and postal address here
- * before the first real send. "CineMind" alone is not an address; the law wants
- * a physical one. Also: hello@cinemind.co.il must have SPF + DKIM records on
- * cinemind.co.il and be verified in Resend, or everything lands in spam.
+ * The advertiser's identity is the owner's own data and is not in the codebase
+ * yet — the same values are still placeholders on the terms page
+ * (messages/he.json: s8_name_todo / s8_id_todo / s8_address_todo). Until they
+ * are filled in, marketingBlockers() below refuses the send rather than putting
+ * a placeholder string in front of a paying customer.
+ *
+ * TODO(owner): three values are needed before the first real send —
+ *   1. the registered business name (ח.פ./ע.מ. holder), into ADVERTISER_NAME
+ *   2. the physical postal address: street, number, city, into ADVERTISER_ADDRESS
+ *   3. the same two into messages/he.json + messages/en.json (s8_name_todo,
+ *      s8_id_todo, s8_address_todo) so the terms page stops showing placeholders
+ * Also: hello@cinemind.co.il must have SPF + DKIM records on cinemind.co.il and
+ * be verified in Resend, or everything lands in spam.
  */
 export const MARKETING_SENDER = 'CineMind <hello@cinemind.co.il>';
 export const ADVERTISER_NAME = 'CineMind';
-export const ADVERTISER_ADDRESS = 'TODO-ADDRESS'; // TODO(owner): real street, number, city
+export const ADVERTISER_ADDRESS = ''; // TODO(owner): real street, number, city — see above
 
 /** Field on the user doc. Set by /api/unsubscribe, honoured by every cron sender. */
 export const OPT_OUT_FIELD = 'marketingOptOut';
 
-// TODO(owner): NEXT_PUBLIC_BASE_URL is localhost in .env.local. In production it must be
-// the real https origin, or every unsubscribe link in a sent email points at nothing.
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+// The unsubscribe link must survive leaving our process, so it is built from the public
+// origin, never from NEXT_PUBLIC_BASE_URL — that one has no production fallback (the
+// checkout throws when it is unset) and is localhost in .env.local, which would put a
+// dead link in every sent message. NEXT_PUBLIC_SITE_URL is what the rest of the app
+// treats as canonical (layout.tsx, robots.ts, sitemap.ts), fallback included.
+const PUBLIC_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || 'https://cinemind.co.il').replace(/\/+$/, '');
+
+/**
+ * Everything that would make an advertising message unlawful under s.30א, as a list
+ * of English reasons for the log. Empty list = safe to send. Checked at the one place
+ * that actually sends, so no caller can route around it.
+ */
+export function marketingBlockers(): string[] {
+  const blockers: string[] = [];
+  if (!ADVERTISER_NAME.trim()) {
+    blockers.push('ADVERTISER_NAME is empty — the law requires the advertiser to be named');
+  }
+  if (!ADVERTISER_ADDRESS.trim()) {
+    blockers.push('ADVERTISER_ADDRESS is empty — the law requires a physical address, and messages/he.json s8_address_todo is still a placeholder');
+  }
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(PUBLIC_ORIGIN)) {
+    blockers.push(`unsubscribe links would point at ${PUBLIC_ORIGIN} — set NEXT_PUBLIC_SITE_URL to the public origin`);
+  }
+  return blockers;
+}
 
 /**
  * Signed, non-guessable opt-out link — no login needed. Same HMAC scheme as the
@@ -39,7 +70,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
  */
 export function unsubscribeUrl(uid: string): string {
   const token = signSessionState({ uid, k: 'mkt' });
-  return `${BASE_URL}/api/unsubscribe?t=${encodeURIComponent(token)}`;
+  return `${PUBLIC_ORIGIN}/api/unsubscribe?t=${encodeURIComponent(token)}`;
 }
 
 function marketingFooterHtml(uid: string): string {
@@ -78,10 +109,22 @@ export function composeMarketingEmail(opts: {
   };
 }
 
-/** Sends unless there is no API key (then it is a dry run). Returns what was composed. */
+/**
+ * Sends unless there is no API key (then it is a dry run). Returns what was composed.
+ * Throws before composing anything if the message could not be lawful — a send that
+ * cannot be lawful must fail loudly, not go out with a placeholder in the footer.
+ */
 export async function sendMarketingEmail(opts: {
   to: string; uid: string; subject: string; html: string;
 }): Promise<MarketingEmail> {
+  const blockers = marketingBlockers();
+  if (blockers.length) {
+    console.error(
+      '[EMAIL BLOCKED] refusing to send an advertising message — Communications Law s.30א:\n  - ' +
+      blockers.join('\n  - ')
+    );
+    throw new Error(`Marketing email blocked: ${blockers.join('; ')}`);
+  }
   const msg = composeMarketingEmail(opts);
   if (isResendConfigured) await resend.emails.send(msg);
   // No API key = dry run. Log what would have gone out, so the compliance bits

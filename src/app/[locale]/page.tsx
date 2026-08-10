@@ -91,7 +91,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden selection:bg-rose-500/30">
+    <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-surface-0 text-white font-sans overflow-x-hidden selection:bg-rose-500/30">
       <div className="w-full bg-gradient-to-r from-rose-600 to-indigo-600 text-center py-2 px-4 text-xs font-bold tracking-wide flex justify-center items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
         <span className="animate-in fade-in slide-in-from-bottom-1 duration-500" key={ticker}>{ticker}</span>
@@ -107,7 +107,7 @@ export default function LandingPage() {
           {t('subtitle')}
         </h2>
 
-        <div className="bg-black/40 border border-white/10 rounded-[2rem] p-8 md:p-12 mb-12 w-full max-w-3xl backdrop-blur-md shadow-2xl relative overflow-hidden flex flex-col items-center">
+        <div className="bg-black/40 border border-white/10 rounded-panel p-8 md:p-12 mb-12 w-full max-w-3xl backdrop-blur-md shadow-raise relative overflow-hidden flex flex-col items-center">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[100px]"></div>
           
           {/* The button comes BEFORE the riff. Below it, the paragraph ran seven lines on a phone
@@ -116,7 +116,7 @@ export default function LandingPage() {
               unchanged; it now reads as what it is, the pitch under the button. */}
           <Link
             href="/quiz"
-            className="group relative inline-flex items-center justify-center gap-2 px-10 py-5 bg-gradient-to-r from-rose-500 to-red-600 rounded-2xl text-white font-bold text-xl hover:from-rose-400 hover:to-red-500 transition-all duration-300 shadow-[0_0_30px_rgba(225,29,72,0.3)] hover:shadow-[0_0_50px_rgba(225,29,72,0.5)] active:scale-95 z-10"
+            className="group relative inline-flex items-center justify-center gap-2 px-10 py-5 bg-gradient-to-r from-accent to-accent-strong rounded-control text-white font-bold text-xl hover:from-accent-soft hover:to-accent transition-all duration-300 shadow-accent active:scale-95 z-10"
           >
             <span>{t('cta')}</span>
           </Link>
@@ -130,8 +130,8 @@ export default function LandingPage() {
 
         {/* Dynamic Carousel - Hermetically Protected */}
         <div className="relative w-full max-w-5xl mx-auto py-8 flex overflow-x-auto snap-x hide-scrollbar gap-4 md:justify-center px-4 min-h-[250px]">
-          <div className="absolute left-0 top-0 bottom-0 w-12 md:w-24 bg-gradient-to-r from-[#070709] to-transparent z-10 pointer-events-none"></div>
-          <div className="absolute right-0 top-0 bottom-0 w-12 md:w-24 bg-gradient-to-l from-[#070709] to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute left-0 top-0 bottom-0 w-12 md:w-24 bg-gradient-to-r from-surface-0 to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-12 md:w-24 bg-gradient-to-l from-surface-0 to-transparent z-10 pointer-events-none"></div>
           
           {postersLoading ? (
             <div className="w-full flex justify-start md:justify-center items-center gap-4 opacity-50 px-4 md:px-0">
@@ -139,7 +139,7 @@ export default function LandingPage() {
             </div>
           ) : (
             displayMovies.map((movie) => (
-              <div key={movie.id} className="shrink-0 snap-center w-28 sm:w-32 md:w-44 aspect-[2/3] bg-zinc-900 rounded-xl border border-white/10 overflow-hidden relative shadow-2xl opacity-60 hover:opacity-100 hover:-translate-y-2 transition-all duration-500 cursor-pointer animate-in fade-in zoom-in duration-500">
+              <div key={movie.id} className="shrink-0 snap-center w-28 sm:w-32 md:w-44 aspect-[2/3] bg-surface-2 rounded-xl border border-white/10 overflow-hidden relative shadow-raise opacity-60 hover:opacity-100 hover:-translate-y-2 transition-all duration-500 cursor-pointer animate-in fade-in zoom-in duration-500">
                 <SmartPoster movie={movie} getNextBackup={getNextBackup} />
               </div>
             ))

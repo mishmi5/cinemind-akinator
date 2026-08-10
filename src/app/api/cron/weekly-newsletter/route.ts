@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cronAuthorized } from '@/lib/cronAuth';
-import { isResendConfigured, sendMarketingEmail, isOptedOut } from '@/lib/resend';
+import { isResendConfigured, sendMarketingEmail, isOptedOut, marketingBlockers } from '@/lib/resend';
 import { adminDb } from '@/lib/firebase-admin';
 import { COLLECTIONS, UserDoc } from '@/types/firebase';
 import { recommendBySubGenre, getWatchProviders, getTrailer } from '@/lib/brain/tmdb';
@@ -48,6 +48,14 @@ export async function GET(request: Request) {
   try {
     if (!cronAuthorized(request)) {
       return new Response('Unauthorized', { status: 401 });
+    }
+
+    // sendMarketingEmail() refuses per message anyway, but that refusal would land inside the
+    // per-user catch below after a few hundred TMDB lookups. Fail once, up front, and say why.
+    const blockers = marketingBlockers();
+    if (blockers.length) {
+      console.error('[CRON] weekly newsletter aborted — the message cannot be lawful:\n  - ' + blockers.join('\n  - '));
+      return NextResponse.json({ error: 'Marketing email not compliant', blockers }, { status: 503 });
     }
 
     // Only users who actually finished a quiz have a taste to send against.

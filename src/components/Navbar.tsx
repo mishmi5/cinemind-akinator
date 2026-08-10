@@ -25,17 +25,22 @@ export const CineMindLogo = ({ className = "w-6 h-6" }: { className?: string }) 
 
 export default function Navbar() {
   const router = useRouter();
-  const [vibeClicked, setVibeClicked] = useState(false);
   const { userData } = useAuth();
-  
+
   const xp = userData?.economy?.xp || 0;
   const streak = userData?.streak?.current || 0;
   const multiplier = userData?.economy?.xpMultiplier || 1.0;
 
-  const handleVibeClick = () => {
-    setVibeClicked(true);
-    setTimeout(() => setVibeClicked(false), 4000);
-  };
+  // The profile link is worth showing only to someone who has already answered questions here;
+  // a first-time visitor would follow it to an empty page. The quiz writes every film it showed
+  // into this key, and with sign-in disabled it is the only trace of past play we can read.
+  // ponytail: "has played" stands in for "finished a quiz" — the quiz records no completion flag.
+  const [hasPlayed, setHasPlayed] = useState(false);
+  useEffect(() => {
+    try {
+      setHasPlayed(JSON.parse(localStorage.getItem('cinemind_recent_movies') || '[]').length > 0);
+    } catch { /* private mode or bad JSON: treat as a first visit */ }
+  }, []);
 
   const t = useTranslations('Navigation');
   const locale = useLocale();
@@ -61,12 +66,27 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4 md:gap-6 text-xs md:text-sm font-medium text-zinc-400">
+        {/* Below sm the four labels ran the row past the edge of a 360px phone, so there the emoji
+            carries the link and the label stays in the accessibility tree — the same sr-only trick
+            the wordmark above uses, rather than dropping the destinations on small screens. */}
         <Link href="/arena" className="hover:text-rose-400 transition-colors flex items-center gap-1 font-bold">
-          <span className="text-xl">👾</span> {t('arena')}
+          <span className="text-xl" aria-hidden="true">👾</span>
+          <span className="sr-only sm:not-sr-only">{t('arena')}</span>
         </Link>
         <Link href="/pulse" className="hover:text-orange-400 transition-colors flex items-center gap-1 font-bold text-orange-500/80">
-          <span className="text-xl">🔥</span> {t('pulse')}
+          <span className="text-xl" aria-hidden="true">🔥</span>
+          <span className="sr-only sm:not-sr-only">{t('pulse')}</span>
         </Link>
+        <Link href="/daily" className="hover:text-rose-400 transition-colors flex items-center gap-1 font-bold">
+          <span className="text-xl" aria-hidden="true">🎯</span>
+          <span className="sr-only sm:not-sr-only">{t('daily')}</span>
+        </Link>
+        {hasPlayed && (
+          <Link href="/profile" className="hover:text-indigo-400 transition-colors flex items-center gap-1 font-bold">
+            <span className="text-xl" aria-hidden="true">🧬</span>
+            <span className="sr-only sm:not-sr-only">{t('profile')}</span>
+          </Link>
+        )}
         {xp > 0 && (
           <div className="hidden sm:flex items-center gap-1 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full font-bold text-indigo-400">
             <span>✨</span> {xp} XP
@@ -77,20 +97,15 @@ export default function Navbar() {
             <span>🔥</span> {streak} ({multiplier.toFixed(1)}x)
           </div>
         )}
+        {/* The paid tier is called "מייסד" on the pricing page and in the terms, so the nav says
+            that too. It used to read "Premium מנויים" — a second name for the tier, and the word
+            "subscriptions" on a product that sells one payment and never charges again. */}
         <Link href="/pricing" className="hover:text-indigo-400 transition-colors flex items-center gap-1">
-          <span className="text-indigo-400">Premium</span> {t('premium').replace('Premium', '').trim()}
+          <span className="text-indigo-400">{t('premium')}</span>
         </Link>
-        <button onClick={handleVibeClick} className="hover:text-white transition-colors group relative hidden lg:block">
-          {t('vibe')} 🦇
-          {vibeClicked && (
-            <div className="absolute top-full mt-4 -end-4 w-56 p-3 bg-zinc-900 border border-rose-500/50 rounded-xl text-xs text-rose-300 shadow-2xl z-50 whitespace-normal leading-relaxed animate-in fade-in zoom-in duration-200">
-              <div className="absolute -top-2 end-12 w-4 h-4 bg-zinc-900 border-t border-s border-rose-500/50 rotate-45"></div>
-              <span className="relative z-10 font-bold">עובדים על משהו שישאיר אותך ער עד 4 בבוקר עם עיניים אדומות 👀.</span>
-              <br/><br/>
-              <span className="relative z-10 text-zinc-400">בינתיים, לך תעשה חידון ותפסיק ללחוץ על כפתורים רנדומליים באקרנצ'יק.</span>
-            </div>
-          )}
-        </button>
+        {/* The "Vibe חצות" button was a tooltip gag for a feature that does not exist, and the row
+            has to hold the two destinations a returning visitor came back for. The Navigation.vibe
+            string stays in messages for whenever that feature is real. */}
         <LanguageSwitcher />
         <Link href="/login" className="px-4 py-1.5 md:px-5 md:py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all border border-white/10">
           {t('login')}

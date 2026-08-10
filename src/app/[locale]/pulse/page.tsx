@@ -168,12 +168,16 @@ export default function DailyPulsePage() {
       <main dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center px-4">
         <div className="text-4xl mb-4">🔒</div>
         <h2 className="text-2xl font-bold text-white mb-2">{tNav('login')}</h2>
-        {/* ponytail: inline copy — messages/*.json is owned by another change; move here to a Pulse key when that lands */}
-        <p className="text-zinc-400 text-center">
-          {locale === 'he' ? 'צריך להתחבר כדי לשחק בדופק היומי.' : 'You need to log in to play the Daily Pulse.'}
+        {/* The Pulse keeps its streak on the server, so it needs an account — and every control on
+            /login is disabled until sign-in opens. Sending people there was a dead end, so the way
+            out points at the daily challenge, which runs without an account. */}
+        <p className="text-zinc-400 text-center max-w-sm">
+          {locale === 'he'
+            ? 'הדופק היומי דורש חשבון, וההרשמה עדיין סגורה. בינתיים אפשר לשחק באתגר היומי בלי חשבון.'
+            : 'The Daily Pulse needs an account, and sign-in is not open yet. The daily challenge runs without one.'}
         </p>
-        <Link href="/login" className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-bold text-white transition-all">
-          {tNav('login')}
+        <Link href="/daily" className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-bold text-white transition-all">
+          {tNav('daily')}
         </Link>
       </main>
     );

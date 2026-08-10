@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { getSession, startSession, saveSession, isVerified } from '@/lib/brain/sessionStore';
-import { recReason, directRecs, termInLocale, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
+import { recReason, recReasonFallback, directRecs, type BrainHistoryItem } from '@/lib/brain/tasteBrain';
 import { brainBackend } from '@/lib/brain/model';
 import { allSubGenreTerms, fetchCandidatePool, fetchFamilyPool, fetchPoolByHint, fetchSeedCandidates, fetchSubGenreSampler, samplerProbeOf, samplerTier, subGenreFamily, recommendBySubGenre, movieById, getTrailer, getWatchProviders, genreNames } from '@/lib/brain/tmdb';
 
@@ -22,7 +22,13 @@ const MIN_Q = 5;        // never finish before this many ratings
 // be: a sharp taste is settled in fifteen, a genuinely ambiguous one may take fifty, and that is
 // the right outcome. What the owner is buying with those extra questions is a recommendation
 // precise enough that the customer comes back.
-const MAX_Q = 80;       // hard cap on RATED answers
+// 40, not 80. The cap is a safety net rather than a target, but it is also the only thing that
+// bounds the one person it was written for: someone whose answers keep contradicting each other
+// never locks, so every question ends with the engine wanting one more. A traced contradictory
+// answerer rated 57 films — the product promises twenty to forty, and the fifty-seventh question
+// bought nothing that the fortieth had not already failed to settle. At the cap the quiz
+// recommends from the best signal it has and says honestly how sure it is.
+const MAX_Q = 40;       // hard cap on RATED answers
 // Films SHOWN, including "didn't see" — the real backstop so a session cannot run forever.
 const SHOWN_CAP = 90;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
                         // quiz always terminates even for a user who's seen few films
@@ -61,8 +67,9 @@ type ProbeScores = Record<string, { sum: number; n: number; hi: number; hi5?: nu
 // explored, so a true love in an adjacent family is never skipped.
 const FAMILY_ADJ: Record<string, string[]> = {
   horror: ['scifi'], scifi: ['horror', 'action'], action: ['crime', 'scifi'],
-  crime: ['action', 'drama'], comedy: ['drama'], drama: ['comedy', 'crime'],
+  crime: ['action', 'drama'], comedy: ['drama', 'romance'], drama: ['comedy', 'crime', 'romance', 'world'],
   western: ['action', 'drama'], animation: [], fantasy: ['scifi', 'action'],
+  romance: ['drama', 'comedy'], world: ['drama', 'crime'], documentary: ['drama'],
 };
 
 // The "(1 = hate, 5 = love)" tail used to ride along here. The star row already carries those two
@@ -91,17 +98,24 @@ function cleanTitle(raw: unknown): string {
 }
 
 function questionText(title: string, locale: string): string {
+  // All four variants have to describe the SAME act, because the controls under them do. The stars
+  // run "hated" to "loved" and there is a separate "didn't see it" button, so the answer is always a
+  // rating of a film the person has already watched. Two of these used to ask something else —
+  // "בקטע שלך או פספוס מוחלט?" and "עד כמה מדבר אליך?" ask whether the film sounds appealing, which
+  // is a question someone can answer about a film they have never seen. Whoever did that was
+  // teaching the engine that they liked a film they had not watched. The variety is worth keeping;
+  // the ambiguity is not.
   const he = [
-    `כמה כוכבים תיתן ל"${title}"?`,
-    `"${title}" — בקטע שלך או פספוס מוחלט?`,
-    `נתקלת ב"${title}". מה הדירוג שלך?`,
-    `עד כמה "${title}" מדבר אליך?`,
+    `כמה כוכבים תתנו ל"${title}"?`,
+    `ראיתם את "${title}"? כמה כוכבים?`,
+    `נתקלתם ב"${title}". מה הדירוג?`,
+    `איך תדרגו את "${title}"?`,
   ];
   const en = [
     `How many stars for "${title}"?`,
-    `"${title}" — your thing or a total miss?`,
+    `Seen "${title}"? How many stars?`,
     `You run into "${title}". Your rating?`,
-    `How much does "${title}" speak to you?`,
+    `How would you rate "${title}"?`,
   ];
   const pool = locale === 'en' ? en : he;
   return pool[Math.floor(Math.random() * pool.length)];
@@ -125,6 +139,8 @@ const familyOfGenres = (ids?: number[]): string | undefined => {
   if (g.includes(80) || g.includes(53) || g.includes(9648)) return 'crime';
   if (g.includes(14)) return 'fantasy';
   if (g.includes(10752) || g.includes(28)) return 'action';
+  if (g.includes(99)) return 'documentary';
+  if (g.includes(10749)) return 'romance';
   if (g.includes(18)) return 'drama';
   return undefined;
 };
@@ -141,6 +157,8 @@ const familyOfGenreNames = (names?: string[]): string | undefined => {
   if (n.includes('Crime') || n.includes('Thriller') || n.includes('Mystery')) return 'crime';
   if (n.includes('Fantasy')) return 'fantasy';
   if (n.includes('War') || n.includes('Action')) return 'action';
+  if (n.includes('Documentary')) return 'documentary';
+  if (n.includes('Romance')) return 'romance';
   if (n.includes('Drama')) return 'drama';
   return undefined;
 };
@@ -296,7 +314,7 @@ export async function POST(req: Request) {
     // his read. When the quiz has clearly missed, it stops guessing and asks. What they pick is
     // not a rating — it is a place to look — so it steers the sweep without ever counting as
     // taste evidence the recommendation is built on.
-    const FAMILIES = new Set(['horror', 'scifi', 'animation', 'action', 'western', 'crime', 'comedy', 'drama', 'fantasy']);
+    const FAMILIES = new Set(['horror', 'scifi', 'animation', 'action', 'western', 'crime', 'comedy', 'drama', 'fantasy', 'romance', 'world', 'documentary']);
     const directions: string[] = Array.isArray(payload.directions)
       ? payload.directions.filter((f: unknown): f is string => typeof f === 'string' && FAMILIES.has(f)).slice(0, 9)
       : [];
@@ -610,7 +628,15 @@ export async function POST(req: Request) {
     // switched off, so the run came back recommending Evangelion and Gundam again. The love is the
     // signal on its own. Two family films rated high, and nothing scary rated high, is a child's
     // profile; one of each still qualifies when they did reject something.
+    // An adult who loves romance is not a child, and one measured run treated them as one. Several
+    // romance exemplars are also Family films — Cinderella and its sequels, animated love stories —
+    // so rating romance highly quietly accumulated familyLove, kids mode switched on, and a horror-
+    // and-romance viewer finished with Cinderella 3 and Toy Story 5. A child does not rate three
+    // separate romances five. This turns the mode off for that profile rather than lowering the
+    // family threshold, so nothing about the child's protection gets weaker.
+    const romanceLove = history.filter(h => h.rating >= HI && h.genres.includes('Romance')).length;
     const kidsMode = !history.some(h => h.rating >= HI && h.genres.includes('Horror'))
+      && romanceLove < 3
       && (familyLove >= 2 || (familyLove >= 1 && scaryReject >= 1));
     const unsafeForKids = (c: { id: string; _genreIds?: number[] }) => {
       if (!kidsMode) return false;
@@ -655,6 +681,9 @@ export async function POST(req: Request) {
     };
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
     let nextHint = '';
+    // Sub-genre term per candidate id, for pools whose films carry no probe term of their own.
+    // Read once the question's film has actually been picked (a pool holds several terms).
+    const hintOf = new Map<string, string>();
     // Which branch produced this question. Returned on the response so a QA run can attribute an
     // off-taste screen to the pool that served it instead of guessing.
     let poolSrc = '';
@@ -817,6 +846,18 @@ export async function POST(req: Request) {
       // a heist fan spent the last eight questions rating war films.
       const cover = (c: { id: string }) => { const t = samplerProbeOf(c.id); return t && probe[t] ? probe[t].n : 0; };
       const byCover = (list: typeof samplerAll) => [...list].sort((a, b) => cover(a) - cover(b));
+      // WHICH SUB-GENRE A TAIL ANSWER SCORES. A sampler exemplar carries its own term, but a film
+      // resolved from a curated seed list does not — it is looked up by title, so it is absent from
+      // samplerProbeMap and termOf() returned null for it. The whole tail of the quiz therefore
+      // scored nothing: five slashers rated 5 at question 30 moved the model by exactly zero, and
+      // the confirming half of the quiz was decoration. Tag each seed with the term it came from
+      // and hand that back as the searchHint once the film is actually chosen.
+      // Deliberately NOT applied to famPool/popular: those are a genre shelf and a trending list,
+      // and a film's presence on either is no evidence of any sub-genre.
+      const tag = <T extends { id: string }>(list: T[], term: string): T[] => {
+        for (const c of list) hintOf.set(c.id, term);
+        return list;
+      };
 
       const tiers: [string, () => Promise<typeof samplerAll>][] = [
         // 1. Unasked curated exemplars inside the focus family.
@@ -826,7 +867,7 @@ export async function POST(req: Request) {
         // eight of a term's canonical films as questions, and the recommendation stage then had
         // nothing of its own left and fell through to the family shelf — a musical fan was handed
         // Goodfellas at 99%. The other half is the answer, not the question.
-        ['seeds', async () => focusTerm ? gate(await fetchSeedCandidates(focusTerm, seen, 4)) : []],
+        ['seeds', async () => focusTerm ? tag(gate(await fetchSeedCandidates(focusTerm, seen, 4)), focusTerm) : []],
         // 3. Its sibling sub-genres — same family, still the right shelf.
         ['kinSeeds', async () => {
           if (!focusFam) return [];
@@ -834,7 +875,7 @@ export async function POST(req: Request) {
           for (const t of allSubGenreTerms()) {
             if (out.length >= 8) break;
             if (t === focusTerm || subGenreFamily(t) !== focusFam || disliked.includes(t)) continue;
-            out = out.concat(gate(await fetchSeedCandidates(t, seen, 2)));
+            out = out.concat(tag(gate(await fetchSeedCandidates(t, seen, 2)), t));
           }
           return out;
         }],
@@ -849,7 +890,7 @@ export async function POST(req: Request) {
             if (out.length >= 8) break;
             const f = subGenreFamily(t);
             if (!f || !(FAMILY_ADJ[focusFam] || []).includes(f) || disliked.includes(t)) continue;
-            out = out.concat(gate(await fetchSeedCandidates(t, seen, 4)));
+            out = out.concat(tag(gate(await fetchSeedCandidates(t, seen, 4)), t));
           }
           return out;
         }],
@@ -1045,10 +1086,16 @@ export async function POST(req: Request) {
       // where the card had nothing to read. Prefer a candidate that has one; only fall back to a
       // synopsis-less film if nothing else is left.
       let bare: Awaited<ReturnType<typeof movieById>> = null;
+      // THE LAST GATE BEFORE A FILM IS ON SCREEN. rejectsUser() guards the pools, but the pool is
+      // not what the child sees — this film is. Two paths reached here ungated: the safety net a
+      // few lines above keeps an all-unsafe pool when filtering leaves nothing behind, and the
+      // emergency refill below pulls straight from the popular list. Both are checked here, on the
+      // resolved film, so no branch can put a horror title in front of a children's profile.
       for (const cand of shuffled.slice(0, 8)) {
         const m = await movieById(cand.id, locale);
         if (!m) continue;
         if (usedTitles.has(titleKey(m.title))) continue;
+        if (unsafeForKids(m)) continue;
         if (m.overview && m.overview.trim()) { movie = m; break; }
         bare = bare || m;
       }
@@ -1056,7 +1103,7 @@ export async function POST(req: Request) {
       if (!movie) {
         for (const cand of await fetchCandidatePool(seen, locale, 10)) {
           const m = await movieById(cand.id, locale);
-          if (!m || usedTitles.has(titleKey(m.title))) continue;
+          if (!m || usedTitles.has(titleKey(m.title)) || unsafeForKids(m)) continue;
           movie = m; break;
         }
       }
@@ -1070,6 +1117,10 @@ export async function POST(req: Request) {
           saveSession(sessionKey, stored);
         }
         movie.trailerId = await getTrailer(movie.id);
+        // The chosen film's own sub-genre, so the answer to it scores that sub-genre when it comes
+        // back. Only a pool that knows the term sets one; the sampler's own films are already
+        // covered by samplerProbeMap and must not be overridden.
+        if (!nextHint) nextHint = hintOf.get(movie.id) || '';
         const tasteSummary = lockedLove ? `Confirming: ${lockedLove.t}` : leader ? `Closing in on: ${leader.t}` : 'Mapping your taste…';
         // Whether stopping RIGHT NOW would still produce a recommendation worth having. The quiz
         // already lets anyone stop from question five, but the button says nothing about what they
@@ -1085,11 +1136,25 @@ export async function POST(req: Request) {
         // not a shelf, and a family-level guess is the misread this engine exists to prevent. The
         // offer waits for two hits on one sub-genre. Anyone who wants out sooner still has the
         // quiet button from question five — it is their call to make, not ours to encourage.
-        const readyToFinish = !!lockedLove || !!(leader && leader.hi >= LOCK_HITS);
+        // The offer also has to reach the person it was never reaching. Someone who has seen few
+        // films answers "didn't see it" to most of what we show, and a skip carries no taste signal
+        // — so they never grow a leading sub-genre, never satisfy the condition above, and rode all
+        // the way to the 90-film cap with no worded way out. Measured: 90 films shown, 30 actually
+        // rated. Once we have shown that many films without the taste settling, the quiz is not
+        // going to settle, and saying so is more honest than asking forty more times. The results
+        // screen already labels this case as an early stop rather than a finished read.
+        const STALLED_SHOWN = 45;
+        const readyToFinish = !!lockedLove
+          || !!(leader && leader.hi >= LOCK_HITS)
+          || (shownCount >= STALLED_SHOWN && history.length >= MIN_Q);
         return NextResponse.json({
           ...baseState, tasteSummary, searchHint: nextHint, poolSrc, readyToFinish,
           isComplete: false, confidenceScore: shown / 100, progressPercent: Math.min(99, shown),
-          currentVectorState: { possibleMoviesRemaining: Math.max(2, Math.round(50000 * (1 - shown / 100))), leadingMicroGenres: [tasteSummary] },
+          // No "films still in play" count. It was 50000 × (1 − meter), i.e. the progress bar
+          // wearing a number's clothes: the engine has no catalogue of 50,000 candidates and never
+          // narrowed one. A figure nobody can back is worse than no figure on a screen that is
+          // asking to be trusted with someone's taste.
+          currentVectorState: { leadingMicroGenres: [tasteSummary] },
           currentQuestion: { id: `bq_${Date.now()}`, text: questionText(movie.title, locale), movie },
           finalMovies: undefined,
         }, { status: 200 });
@@ -1135,6 +1200,18 @@ export async function POST(req: Request) {
     const hardRejectedGenres = new Set(
       [...hatedGenres].filter(g => (lovedGenreHits[g] || 0) === 0 && (hatedGenreHits[g] || 0) >= HARD_REJECT_HITS),
     );
+    // THE LEAD GENRE IS WHAT THE FILM *IS*. A person who rated every animation they were shown a 1
+    // and never rated one above 1 was still recommended a film whose PRIMARY genre is Animation —
+    // twice more with horror and mystery. Two gaps let it through: hardRejectedGenres wants three
+    // rejections and this person had been shown two, and every last-resort tier further down
+    // bypasses the candidate filter altogether. So the first genre TMDB lists — the one the film
+    // leads with — gets its own, stricter test, and it is applied on every path to the final list.
+    const LEAD_REJECT_HITS = 2;
+    const leadGenreRejected = (m: { _genreIds?: number[] }) => {
+      const lead = genreNames(m._genreIds || [])[0];
+      if (!lead) return false;
+      return (lovedGenreHits[lead] || 0) === 0 && (hatedGenreHits[lead] || 0) >= LEAD_REJECT_HITS;
+    };
     // Per-genre filtering SELF-CANCELS for a franchise: someone who hates Marvel but likes Action
     // clears "Action" from hatedGenres, so Guardians of the Galaxy slipped through. So also record
     // the full genre COMBINATION of each rejected film — a candidate carrying every genre of a
@@ -1154,6 +1231,23 @@ export async function POST(req: Request) {
     // their own locked niche filtered out and replaced with off-taste filler. Their confirmed
     // sub-genre is exempt from the combo test — an explicit low rating on the film itself, or on
     // its franchise, still blocks it.
+    // KIDS MODE IS NOT AN OPINION ABOUT TASTE, so it must not live inside the taste filter's
+    // exemptions or inside any one tier. It sat below the `onTaste` early return, which is the
+    // path that produces the MAIN recommendation pool — a confirmed sub-genre skipped the check
+    // entirely — and half the fallback tiers further down build `resolved` without calling isBad
+    // at all. The test therefore stands on its own and is applied twice: inside isBad above every
+    // exemption, so the candidate pools stay clean, and again on the finished list, where every
+    // path converges. Getting this wrong puts an adult film in front of a child, so it is checked
+    // where nothing can route around it rather than where the bug was reported.
+    const unsafeRecForKids = (m: { _genreIds?: number[] }) => {
+      if (!kidsMode) return false;
+      const names = genreNames(m._genreIds || []);
+      if (names.includes('Horror') || names.includes('Thriller') || names.includes('Crime')) return true;
+      // "Animation" covers both Toy Story and The End of Evangelion, and a child's profile was
+      // answered with three Gundam films at "99% match". In kids mode a pick has to carry the
+      // Family genre — the one label that separates the children's shelf from adult anime.
+      return !names.includes('Family');
+    };
     const isBad = (m: Rec, onTaste = false) => {
       if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
       // Recommending a film under a name they were just asked about reads as the engine forgetting
@@ -1164,14 +1258,14 @@ export async function POST(req: Request) {
       // Checked before the on-taste exemption: a hard-rejected genre outranks every other reason
       // to keep a candidate, including its own locked sub-genre.
       if (names.some(n => hardRejectedGenres.has(n))) return true;
+      // Also before the on-taste exemption: a confirmed sub-genre is not a licence to lead with a
+      // genre this person turned down every time they met it.
+      if (leadGenreRejected(m)) return true;
+      // The safety signal outranks the on-taste exemption for the same reason a hard-rejected
+      // genre does: a confirmed sub-genre is not a licence to hand a child an adult film.
+      if (unsafeRecForKids(m)) return true;
       if (onTaste) return false;
       if (names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) return true;
-      // The same safety signal applies to what we finally recommend, not only to what we ask.
-      if (kidsMode && (names.includes('Horror') || names.includes('Thriller') || names.includes('Crime'))) return true;
-      // "Animation" covers both Toy Story and The End of Evangelion, and a child's profile was
-      // answered with three Gundam films at "99% match". In kids mode a pick has to carry the
-      // Family genre — the one label that separates the children's shelf from adult anime.
-      if (kidsMode && !names.includes('Family')) return true;
       if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) return true;
       return false;
     };
@@ -1267,7 +1361,7 @@ export async function POST(req: Request) {
         const m = await movieById(c.id, locale);
         if (!m || resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
         const names = genreNames(m._genreIds || []);
-        if (names.some(n => hardRejectedGenres.has(n))) continue;
+        if (names.some(n => hardRejectedGenres.has(n)) || leadGenreRejected(m)) continue;
         if (names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) continue;
         if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) continue;
         resolved.push(m);
@@ -1278,11 +1372,30 @@ export async function POST(req: Request) {
     // guarded tier above rejects its whole pool and the results screen came back EMPTY after a
     // 34-question quiz — seen in a browser run. Three well-reviewed films they never rated low
     // is a poor read but an honest one; an empty screen is neither.
+    //
+    // This is the floor, and a floor that can reject its whole pool is not a floor. When the
+    // lead-genre guard was added to every tier it was added here too, and that took a
+    // rate-everything-1 quiz down to a single film: for that person EVERY lead genre has two
+    // rejections and no likes, so the guard rejected the entire catalogue. Dropping the guard
+    // outright is the opposite mistake — it hands the first film that comes back, which is how a
+    // rejected animation led a recommendation again. So the pool is walked twice: once respecting
+    // the guard, and only then again without it. A person who rejected everything still gets three
+    // films, and everyone else still gets the guard, because the second pass never runs for them.
     if (resolved.length < 3) {
-      for (const c of await fetchCandidatePool(seen, locale, 40)) {
+      // Eighty rather than forty: the first pass here is the one that still respects the lead-genre
+      // guard, and a narrow pool is what pushes a session into the second pass. A measured run had
+      // an animation-lead film reach someone who had rejected animation purely because forty
+      // popular candidates did not contain three they had not already seen.
+      const pool = await fetchCandidatePool(seen, locale, 80);
+      for (const respectLeadGenre of [true, false]) {
         if (resolved.length >= 3) break;
-        const m = await movieById(c.id, locale);
-        if (m && !hatedIds.has(m.id) && !resolved.some(x => x.id === m.id)) resolved.push(m);
+        for (const c of pool) {
+          if (resolved.length >= 3) break;
+          const m = await movieById(c.id, locale);
+          if (!m || hatedIds.has(m.id) || resolved.some(x => x.id === m.id)) continue;
+          if (respectLeadGenre && leadGenreRejected(m)) continue;
+          resolved.push(m);
+        }
       }
     }
 
@@ -1291,6 +1404,9 @@ export async function POST(req: Request) {
     // week-cached, so this usually succeeds even mid-outage) before we give up.
     if (!resolved.length) {
       await new Promise(r => setTimeout(r, 400));
+      // Films this retry found but set aside because they lead with a rejected genre. They are used
+      // only if the preferred pass leaves us with nothing at all — see the two-pass note below.
+      const lastDitch: typeof resolved = [];
       // A user the engine never read at all — "Eclectic taste" — has no loved terms AND no
       // confirmed term, so this loop used to iterate over an empty array and do nothing. That is
       // exactly the person most likely to reach it: someone who rejected or skipped every film.
@@ -1303,8 +1419,18 @@ export async function POST(req: Request) {
         if (resolved.length >= 3) break;
         for (const m of await recommendBySubGenre(term, [], locale, 5)) {
           if (resolved.length >= 3) break;
-          if (!resolved.some(x => x.id === m.id) && !hatedIds.has(m.id)) resolved.push(m);
+          // Same reasoning as the floor above, and the same two-pass shape: prefer a film that does
+          // not lead with a rejected genre, but never return an empty screen to protect that
+          // preference. This retry only runs when every earlier source came back with nothing.
+          if (resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
+          if (leadGenreRejected(m)) { lastDitch.push(m); continue; }
+          resolved.push(m);
         }
+      }
+      // Nothing survived the preference. An imperfect film beats an empty results screen.
+      for (const m of lastDitch) {
+        if (resolved.length >= 3) break;
+        if (!resolved.some(x => x.id === m.id)) resolved.push(m);
       }
     }
 
@@ -1318,15 +1444,38 @@ export async function POST(req: Request) {
       for (const c of await fetchCandidatePool([], locale, 40)) {
         if (resolved.length >= 3) break;
         const m = await movieById(c.id, locale);
-        if (m && !hatedIds.has(m.id) && !resolved.some(x => x.id === m.id)) resolved.push(m);
+        if (m && !hatedIds.has(m.id) && !leadGenreRejected(m) && !resolved.some(x => x.id === m.id)) resolved.push(m);
       }
     }
 
     const tasteSummary = confirmedTerm ? `Loves ${confirmedTerm}` : 'Eclectic taste';
+    // The final screen used to recompute its percentage from scratch and ignore what the user had
+    // just been shown: a quiz sitting at 99% ended on 71%, one at 35% ended on 100%. Whatever the
+    // engine believes, the number can only move by the same small step as every other answer — it
+    // is the same meter, on the same screen, one moment later. A confirmed lock earns the last
+    // step to 100; running out of questions does not.
+    const finalPercent = lockedLove
+      ? Math.min(100, Math.max(prevShown, 96))
+      : Math.min(prevShown + 4, Math.max(prevShown, Math.max(60, Math.min(95, Math.round(confidence * 100)))));
 
     const uniq: typeof resolved = [];
     const seenRec = new Set<string>();
-    for (const m of resolved) { if (!seenRec.has(m.id)) { seenRec.add(m.id); uniq.push(m); } }
+    // WHERE EVERY TIER MEETS. The ladder above has eight ways to fill `resolved` and four of them
+    // push straight past isBad to guarantee three films, so a per-tier safety check is a check
+    // that the next fallback undoes. This line is the one place all of them pass through.
+    for (const m of resolved) { if (!seenRec.has(m.id) && !unsafeRecForKids(m)) { seenRec.add(m.id); uniq.push(m); } }
+    // Filtering can legitimately empty the list — the tiers that ignore isBad are exactly the ones
+    // that reach for the popular pool — and an empty results screen is the one ending this product
+    // must not produce. The children's shelf answers both: TMDB's animation/family genres are deep
+    // enough that a child always ends the quiz with three films they are allowed to watch.
+    if (kidsMode && uniq.length < 3) {
+      for (const c of await fetchFamilyPool('animation', seen, locale, 20)) {
+        if (uniq.length >= 3) break;
+        const m = await movieById(c.id, locale);
+        if (!m || seenRec.has(m.id) || hatedIds.has(m.id) || unsafeRecForKids(m)) continue;
+        seenRec.add(m.id); uniq.push(m);
+      }
+    }
     const picks = uniq.slice(0, 3);
     for (const p of picks) p.trailerId = await getTrailer(p.id);
 
@@ -1337,8 +1486,34 @@ export async function POST(req: Request) {
     // Availability is fetched alongside the reasons — a rec the user cannot act on tonight is
     // not a recommendation. Region is IL; a miss just omits the row.
     const watch = await Promise.all(picks.map(p => getWatchProviders(p.id, 'IL')));
+    // The person, not only the film. Their highest-rated titles go into the prompt and the reason
+    // has to name one, so the sentence says why THIS viewer gets THIS film. Best-rated first, so a
+    // 5★ anchors the sentence rather than whichever 4 happened to come first in the quiz.
+    const anchorTitles = history.filter(h => h.rating >= HI)
+      .sort((a, b) => b.rating - a.rating).map(h => h.title);
+    // The empty string, deliberately: passing the Hebrew words "הסגנון שלך" as the TERM produced
+    // "בחירה קלאסית ומדויקת בסגנון הסגנון שלך" on a shipped results card, because the template
+    // wraps whatever it is given in "בסגנון ...". With no term the reason is written around the
+    // user's own films instead.
     const reasons = await Promise.all(picks.map(p =>
-      recReason({ title: p.title, year: yearOf(p), term: termOfPick.get(p.id) || confirmedTerm || (locale === 'en' ? 'this style' : 'הסגנון שלך'), locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview })));
+      recReason({
+        title: p.title, year: yearOf(p), term: termOfPick.get(p.id) || confirmedTerm || '',
+        locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview,
+        loved: anchorTitles, hated: hatedTitles,
+      })));
+    // Three cards on one screen carrying the identical sentence read as a template rather than a
+    // recommendation, and a two-word reason reads as a bug. Either way the fallback — which names
+    // the film itself and one of theirs — is a better card than the repeat.
+    const usedReasons = new Set<string>();
+    const finalReasons = reasons.map((r, i) => {
+      const ok = r && r.length >= 40 && !usedReasons.has(r);
+      const text = ok ? r : recReasonFallback({
+        title: picks[i].title, term: termOfPick.get(picks[i].id) || confirmedTerm || '',
+        locale, loved: anchorTitles,
+      });
+      usedReasons.add(text);
+      return text;
+    });
 
     const finalMovies = picks.map((p, i) => ({
       id: `res_${p.id}`, title: p.title,
@@ -1352,10 +1527,7 @@ export async function POST(req: Request) {
       // handed. The data was already on the pick and simply was not passed on.
       originalDetails: p.originalDetails,
       _genreIds: p._genreIds,
-      // The last-resort line was English on a Hebrew screen.
-      reason: reasons[i] || (confirmedTerm
-        ? (locale === 'he' ? `בחירה קלאסית בסגנון ${termInLocale(confirmedTerm, locale)}` : `A canonical ${confirmedTerm} pick`)
-        : ''),
+      reason: finalReasons[i],
       watch: watch[i] || null, // where to actually watch it in Israel
     }));
 
@@ -1401,18 +1573,16 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ...baseState, tasteSummary,
-      // A timed-out quiz used to be presented as 1.0 certainty. Report what we actually have:
-      // a confirmed lock earns 100, running out of questions does not.
+      // ONE NUMBER, NOT TWO. confidenceScore was computed on its own and came back as a flat 1
+      // whenever the taste locked, while progressPercent — the meter the person had been watching
+      // all quiz — ended on 96. Two different answers to "how sure are you" on the same screen,
+      // and every consumer of the payload had to guess which one meant it. The meter is the
+      // answer; the score is the same figure on a 0–1 scale.
       isComplete: true,
-      confidenceScore: lockedLove ? 1.0 : Math.max(0.6, Math.min(0.95, confidence)),
-      // The final screen recomputed the percentage from scratch and ignored what the user had
-      // just been shown: a quiz sitting at 99% ended on 71%, one at 35% ended on 100%. Whatever
-      // the engine believes, the number can only move by the same small step as every other
-      // answer — it is the same meter, on the same screen, one moment later.
-      progressPercent: lockedLove ? Math.min(100, Math.max(prevShown, 96)) 
-        : Math.min(prevShown + 4, Math.max(prevShown, Math.max(60, Math.min(95, Math.round(confidence * 100))))),
+      confidenceScore: finalPercent / 100,
+      progressPercent: finalPercent,
       userAffinities: subGenreVector,
-      currentVectorState: { possibleMoviesRemaining: 1, leadingMicroGenres: [tasteSummary] },
+      currentVectorState: { leadingMicroGenres: [tasteSummary] },
       currentQuestion: null, finalMovies, proofToken,
     }, { status: 200 });
   } catch (error) {

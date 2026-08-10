@@ -2,15 +2,16 @@
   "Index": {
     "title": "While you were searching for what to watch, the movie could have been over by now.",
     "subtitle": "Honestly? We all burn at least 40 minutes just scrolling, hesitating, and eventually falling asleep on the remote.",
-    "description": "So....... CineMind is here to cut the bullshit. Through a light 20-question quiz, our insane algorithm reads your mind (yes, exactly like that, I saw that smile, stop playing) and drops the exact movie you HAVE to watch right now, but like RIGHT right now, yeah? Because if not now, you'll postpone to tomorrow and tomorrow to later and... enough, it's time to watch a good movie.",
+    "description": "So....... CineMind is here to cut the bullshit. Through a light quiz, our insane algorithm reads your mind (yes, exactly like that, I saw that smile, stop playing) and drops the three movies you HAVE to watch right now, but like RIGHT right now, yeah? Because if not now, you'll postpone to tomorrow and tomorrow to later and... enough, it's time to watch a good movie.",
     "cta": "Save My Evening 🎬",
-    "fomo_banner": "One quiz, one movie that fits you. No hour of scrolling. 🎬"
+    "fomo_banner": "One quiz, three movies that fit you. No hour of scrolling. 🎬"
   },
   "Navigation": {
     "arena": "Online Arena",
-    "premium": "Premium Subscriptions",
+    "premium": "Founder",
     "vibe": "Midnight Vibe",
     "pulse": "Daily Pulse",
+    "daily": "Daily Challenge",
     "login": "Login",
     "profile": "Profile"
   },
@@ -18,16 +19,16 @@
     "loading_db": "Extracting data from 50,000 movies...",
     "anonymous": "Anonymous",
     "brain_scan": "Brain Scan Active",
-    "perfect_match": "99% Accuracy Reached",
+    "perfect_match": "We read your taste",
     "cracked_you": "The system cracked you.",
-    "perfect_movie_desc": "We have the perfect movie for you tonight.",
+    "perfect_movie_desc": "Three movies for you tonight.",
     "match_perfect": "Perfect Match",
     "hidden_overview": "Movie overview is hidden. This is a masterpiece tailored to the unique taste you showed during this deep quiz. Worth discovering.",
-    "your_movie_waits": "Your movie is waiting.",
-    "cut_bullshit": "Want to know which movie we picked for you? Cut the bullshit. Your time is worth more than searching for an hour on Netflix just to fall asleep.",
+    "your_movie_waits": "Your three movies are waiting.",
+    "cut_bullshit": "Want to know which three movies we picked for you? Cut the bullshit. Your time is worth more than searching for an hour on Netflix just to fall asleep.",
     "discover_now": "Discover Now",
     "only": "only",
-    "or_elite": "Or join Elite for unlimited access 👑",
+    "or_elite": "A founder seat: ₪99 once. Not a subscription, no recurring charge.",
     "already_elite": "Already a founder?",
     "login_test": "Log in",
     "watch_trailer": "Watch Trailer",
@@ -40,19 +41,79 @@
     "back": "Back",
     "fomo_timer_warning": "No timer, no pressure. Your three films, free.",
     "fomo_loss_aversion": "You can close this and come back — your answers are saved on this device.",
-    "fomo_social_proof": "This pick came from your answers, not from a popularity list 🎬"
+    "fomo_social_proof": "All three came from your answers, not from a popularity list 🎬",
+    "coach_pattern": "🧠 We're picking up a pattern in your taste...",
+    "coach_narrowing": "🎯 Narrowing 50,000 films down to the top 1%...",
+    "coach_almost": "⚡ Your film DNA is nearly decoded.",
+    "coach_final": "🔥 Almost there. Only the closest matches are left.",
+    "fallback": {
+      "155": {
+        "title": "The Dark Knight",
+        "overview": "Batman goes up against the Joker, a psychopathic criminal...",
+        "question": "Seen The Dark Knight? How many stars does it get?"
+      },
+      "27205": {
+        "title": "Inception",
+        "overview": "A professional thief breaks into people's dreams...",
+        "question": "Your rating for Inception?"
+      },
+      "680": {
+        "title": "Pulp Fiction",
+        "overview": "The tangled stories of criminals in Los Angeles...",
+        "question": "How many stars for Pulp Fiction?"
+      },
+      "348": {
+        "title": "Alien",
+        "overview": "The crew of a spaceship runs into a lethal alien creature...",
+        "question": "Seen Alien? Give it a score."
+      },
+      "603": {
+        "title": "The Matrix",
+        "overview": "The world we know turns out to be an illusion.",
+        "question": "How many stars does The Matrix get?"
+      },
+      "98": {
+        "title": "Gladiator",
+        "overview": "A Roman general is betrayed and becomes a gladiator...",
+        "question": "Your rating for Gladiator?"
+      },
+      "157336": {
+        "title": "Interstellar",
+        "overview": "An epic journey into space to save humanity...",
+        "question": "Seen Interstellar? How many stars?"
+      },
+      "4232": {
+        "title": "Scream",
+        "overview": "A masked serial killer hunts a group of teenagers.",
+        "question": "How many stars for Scream?"
+      },
+      "22970": {
+        "title": "The Cabin in the Woods",
+        "overview": "Five friends drive to a remote cabin and find out it is all part of an insane experiment.",
+        "question": "Seen The Cabin in the Woods? Your rating?"
+      },
+      "11036": {
+        "title": "The Notebook",
+        "overview": "A love story spanning decades and crossing class lines.",
+        "question": "How many stars does The Notebook get?"
+      },
+      "862": {
+        "title": "Toy Story",
+        "overview": "Toys come to life whenever people are not looking.",
+        "question": "Your rating for Toy Story?"
+      }
+    }
   },
   "Quiz": {
-    "title_span1": "The Cinematic Crack",
-    "title_span2": "by CineMind",
+    "badge": "20-30 questions · no signup",
     "title_main1": "The Cinematic Crack",
     "title_main2": "of ",
-    "desc_1": "Discovering your cinematic DNA. Answer a few light questions and get a recommendation that hits the bullseye.",
+    "desc_1": "Discovering your cinematic DNA. Answer 20-30 short questions and get three movies that hit the bullseye.",
     "desc_2_1": "CineMind's AI engine will analyze your taste and tailor a precise personal recommendation. ",
     "desc_2_2": "Simple, fast, and on point.",
     "feature_1": "Maximum Accuracy",
     "feature_2": "DNA Algorithm",
-    "feature_3": "Your Top 5",
+    "feature_3": "Your three movies",
     "cta_start": "Let's Start 🎬",
     "disclaimer": "No registration forms • No credit card • And if the movie turns out shit, we'll blame your taste and not the algorithm 🍿",
     "good_to_know": "Good to know",
@@ -133,11 +194,13 @@
     "founder_title": "Founder",
     "founder_price_note": "once",
     "founder_note": "One payment, lifetime access. Not a subscription, no recurring charge.",
-    "founder_f1": "Your taste profile is saved",
+    "founder_f1": "Your taste profile is saved in this browser",
     "founder_f2": "Unlimited repeat quizzes",
     "founder_f3": "A weekly email with a film that fits you",
-    "founder_f4": "A history of every \"why this film\"",
+    "founder_f4": "Your price is locked, even once the product goes subscription",
     "founder_cta": "Take a founder seat",
+    "sold_out_cta": "Every founder seat is taken",
+    "sold_out_note": "You arrived after the last seat. What happens from here is written below.",
     "loading": "Loading...",
     "pay_card": "💳 Credit",
     "after_title": "What happens when the {seats} run out",

@@ -3,12 +3,47 @@
 :root {
   --background: #070709;
   --foreground: #ededed;
+
+  /* THE THREE SURFACES. Every screen was writing its own hex, and the three that were clearly
+     meant as one system had drifted apart — the quiz sat on #0a0a0c while its own nav sat on
+     #070709, a seam visible on any decent screen. surface-0 is the page, surface-1 the card
+     that lifts off it, surface-2 anything that lifts off a card (toasts, dialogs). */
+  --surface-0: #070709;
+  --surface-1: #111113;
+  --surface-2: #17171b;
+
+  /* ONE ACCENT, ONE SIGNAL. The warm family had grown to seven hues doing a single job. Rose is
+     the interactive and branded colour (with indigo as the second half of the identity, left
+     alone); emerald means only one thing in this product — "you may stop now". */
+  --accent: #f43f5e;
+  --accent-strong: #e11d48;
+  --accent-soft: #fb7185;
+  --signal: #10b981;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-signal: var(--signal);
+
+  --radius-control: 1rem;
+  --radius-panel: 2rem;
+  --radius-card: 2.5rem;
+
+  /* Two steps, and no third. Depth is either "this sits above the page" or "this is the thing
+     you are meant to press"; everything else was a glow that rendered as nothing. */
+  --shadow-raise: 0 18px 45px rgba(0, 0, 0, 0.55);
+  --shadow-accent: 0 0 30px rgba(225, 29, 72, 0.35);
+
+  --font-sans: var(--font-rubik);
   --font-mono: var(--font-geist-mono);
 }
 

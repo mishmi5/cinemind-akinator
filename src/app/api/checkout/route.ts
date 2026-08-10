@@ -89,6 +89,11 @@ export async function POST(req: Request) {
       ],
       client_reference_id: uid,
       metadata: uid ? { uid } : undefined,
+      // Stripe issues the invoice and mails it to the buyer. We sent nothing at all before, while
+      // the privacy page promises invoices kept for seven years — this is the document that promise
+      // refers to. An invoice needs a Customer, which payment mode only creates when asked.
+      customer_creation: 'always',
+      invoice_creation: { enabled: true },
       // {CHECKOUT_SESSION_ID} is substituted by Stripe. The success page posts it to
       // /api/checkout/verify, which asks Stripe whether the money actually arrived and grants the
       // seat if the webhook did not. Without this the success page is a cosmetic string and a

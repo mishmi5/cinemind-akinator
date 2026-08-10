@@ -31,7 +31,10 @@ export interface Question {
 }
 
 export interface VectorState {
-  possibleMoviesRemaining: number;
+  /** How many films are still candidates. Optional because the brain engine cannot measure it and
+   *  no longer sends it: its value there was derived from the progress bar, not from any pool the
+   *  engine holds. Only send this where a real candidate count exists. */
+  possibleMoviesRemaining?: number;
   leadingMicroGenres: string[];
 }
 

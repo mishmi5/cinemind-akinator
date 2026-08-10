@@ -182,6 +182,16 @@ export default function DailyChallengePage() {
         <p className="text-zinc-400 text-xs font-bold mt-6 uppercase tracking-widest">
           {he ? 'סרט חדש בכל חצות (שעון ישראל)' : 'New film every midnight (Israel time)'}
         </p>
+        {/* The counter lives in this browser's localStorage and nowhere else, so a new phone or a
+            cleared history starts it over. Saying so beats letting someone build a long streak on
+            the assumption that it is being kept for them somewhere. */}
+        {streak > 0 && (
+          <p className="text-zinc-500 text-xs mt-3">
+            {he
+              ? 'הסטריק נשמר בדפדפן הזה בלבד. במכשיר אחר הוא מתחיל מאפס.'
+              : 'The streak is saved in this browser only. On another device it starts from zero.'}
+          </p>
+        )}
       </div>
     </main>
   );

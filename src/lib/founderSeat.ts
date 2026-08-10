@@ -69,13 +69,17 @@ export async function grantFounderSeat(
     if (claim.exists) {
       return (claim.data() as PurchaseClaim).refundedAt ? 'refunded' : 'already-granted';
     }
+    // Both reads have to happen before the first write — Firestore refuses a read after a write
+    // inside a transaction.
+    const existingEmail = (await tx.get(userRef)).data()?.email as string | undefined;
+    const email = session.customer_details?.email ?? null;
     const record: PurchaseClaim = {
       uid,
       sessionId: session.id,
       paymentIntentId: paymentIntentId(session),
       amountTotal: session.amount_total ?? null,
       currency: session.currency ?? null,
-      email: session.customer_details?.email ?? null,
+      email,
       paidAt,
       grantedAt: new Date().toISOString(),
       grantedBy,
@@ -89,6 +93,11 @@ export async function grantFounderSeat(
         premiumSince: record.grantedAt,
         stripeSessionId: session.id,
         stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+        // The weekly recommendations mail — the headline reason to pay — reads `email` off this
+        // document, and nothing was ever writing it for a customer who paid without an account
+        // email. Stripe does not guarantee an email on the session, and an address the user gave us
+        // at signup is the one they know, so Stripe's fills the gap and never overwrites.
+        ...(email && !existingEmail ? { email } : {}),
       },
       { merge: true }
     );
