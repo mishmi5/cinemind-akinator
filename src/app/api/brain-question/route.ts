@@ -1387,13 +1387,21 @@ export async function POST(req: Request) {
       // an animation-lead film reach someone who had rejected animation purely because forty
       // popular candidates did not contain three they had not already seen.
       const pool = await fetchCandidatePool(seen, locale, 80);
-      for (const respectLeadGenre of [true, false]) {
+      for (const respectTaste of [true, false]) {
         if (resolved.length >= 3) break;
         for (const c of pool) {
           if (resolved.length >= 3) break;
           const m = await movieById(c.id, locale);
           if (!m || hatedIds.has(m.id) || resolved.some(x => x.id === m.id)) continue;
-          if (respectLeadGenre && leadGenreRejected(m)) continue;
+          // The first pass has to honour BOTH guards, not just the lead-genre one. Honouring only
+          // the lead genre let a horror film reach someone who rated every horror film they were
+          // shown a one, because horror sat second in that film's genre list. The set of genres
+          // this person rejected outright is the stronger signal of the two; a film carrying any
+          // of them has no place here while any alternative exists.
+          if (respectTaste) {
+            if (leadGenreRejected(m)) continue;
+            if (genreNames(m._genreIds || []).some(n => hardRejectedGenres.has(n))) continue;
+          }
           resolved.push(m);
         }
       }
@@ -1404,8 +1412,8 @@ export async function POST(req: Request) {
     // week-cached, so this usually succeeds even mid-outage) before we give up.
     if (!resolved.length) {
       await new Promise(r => setTimeout(r, 400));
-      // Films this retry found but set aside because they lead with a rejected genre. They are used
-      // only if the preferred pass leaves us with nothing at all — see the two-pass note below.
+      // Films this retry found but set aside because they carry a genre this person rejected. They
+      // are used only if the preferred pass leaves us with nothing at all — see the note below.
       const lastDitch: typeof resolved = [];
       // A user the engine never read at all — "Eclectic taste" — has no loved terms AND no
       // confirmed term, so this loop used to iterate over an empty array and do nothing. That is
@@ -1423,7 +1431,9 @@ export async function POST(req: Request) {
           // not lead with a rejected genre, but never return an empty screen to protect that
           // preference. This retry only runs when every earlier source came back with nothing.
           if (resolved.some(x => x.id === m.id) || hatedIds.has(m.id)) continue;
-          if (leadGenreRejected(m)) { lastDitch.push(m); continue; }
+          const rejectedHere = leadGenreRejected(m)
+            || genreNames(m._genreIds || []).some(n => hardRejectedGenres.has(n));
+          if (rejectedHere) { lastDitch.push(m); continue; }
           resolved.push(m);
         }
       }
