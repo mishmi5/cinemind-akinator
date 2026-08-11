@@ -545,10 +545,17 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     // put raw CJK on a Hebrew results card (機動警察パトレイバー 劇場版). Prefer a Latin title in
     // that case — recognizable to an Israeli reader in a way the original script is not.
     // Not just CJK: the Hebrew UI also received องค์บาก (Thai) and Сталкер (Cyrillic) as the
-    // film's "original title" line. Anything with no Latin letter at all is unreadable here.
-    const cjk = (t: string) => !!t && !/[A-Za-z֐-׿]/.test(t);
+    // film's "original title" line.
+    //
+    // The test used to be "contains no Latin letter at all", which let a MIXED title through: a
+    // Hebrew results card showed "NEMO/ニモ", because NEMO satisfied the Latin requirement and the
+    // katakana rode along beside it. Half a readable title is still half an unreadable one. The
+    // question is not whether a reader can find something familiar in the string — it is whether
+    // the string contains a script they cannot read at all.
+    const unreadableHere = (t: string) =>
+      !!t && /[Ѐ-ӿ؀-ۿ฀-๿぀-ヿ㐀-鿿가-힯]/.test(t);
     const heTitle = m.title || m.original_title || '';
-    let title = cjk(heTitle) && m.original_title && !cjk(m.original_title)
+    let title = unreadableHere(heTitle) && m.original_title && !unreadableHere(m.original_title)
       ? m.original_title : heTitle;
     const safeTitle = title;
     // The subtitle line under the Hebrew title carries the original title, and for Japanese
@@ -559,17 +566,17 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     // One English lookup covers both gaps: an unreadable original-title line, and a film TMDB has
     // no Hebrew synopsis for — the card then rendered as a bare title over a poster (seen on Rudy
     // and on I giorni dell'ira). An English synopsis beats no synopsis.
-    if (cjk(sub) || !overview.trim()) {
+    if (unreadableHere(sub) || !overview.trim()) {
       try {
         const en = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=en-US`, { next: { revalidate: 604800 } });
         const ed = en.ok ? await en.json() : null;
-        if (cjk(sub)) {
-          if (ed?.title && !cjk(ed.title)) sub = ed.title;
-          else if (!cjk(safeTitle)) sub = safeTitle;
+        if (unreadableHere(sub)) {
+          if (ed?.title && !unreadableHere(ed.title)) sub = ed.title;
+          else if (!unreadableHere(safeTitle)) sub = safeTitle;
         }
         // When BOTH titles are Japanese there was nothing to fall back to and the card printed
         // 機動戦士ガンダム 逆襲のシャア as the film's name. The English title covers it.
-        if (cjk(title) && ed?.title && !cjk(ed.title)) title = ed.title;
+        if (unreadableHere(title) && ed?.title && !unreadableHere(ed.title)) title = ed.title;
         if (!overview.trim() && ed?.overview) overview = ed.overview;
       } catch { /* keep what we have rather than lose the line */ }
     }
