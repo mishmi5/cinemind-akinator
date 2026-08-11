@@ -297,8 +297,11 @@ export async function POST(req: Request) {
     if (rlSessionId && !checkRateLimit('brain-session:' + rlSessionId, 90, 60_000)) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
-    // Reconciled against the session a few lines below, once we know whether we already hold one.
-    let locale = req.headers.get('x-locale') || 'he';
+    // Absent and "he" are not the same thing, so the raw header is kept: a request that OMITS the
+    // header must inherit the session's language, while one that explicitly asks for another must
+    // be obeyed. Reconciled against the session a few lines below.
+    const headerLocale = req.headers.get('x-locale');
+    let locale = headerLocale || 'he';
     // These headers come from the browser and were parsed with a bare JSON.parse: a header of
     // `not-json`, `{}` or `5` crashed the route with a 500 that echoed the exception text back to
     // the caller. Anything that is not an array of strings is simply no history.
@@ -329,12 +332,14 @@ export async function POST(req: Request) {
     const sessionKey = typeof payload.sessionId === 'string' ? payload.sessionId : '';
     const stored = payload.isInit ? startSession(sessionKey) : getSession(sessionKey);
     // The language belongs to the quiz, not to the request. Every title, synopsis and question in a
-    // session was fetched in one language, so a later request arriving without an x-locale header
-    // used to fall back to Hebrew and start mixing Hebrew films into an English quiz mid-run. The
-    // client does send the header every time; this makes that a convenience rather than a load-
-    // bearing assumption. An init request sets the language, and after that the session decides.
+    // session was fetched in one language, so a request arriving WITHOUT an x-locale header used to
+    // fall back to Hebrew and start mixing Hebrew films into an English quiz mid-run.
+    //
+    // Only a missing header is ignored. A header that explicitly names another language is obeyed
+    // and remembered: someone who switches the site to English mid-quiz should get English, and the
+    // first version of this guard made the language immutable and took that away from them.
     if (stored) {
-      if (payload.isInit) stored.locale = locale;
+      if (headerLocale) stored.locale = headerLocale;
       else if (stored.locale) locale = stored.locale;
     }
     // Non-ASCII (Hebrew) titles can't ride HTTP headers, so taste state lives in the BODY.
