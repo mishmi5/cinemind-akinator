@@ -356,11 +356,19 @@ export async function POST(req: Request) {
 
     // The hint that produced the movie just answered (round-tripped from the prior response).
     const activeHint = typeof payload.searchHint === 'string' ? payload.searchHint.trim() : '';
-    // SESSION-scoped count of "didn't see" answers (round-trips in the body). The completion
-    // cap must be based on movies shown THIS quiz — NOT the cross-quiz `x-asked-ids` list
-    // (which carries variety/dedup history from prior quizzes and would otherwise trip the
-    // cap instantly for a returning user → quiz jumps straight to recommendations).
-    let notSeen = typeof payload.notSeen === 'number' ? payload.notSeen : 0;
+    // SESSION-scoped count of "didn't see" answers. The completion cap must be based on movies
+    // shown THIS quiz — NOT the cross-quiz `x-asked-ids` list (which carries variety/dedup history
+    // from prior quizzes and would otherwise trip the cap instantly for a returning user → quiz
+    // jumps straight to recommendations).
+    //
+    // This one was still being read from the body while history, probe and skipYears above had
+    // already moved to the stored session, and it is load-bearing twice over: it feeds SHOWN_CAP,
+    // so posting notSeen: 5000 ended the quiz on the first answer and minted a completed-quiz
+    // token; and it feeds the "you can stop now" offer, so a real skipper whose client had not yet
+    // echoed a count was never offered the exit. Same rule as the rest: the server's copy wins,
+    // and the client's is only continuity after a cold start.
+    let notSeen = stored ? stored.notSeen
+      : (typeof payload.notSeen === 'number' && payload.notSeen >= 0 ? Math.min(payload.notSeen, 500) : 0);
 
     const backend = brainBackend();
     const mock = req.headers.get('x-brain-mock') === '1' || process.env.BRAIN_MOCK === '1';
@@ -978,7 +986,13 @@ export async function POST(req: Request) {
     // answer (owner wants smooth 1-4% steps, never a 5→42 jump). The previous shown value
     // round-trips via the x-current-confidence header. Completion is gated on the SHOWN meter
     // (below), so the final step to 100 is also ≤4.
-    const prevShown = Math.round((parseFloat(req.headers.get('x-current-confidence') || '0') || 0) * 100);
+    // The stored session carries the last meter we served, so that is what the ramp continues from.
+    // Reading the header first let a client post x-current-confidence: 0.99 and watch the meter go
+    // to 95 on its first answer — and since completion is gated on this same displayed meter, that
+    // is the first half of forging a finished quiz. The header remains the fallback for a session
+    // the server no longer holds, which is the only case it was ever needed for.
+    const headerShown = Math.round((parseFloat(req.headers.get('x-current-confidence') || '0') || 0) * 100);
+    const prevShown = stored && typeof stored.shown === 'number' ? stored.shown : headerShown;
 
     // ── Completion intent: the engine WANTS to finish once the taste is locked (after MIN_Q),
     //    or a hard cap is reached. Two caps: MAX_Q on RATED answers, and a TOTAL-SHOWN cap on
