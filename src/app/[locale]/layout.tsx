@@ -148,6 +148,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { routing } from '@/i18n/routing';
+import SkipLink from '@/components/SkipLink';
 
 export default async function RootLayout({
   children,
@@ -210,9 +211,22 @@ export default async function RootLayout({
               <Suspense fallback={null}>
                 <PostHogPageView />
               </Suspense>
-              <main className="flex-1">
+              {/* The bypass link belongs here, not on individual pages. It was on three of them —
+                  scan, profile and login — so the other nine, including the landing page, the
+                  pricing page and both legal pages, had no way for a keyboard or screen-reader user
+                  to skip the navigation, and no main landmark to skip to. WCAG 2.4.1 is a level-A
+                  criterion and Israeli standard 5568 adopts it, so this was a compliance gap on the
+                  pages a visitor is most likely to land on. Putting it in the layout means a new
+                  page cannot be added without it. */}
+              <SkipLink />
+              {/* A div, not a <main>. Most pages here already ARE a <main> at their root — the
+                  landing page, pricing, the legal pages, arena, daily and the rest — so wrapping
+                  them in another one gave every page two main landmarks, which is its own defect.
+                  The bypass target does not have to be the landmark; it only has to be where the
+                  link lands. */}
+              <div id="main-content" className="flex-1 flex flex-col">
                 {children}
-              </main>
+              </div>
             </AuthProvider>
 
             <footer className="border-t border-zinc-800 bg-zinc-950 py-6 mt-auto">

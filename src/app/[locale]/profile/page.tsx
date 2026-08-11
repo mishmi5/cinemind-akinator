@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/Navbar';
-import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
@@ -90,10 +89,9 @@ export default function UserProfile() {
 
   return (
     <div dir={dir} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden pb-20">
-      <SkipLink />
       <Navbar />
 
-      <div id="main-content" className="max-w-4xl mx-auto px-4 mt-12">
+      <div className="max-w-4xl mx-auto px-4 mt-12">
         {/* Header Profile */}
         <div className="bg-[#111113] border border-white/5 rounded-[2rem] p-8 md:p-12 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden shadow-2xl mb-8 transition-all duration-500" style={{ boxShadow: `0 20px 40px -10px ${accent.glow}` }}>
           <div className="absolute top-0 right-0 w-64 h-64 blur-[100px] pointer-events-none transition-colors duration-500" style={{ backgroundColor: accent.glow }}></div>

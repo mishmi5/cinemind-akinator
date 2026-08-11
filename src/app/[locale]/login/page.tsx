@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { Link } from '@/i18n/routing';
 import { useLocale, useTranslations } from 'next-intl';
 import Navbar from '@/components/Navbar';
-import SkipLink from '@/components/SkipLink';
 
 // ponytail: no auth provider is wired yet (AuthContext only does anonymous sign-in,
 // and nothing in src/ calls signInWithEmailAndPassword / signInWithPopup).
@@ -18,15 +17,13 @@ export default function LoginPage() {
   return (
     <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden flex flex-col selection:bg-rose-500/30">
 
-      <SkipLink />
-
       {/* תאורת רקע עדינה */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-rose-900/10 blur-[150px] pointer-events-none"></div>
 
       <Navbar />
 
       {/* אזור ההתחברות */}
-      <div id="main-content" className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-10 pb-20">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-10 pb-20">
         
         {/* כותרת קטנה מעל הקופסה */}
         <div className="mb-6 flex items-center gap-2 text-2xl font-black tracking-tight">

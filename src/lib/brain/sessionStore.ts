@@ -34,6 +34,12 @@ export interface BrainSession {
   servedTitles: string[];
   /** The id of the question currently on screen. */
   pending?: string;
+  /** The language the quiz started in. Titles, synopses and question text are all fetched in it and
+   *  they live inside the session, so a later request that arrives without an x-locale header must
+   *  not be allowed to flip the quiz to the default language halfway through. The client does send
+   *  the header on every request; this is here so that one client bug cannot serve a Hebrew film to
+   *  an English reader without anything failing. */
+  locale?: string;
   touched: number;
 }
 

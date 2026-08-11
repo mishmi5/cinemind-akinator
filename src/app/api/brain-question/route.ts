@@ -297,7 +297,8 @@ export async function POST(req: Request) {
     if (rlSessionId && !checkRateLimit('brain-session:' + rlSessionId, 90, 60_000)) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
-    const locale = req.headers.get('x-locale') || 'he';
+    // Reconciled against the session a few lines below, once we know whether we already hold one.
+    let locale = req.headers.get('x-locale') || 'he';
     // These headers come from the browser and were parsed with a bare JSON.parse: a header of
     // `not-json`, `{}` or `5` crashed the route with a 500 that echoed the exception text back to
     // the caller. Anything that is not an array of strings is simply no history.
@@ -327,6 +328,15 @@ export async function POST(req: Request) {
     //    restored that way is NOT eligible to be paid for.
     const sessionKey = typeof payload.sessionId === 'string' ? payload.sessionId : '';
     const stored = payload.isInit ? startSession(sessionKey) : getSession(sessionKey);
+    // The language belongs to the quiz, not to the request. Every title, synopsis and question in a
+    // session was fetched in one language, so a later request arriving without an x-locale header
+    // used to fall back to Hebrew and start mixing Hebrew films into an English quiz mid-run. The
+    // client does send the header every time; this makes that a convenience rather than a load-
+    // bearing assumption. An init request sets the language, and after that the session decides.
+    if (stored) {
+      if (payload.isInit) stored.locale = locale;
+      else if (stored.locale) locale = stored.locale;
+    }
     // Non-ASCII (Hebrew) titles can't ride HTTP headers, so taste state lives in the BODY.
     let history: BrainHistoryItem[] = stored ? stored.history
       : (Array.isArray(payload.ratingHistory) ? payload.ratingHistory : []);

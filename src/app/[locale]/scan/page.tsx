@@ -8,7 +8,6 @@ import type { SessionState, AnswerType, MovieContext, EasterEggType } from '@/ty
 import quizToasts from '@/data/quiz-toasts.json';
 import posthog from 'posthog-js';
 import RoastReveal from '@/components/roast/RoastReveal';
-import SkipLink from '@/components/SkipLink';
 import { useAuth } from '@/context/AuthContext';
 
 // The offline fallback film. Its title, synopsis and question used to sit here as Hebrew string
@@ -618,7 +617,6 @@ export default function ScanMovieEvaluation() {
   };
   return (
     <div dir={locale === 'he' ? 'rtl' : 'ltr'} className="min-h-screen bg-surface-0 text-white font-sans overflow-x-hidden pb-20 relative">
-      <SkipLink />
 
       {activeEffect === 'oscar' && (
         <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center overflow-hidden">
@@ -692,7 +690,7 @@ export default function ScanMovieEvaluation() {
         <div className="flex items-center gap-6 text-sm font-medium text-zinc-400"><Link href="/arena" className="hover:text-rose-400 font-bold transition-colors text-base">👾 {tNav('arena')}</Link><span className="text-zinc-400">{t('anonymous')}</span></div>
       </nav>
 
-      <div id="main-content" className="w-full max-w-5xl mx-auto px-4 mt-4 md:mt-8 mb-2 md:mb-4 flex items-center justify-between">
+      <div className="w-full max-w-5xl mx-auto px-4 mt-4 md:mt-8 mb-2 md:mb-4 flex items-center justify-between">
         <div className="flex-1 bg-white/10 rounded-full h-2 relative overflow-hidden me-6">
           {/* start-anchored so the bar grows from the side the locale reads from: right in Hebrew,
               left in English (it used to be pinned to the physical right in both). */}
