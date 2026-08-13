@@ -131,8 +131,12 @@ const staticMetadata: Metadata = {
       { url: "/icons/icon-192x192.svg", sizes: "192x192", type: "image/svg+xml" },
       { url: "/icons/icon-512x512.svg", sizes: "512x512", type: "image/svg+xml" },
     ],
+    // Safari does not accept SVG for apple-touch-icon: an SVG here means the home-screen
+    // icon falls back to a screenshot of the page. The PNG is rasterised from
+    // apple-touch-icon.svg (same mark, flattened onto #070709 — iOS ignores alpha), so the
+    // SVG stays the source of truth and this is the format the platform can actually use.
     apple: [
-      { url: "/icons/apple-touch-icon.svg", sizes: "180x180", type: "image/svg+xml" },
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
   other: {

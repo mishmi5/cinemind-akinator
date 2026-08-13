@@ -38,6 +38,7 @@
     "hate": "Hate",
     "love": "Love",
     "not_seen": "Not Seen",
+    "card_needs_account": "The shareable taste card is built from a saved profile, and sign-up is not open yet. Until then, the results here are everything the quiz knows about you.",
     "back": "Back",
     "fomo_timer_warning": "No timer, no pressure. Your three films, free.",
     "fomo_loss_aversion": "You can close this and come back — your answers are saved on this device.",
@@ -140,7 +141,19 @@
     "success_title": "Boom! Daily Pulse Complete",
     "success_desc": "Streak kept alive. XP multiplier increased.",
     "reward": "Daily Pulse Reward",
-    "back_to_arena": "Back to Arena"
+    "back_to_arena": "Back to Arena",
+    "claim_failed": "The XP did not save this time, and the streak was not updated.",
+    "claim_retry": "Try claiming again",
+    "summary_title": "What you answered today",
+    "summary_note": "Three films is a taste sample, not a profile. The full scan keeps asking until it really knows what fits you.",
+    "rating_loved": "Loved it",
+    "rating_ok": "So-so",
+    "rating_disliked": "Not for you",
+    "rating_unseen": "Not seen",
+    "cta_scan": "Take the full scan",
+    "cta_daily": "Daily challenge",
+    "load_failed": "We could not fetch a film for today's pulse.",
+    "retry": "Try again"
   },
   "Duel": {
     "title": "Taste Duel",

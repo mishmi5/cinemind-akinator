@@ -28,9 +28,19 @@ const MIN_Q = 5;        // never finish before this many ratings
 // answerer rated 57 films — the product promises twenty to forty, and the fifty-seventh question
 // bought nothing that the fortieth had not already failed to settle. At the cap the quiz
 // recommends from the best signal it has and says honestly how sure it is.
-const MAX_Q = 40;       // hard cap on RATED answers
+// 75 WAS THE CENSUS, NOT THE CEILING. Raising it to 75 bought the precision it was meant to buy —
+// a parody fan gets parody, a giallo fan gets giallo — but it bought that by walking all ~60
+// sub-genre terms every time, so the cap became the NORMAL length: a slasher fan measured 66
+// questions and someone who rated everything 5 hit 75 exactly. That is eight to twelve minutes of
+// clicking against copy that promises "20-30", on a quiz whose abandonment work got to 22%.
+// The precision now comes from adaptive depth instead (broad over every family, deep only where
+// the person is warm, stop when the taste locks), so the measured need fell to 24-33 for a clear
+// taste and 45 for the hardest case — a love hiding inside a family whose other shelves they rate
+// 1. 55 leaves that case room to breathe and still bounds the one person nothing settles for.
+// It is a safety net again, not the normal case.
+const MAX_Q = 55;       // hard cap on RATED answers
 // Films SHOWN, including "didn't see" — the real backstop so a session cannot run forever.
-const SHOWN_CAP = 90;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
+const SHOWN_CAP = 95;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
                         // quiz always terminates even for a user who's seen few films
 const HI = 4;           // a rating ≥ HI is a "strong hit" toward a sub-genre
 const LO = 2;           // a rating ≤ LO is a "miss" against a sub-genre
@@ -60,7 +70,13 @@ const LOCK_HITS = 2;    // a loved sub-genre is CONFIRMED at this many strong hi
 // established signal (a loved sub-genre suddenly rated low, or a rejected one rated high).
 // Each contradiction lowers confidence and withholds the lock until the term is re-confirmed
 // — the meter deliberately drops so the quiz lengthens in exchange for a more accurate result.
-type ProbeScores = Record<string, { sum: number; n: number; hi: number; hi5?: number; lo: number; contra?: number }>;
+// `mid` counts the 3s. The widget offers five levels and the engine used to read three of them:
+// HI is 4 and LO is 2, so a 3 landed in neither counter and only reached the average, where it
+// dragged a term below the 3.5 candidate gate. A middle rating therefore could only ever cost a
+// sub-genre — the one answer a viewer gives when they liked something without loving it. It is
+// weak positive evidence now: it qualifies a term that already has a real hit, and it breaks ties
+// toward the term the person has actually watched more of. It never locks anything on its own.
+type ProbeScores = Record<string, { sum: number; n: number; hi: number; hi5?: number; mid?: number; lo: number; contra?: number }>;
 
 // Cross-over family adjacency for the early-stop (e.g. cosmic-horror ↔ hard-SF, thrillers
 // span crime/action). A leader can only early-lock once its family AND these neighbours are
@@ -176,8 +192,8 @@ function seededRank(seed: string): number {
 }
 
 function computeTaste(probe: ProbeScores) {
-  const stats = Object.entries(probe).map(([t, { sum, n, hi, hi5, lo, contra }]) =>
-    ({ t, n, hi, hi5: hi5 || 0, lo, contra: contra || 0, avg: sum / n, hiRate: hi / n }));
+  const stats = Object.entries(probe).map(([t, { sum, n, hi, hi5, mid, lo, contra }]) =>
+    ({ t, n, hi, hi5: hi5 || 0, mid: mid || 0, lo, contra: contra || 0, avg: sum / n, hiRate: hi / n }));
   const totalContra = stats.reduce((a, s) => a + s.contra, 0);
   const disliked = stats.filter(s => s.lo >= 2 && s.hi === 0).map(s => s.t);
   // The LEAD candidate: strongest signal — most strong hits, then highest average. The
@@ -197,11 +213,17 @@ function computeTaste(probe: ProbeScores) {
   // but shrugged at two other slashers sat at avg 3.0 and was filtered out entirely, so eleven
   // lukewarm 4s on neighbouring horror sub-genres won the quiz and the read came back
   // "supernatural horror". Intensity is the signal; frequency is not.
-  const candidates = stats.filter(s => (s.hi >= 1 && s.avg >= 3.5) || s.hi5 >= 1)
+  // A 3 is a "liked it, didn't love it" — so a term with a real hit and a couple of 3s is a term
+  // this person watches, even though those 3s pull its average under the 3.5 gate. Without the
+  // last clause a slasher fan who gave Halloween a 5 and two other slashers a 3 sat at avg 3.67
+  // with one hit, while a single stray 4 elsewhere qualified on its own.
+  const candidates = stats.filter(s => (s.hi >= 1 && s.avg >= 3.5) || s.hi5 >= 1 || (s.hi >= 1 && s.mid >= 2))
     // Purity beats volume once intensity ties. A giallo fan and its neighbour slasher both ended
     // on one emphatic 5, and slasher won on raw hit count collected from lukewarm 4s — the wrong
     // read. Average separates them: the true love has no lukewarm ratings dragging it down.
-    .sort((a, b) => b.hi5 - a.hi5 || b.avg - a.avg || b.hi - a.hi || famScore(b) - famScore(a) || b.n - a.n);
+    // …and when everything above ties, the term they merely liked more of wins: a 3 is the weakest
+    // vote in the row, but it is still a vote.
+    .sort((a, b) => b.hi5 - a.hi5 || b.avg - a.avg || b.hi - a.hi || b.mid - a.mid || famScore(b) - famScore(a) || b.n - a.n);
   const leader = candidates[0] || null;
   // CONTENDERS — sub-genres in a close 5★ race with the leader. When several neighbours
   // tie (a body-horror fan rating both "The Fly" and "Evil Dead" a 5), we must DRILL each
@@ -448,6 +470,8 @@ export async function POST(req: Request) {
           // emphatic 5 on the film that defines them, so their strongest answer changed
           // nothing. hi5 tracks emphatic loves separately and leads the ranking.
           hi5: (cur.hi5 || 0) + (payload.answer >= 5 ? 1 : 0),
+          // The middle of the row. Not a hit, not a miss — see the note on ProbeScores.
+          mid: (cur.mid || 0) + (payload.answer === 3 ? 1 : 0),
           lo: cur.lo + (payload.answer <= LO ? 1 : 0),
           contra,
         };
@@ -469,7 +493,7 @@ export async function POST(req: Request) {
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds,
       ...history.map(h => String(h.id || '')).filter(Boolean)]));
     const seenSet = new Set(seen);
-    const { loved, leader, contenders, disliked, lockedLove: lockedRaw, totalContra, rejectedFamilies } = computeTaste(probe);
+    const { stats, loved, leader, contenders, disliked, lockedLove: lockedRaw, totalContra, rejectedFamilies } = computeTaste(probe);
 
     // ── Decide the next move DETERMINISTICALLY: EXPLORE before EXPLOIT. ──
     // EXPLORE: walk EVERY distinct sub-genre once (iconic exemplar each) before committing
@@ -537,110 +561,14 @@ export async function POST(req: Request) {
     // rated one film 5. The focus still governs families we have real evidence about; a family at
     // zero observations stays askable until it has been offered at least once.
     const probedFams = new Set(Object.keys(probe).map(t => subGenreFamily(t) || '').filter(Boolean));
-    const firstLook: typeof samplerAll = [];
-    const secondChance: typeof samplerAll = [];
-    for (const c of samplerAll) {
-      const t = samplerProbeOf(c.id);
-      if (!t || disliked.includes(t)) continue;
-      const fam = subGenreFamily(t) || '';
-      // A family they pointed at outranks every reason we had to stop offering it: the refusals
-      // that made it look cold were of OTHER shelves, and the whole point of asking was to be
-      // told where to look instead.
-      if (!chosenFams.has(fam)) {
-        if (rejectedFamilies.includes(fam)) continue; // never ask about a family they keep rejecting
-        if (focusFams && !focusFams.has(fam) && probedFams.has(fam)) continue;
-      }
-      if (!probe[t]) firstLook.push(c);
-      else if (ambiguous(t)) secondChance.push(c);
-    }
-    // A NAMED FAMILY KEEPS ITS SECOND CHANCE. secondChance is normally held back until every term
-    // in the catalogue has had a first look, which is right while the engine is still exploring —
-    // but it broke the one promise the direction panel makes. Westerns are a single sub-genre term:
-    // point at them, get exactly one western, then forty questions of everything else, because the
-    // family had no unprobed candidate left and its second exemplar was behind a queue of
-    // forty-six other terms. Measured on the production build: one western in twelve questions.
-    // A family the user asked for jumps that queue; nothing else does.
-    const chosenSecondChance = chosenFams.size
-      ? secondChance.filter(c => chosenFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || ''))
-      : [];
-    const uncovered = firstLook.length || chosenSecondChance.length
-      ? [...chosenSecondChance, ...firstLook]
-      : secondChance;
-    const sweepDone = uncovered.length === 0;
-    // EARLY-STOP (adaptive length): if the leader is a PERFECT 5★ love AND its whole family
-    // has been explored — so every close neighbour was compared and the drill-off settled —
-    // we may exploit without sweeping the remaining families. A focused taste (all 5s for
-    // one sub-genre, neutral elsewhere) thus finishes in ~13 questions; an ambiguous taste
-    // (no perfect 5★) keeps exploring to the full sweep. avg===5 is only reachable when
-    // EVERY rating for that sub-genre was a strict-bullseye 5, so it can't be a stray hit.
-    const leaderFam = leader ? subGenreFamily(leader.t) : undefined;
-    // Families that share cross-over sub-genres (e.g. a hard-SF fan also rates cosmic-horror
-    // high). Before early-stopping on a leader, its family AND these adjacent families must
-    // be explored, so the true love in a neighbour family isn't skipped.
-    const adj = leaderFam ? (FAMILY_ADJ[leaderFam] || []) : [];
-    const famsToClear = leaderFam ? [leaderFam, ...adj] : [];
-    const leaderFamilyExplored = famsToClear.length > 0 &&
-      !uncovered.some(c => famsToClear.includes(subGenreFamily(samplerProbeOf(c.id) || '') || ''));
-    // n >= 2 is required: locking off a SINGLE 5-star sample let one lucky exemplar decide the
-    // whole quiz, and everything the user answered afterwards was ignored.
-    const earlyExploit = !!leader && leader.avg === 5 && leader.hi >= 2 && leaderFamilyExplored && history.length >= MIN_Q;
-    // INTERLEAVED DRILL: the moment a sub-genre gets a strong hit, spend the NEXT question
-    // confirming it instead of waiting for the whole sweep. Previously a 5 on Saving Private Ryan
-    // at Q15 left searchHint empty until Q51 — the quiz felt deaf, and the confirmation that
-    // shortens it arrived far too late. The sweep still resumes right after, so coverage is kept.
-    const freshLead = !!leader && leader.hi >= 1 && leader.n < 2 && history.length >= 3;
-    const exploitNow = sweepDone || earlyExploit || freshLead;
-    // DRILL-OFF: drill the least-explored close contender first so every 5★ neighbour gets
-    // its 2nd exemplar before we lock; once all are drilled, fall to the leader. Data-driven
-    // tiebreak (the real love accrues more hits from its own keyword pool) instead of list
-    // order. Never drill mid-sweep unless early-stop conditions hold.
-    // A contender from the leader's own family is the one worth another question; drilling a
-    // rival from somewhere else reads as the engine losing the thread it just found.
-    const leadFamForDrill = leader ? subGenreFamily(leader.t) : undefined;
-    const needDrill = contenders.filter(s => s.n < 2).sort((a, b) =>
-      (subGenreFamily(a.t) === leadFamForDrill ? 0 : 1) - (subGenreFamily(b.t) === leadFamForDrill ? 0 : 1)
-      || a.n - b.n || b.avg - a.avg);
-    // Pre-lock: drill the least-explored close contender. Post-lock: keep drilling the LEADER
-    // so the final confirmation questions (served while the meter ramps the last bit to 100%)
-    // stay squarely on the user's confirmed taste — never random filler.
-    // Once the taste is LOCKED the confirmed term needs no more proof. Re-asking it produced the
-    // "last nine questions were all slashers I rated 5 — zero new information" complaint. The
-    // remaining questions (the quiz cannot end before the meter reaches 96 at <=4%/step) are
-    // spent on genuinely new ground instead: an undrilled rival first, then — via the EXPLORE
-    // branch below — sub-genres never probed. That keeps every question informative AND widens
-    // the loved set the recommendations are drawn from.
-    // Drilling a leader whose siblings were never asked just piles more evidence onto a term
-    // that may not even be the family's best fit. Explore the siblings first; the drill resumes
-    // once the family is fully mapped.
-    const siblingsPending = !!leader && familyHasUnasked(leader.t);
-    // Post-lock the leftover contenders are drilled to widen the loved set, but a contender from
-    // ANOTHER family is not a rival any more — that is how an anime fan was drilled with Friday
-    // the 13th and a fantasy fan with End of Evangelion, nine questions after being read
-    // correctly. Once locked, only same-family contenders are worth another question.
-    const lockFamNow = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
-    // Once locked, the quiz needs one more confirming hit on the LEADER before it can finish
-    // (see `surgical` below). Drilling rivals instead left the leader's evidence frozen, so the
-    // quiz kept going with nothing left to prove and ran past fifty questions. Confirm the thing
-    // we are about to recommend first; the rivals get the questions after that.
-    const needsMoreProof = !!lockedLove && lockedLove.hi < LOCK_HITS + 1;
-    const postLockDrill = needsMoreProof ? lockedLove
-      : (needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null);
-    // Pre-lock, an undrilled contender from ANOTHER family is not worth a question either: a
-    // quiz already closing in on mecha anime spent question 20 on Re-Animator and World War Z.
-    // With no same-family rival left, confirm the leader instead.
-    const sameFamDrill = needDrill.find(d => subGenreFamily(d.t) === leadFamForDrill) || null;
-    const drillTarget = (exploitNow && !siblingsPending)
-      ? (lockedLove ? postLockDrill : (sameFamDrill || leader))
-      : null;
-    // Every pool must pass the same gate. The family ban was only applied to the EXPLORE sweep,
-    // so the drill pool and the fallback pool kept serving rejected styles — a rom-com fan was
-    // shown Friday the 13th at question 16 and an anime fan got Chicago at question 14. Those
-    // two screens were 7 of the 8 recorded abandonments.
     // A CHILD'S TASTE IS A SAFETY SIGNAL. A persona that rated animation and family films five and
     // everything else one was asked about The Conjuring at question one and Kingsman at question
     // five, and finished with three Gundam films at "99% match". The engine has no age, but a
     // profile whose loves are the children's corner and whose rejections include horror is as
     // clear a signal as it will ever get — and the cost of being wrong is asymmetric.
+    // Computed HERE rather than beside the pool gate below, because the coverage queue is built
+    // above it: a sub-genre we will never be willing to show must not sit in that queue forever,
+    // or the sweep can never complete and every child's quiz runs to the cap.
     const familyLove = history.filter(h => h.rating >= HI && h.genres.includes('Family')).length;
     const scaryReject = history.filter(h => h.rating <= LO && (h.genres.includes('Horror') || h.genres.includes('Thriller'))).length;
     // One of each is enough. Waiting for two meant a child was shown The Ring at question two,
@@ -668,7 +596,214 @@ export async function POST(req: Request) {
       const g = c._genreIds || [];
       return g.includes(27) || g.includes(53) || g.includes(80);
     };
-
+    const firstLook: typeof samplerAll = [];
+    const secondChance: typeof samplerAll = [];
+    for (const c of samplerAll) {
+      const t = samplerProbeOf(c.id);
+      if (!t || disliked.includes(t) || unsafeForKids(c)) continue;
+      const fam = subGenreFamily(t) || '';
+      // A SUB-GENRE THAT WAS NEVER OFFERED WAS NEVER REJECTED. This used to prune by FAMILY before
+      // asking, and the family is the wrong unit: a parody fan who rates slapstick and rom-com a 2
+      // turned "comedy" cold at question ten, so parody — the one comedy shelf he actually loves —
+      // was struck off before it was ever shown, and he finished with Avatar. Measured: parody 0
+      // films in 40 questions, giallo 1, and a slasher+courtroom+parody viewer answered on one axis
+      // out of three. The same pruning applied to the narrowing focus, which closes on the leader's
+      // family and dropped every unprobed term outside it.
+      // A rejection is evidence about films we SHOWED. It cannot speak for a shelf we never opened,
+      // and the cost is asymmetric: one parody film is the difference between a right answer and
+      // Avatar, while a 25th romance buys nothing. So a first look is unconditional; the pruning
+      // still governs everything downstream (drill pool, fallbacks, recommendations, and the
+      // second-chance re-ask below).
+      if (!probe[t]) { firstLook.push(c); continue; }
+      // A family they pointed at outranks every reason we had to stop offering it: the refusals
+      // that made it look cold were of OTHER shelves, and the whole point of asking was to be
+      // told where to look instead.
+      if (!chosenFams.has(fam)) {
+        if (rejectedFamilies.includes(fam)) continue; // never RE-ask about a family they keep rejecting
+        if (focusFams && !focusFams.has(fam) && probedFams.has(fam)) continue;
+      }
+      if (ambiguous(t)) secondChance.push(c);
+    }
+    // A NAMED FAMILY KEEPS ITS SECOND CHANCE. secondChance is normally held back until every term
+    // in the catalogue has had a first look, which is right while the engine is still exploring —
+    // but it broke the one promise the direction panel makes. Westerns are a single sub-genre term:
+    // point at them, get exactly one western, then forty questions of everything else, because the
+    // family had no unprobed candidate left and its second exemplar was behind a queue of
+    // forty-six other terms. Measured on the production build: one western in twelve questions.
+    // A family the user asked for jumps that queue; nothing else does.
+    const chosenSecondChance = chosenFams.size
+      ? secondChance.filter(c => chosenFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || ''))
+      : [];
+    // ONE CANDIDATE PER SUB-GENRE, NOT ONE PER TITLE. The sampler holds ten superhero blockbusters
+    // and two giallo films, and the sweep used to sort the raw title list — so the chance of a
+    // sub-genre being asked about was proportional to how many exemplars it happens to own, and
+    // the rare ones lost every draw. Coverage is a walk over the MAP, so the queue carries one
+    // film per term; which film is seeded by sessionId, so two quizzes still differ.
+    const oneEach = (list: typeof samplerAll) => {
+      const byTerm = new Map<string, typeof samplerAll[number]>();
+      for (const c of [...list].sort((a, b) => (samplerTier(a.id) - samplerTier(b.id))
+        || (seededRank(sessionId + a.id) - seededRank(sessionId + b.id)))) {
+        const t = samplerProbeOf(c.id) || '';
+        if (!byTerm.has(t)) byTerm.set(t, c);
+      }
+      return [...byTerm.values()];
+    };
+    const uncovered = firstLook.length || chosenSecondChance.length
+      ? [...chosenSecondChance, ...oneEach(firstLook)]
+      : secondChance;
+    const sweepDone = uncovered.length === 0;
+    // A SECOND TASTE WE CAN SMELL BUT HAVE NOT FOUND YET. Stopping the census at the lock is what
+    // brings a single taste home in thirty questions, and on its own it costs the owner the exact
+    // customer this engine exists for: the viewer who loves slashers AND courtroom drama AND
+    // parody was read on the slasher axis alone, because the lock fired while crime and comedy
+    // still had unopened shelves.
+    // The tell is in the answers he already gave. A family he does not watch comes back a row of
+    // 1s; a family holding a taste we have not located yet comes back LIKED — he rated its opener
+    // a 3 or a 4 — while no single shelf inside it has landed a strong hit. That combination
+    // (family average at or above the middle of the row, zero strong hits) is a taste showing
+    // itself without saying its name, and it is worth the questions it takes to name it.
+    // Deliberately narrow, because the same rule loosened by one condition is the census again:
+    // a family that has ALREADY landed a hit is resolved (which is why rating everything 5 does
+    // not trigger this — every family has its hit), and a family rated 1 throughout is not a
+    // taste, it is a refusal. Both stop the quiz on time.
+    const famRoll: Record<string, { sum: number; n: number; hi: number }> = {};
+    for (const s of stats) {
+      const f = subGenreFamily(s.t); if (!f) continue;
+      const a = famRoll[f] || (famRoll[f] = { sum: 0, n: 0, hi: 0 });
+      a.sum += s.avg * s.n; a.n += s.n; a.hi += s.hi;
+    }
+    const lockFamHere = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
+    const unresolvedFams = new Set(Object.entries(famRoll)
+      .filter(([f, v]) => f !== lockFamHere && v.hi === 0 && v.n > 0 && v.sum / v.n >= 3)
+      .map(([f]) => f));
+    // `firstLook` is used rather than the raw sampler because it is already what the sweep is
+    // WILLING to offer — a child's profile must not be held open by horror shelves it will never
+    // be shown.
+    const chasingSecondTaste = !!lockedLove && firstLook.some(c =>
+      unresolvedFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || ''));
+    // THE EARLY-STOP IS GONE, ON PURPOSE. It used to let a perfect 5★ leader skip the rest of the
+    // sweep once its own family and the adjacent ones were explored, which is what made a sharp
+    // taste finish in ~13 questions — and it is also why a viewer who loves slashers AND courtroom
+    // drama AND parody was read on the slasher axis alone: the two other tastes lived in families
+    // the shortcut never opened, so they were never offered and could not be stated. A taste the
+    // quiz never shows is a taste the engine cannot find, however good the selection logic is.
+    // The sweep now touches every sub-genre TERM before any drilling begins; the drill still
+    // INTERLEAVES (freshLead, below) so a hit is confirmed while the sweep continues, and the lock
+    // still ends the quiz as soon as the read is surgical. The price is length, which is the trade
+    // the owner asked for by name.
+    // INTERLEAVED DRILL: the moment a sub-genre gets a strong hit, spend the NEXT question
+    // confirming it instead of waiting for the whole sweep. Previously a 5 on Saving Private Ryan
+    // at Q15 left searchHint empty until Q51 — the quiz felt deaf, and the confirmation that
+    // shortens it arrived far too late. The sweep still resumes right after, so coverage is kept.
+    // n < 3, not n < 2. With the sweep now walking all ~60 terms, a single confirming question was
+    // the ONLY film of the user's own sub-genre they saw before the tail: a parody fan was served
+    // Scary Movie and Spaceballs and then sixty questions of other shelves. The confirming hits the
+    // lock needs are worth taking WHILE the sweep runs — they are the most informative questions in
+    // the quiz — so the leading term gets up to three films before the interleave stops. Bounded by
+    // n, so a term the user keeps rating low is dropped rather than drilled forever.
+    const freshLead = !!leader && leader.hi >= 1 && leader.n < 3 && history.length >= 3;
+    // A SECOND TASTE HAS TO EARN ITS SECOND FILM TOO. Every drill below is family-bound — by
+    // design, because a drill that wanders reads as the engine losing the thread it just found —
+    // and that is exactly what capped a multi-taste read at one axis. A viewer who rated slashers,
+    // a courtroom drama and a parody 5 was OFFERED all three once the sweep stopped pruning
+    // unprobed terms (slasher:4 courtroom:1 parody:1), but only the leading family ever collected
+    // a second film, so only the leader could reach LOCK_HITS and only the leader could qualify
+    // for `multiTerms`. One 5 on a courtroom drama is not a fluke to be dropped because the leader
+    // happens to be horror; it is the second taste the owner asked to have represented.
+    // So a love OUTSIDE the leader's family gets its confirming exemplar as well. Deliberately
+    // narrow: only an emphatic 5 (hi5), only until the term has the strong hits `multiTerms`
+    // needs, so it is at most one extra question per taste and it cannot become the wandering
+    // drill that was reverted before — a term whose second exemplar lands a 3 leaves `contenders`
+    // on its average and is never asked about again.
+    const leadFamForDrill = leader ? subGenreFamily(leader.t) : undefined;
+    const crossFamLove = contenders.find(s => s.t !== leader?.t && s.hi5 >= 1 && s.hi < LOCK_HITS
+      && subGenreFamily(s.t) !== leadFamForDrill) || null;
+    // A LOCKED TASTE STOPS THE CENSUS. Exploiting only at the END of the sweep is what turned the
+    // last change into a 67-question quiz, and the trace says so exactly: a parody fan was locked
+    // at question 22 with everything settled except ONE confirming hit — and that hit could not be
+    // taken, because `freshLead` stops interleaving at n=3 and the sweep had fifty terms left. He
+    // answered forty-nine further films of shelves he had already rated 1 to buy a question the
+    // engine had been ready to ask at 23.
+    // The lock is not a guess: it already requires the leader's WHOLE family to have been offered,
+    // and every family has had its first look by then. So once it is on, the remaining questions
+    // belong to confirming it (and to a love found outside it, via crossFamLove) rather than to
+    // finishing the map. What protects a second taste now is the breadth pass, not the census.
+    // …but not while we are chasing that second taste. Once the leader has the hits the lock asks
+    // for, another film of the same shelf tells us nothing, and a traced run spent thirty-three of
+    // its fifty-five questions drilling slasher while the courtroom drama it was being held open
+    // for sat unasked. Prove the leader, then go and look.
+    const exploitNow = sweepDone || freshLead || !!crossFamLove
+      || (!!lockedLove && (!chasingSecondTaste || lockedLove.hi < LOCK_HITS + 1));
+    // DRILL-OFF: drill the least-explored close contender first so every 5★ neighbour gets
+    // its 2nd exemplar before we lock; once all are drilled, fall to the leader. Data-driven
+    // tiebreak (the real love accrues more hits from its own keyword pool) instead of list
+    // order. Never drill mid-sweep unless early-stop conditions hold.
+    // A contender from the leader's own family is the one worth another question; drilling a
+    // rival from somewhere else reads as the engine losing the thread it just found.
+    const needDrill = contenders.filter(s => s.n < 2).sort((a, b) =>
+      (subGenreFamily(a.t) === leadFamForDrill ? 0 : 1) - (subGenreFamily(b.t) === leadFamForDrill ? 0 : 1)
+      || a.n - b.n || b.avg - a.avg);
+    // Pre-lock: drill the least-explored close contender. Post-lock: keep drilling the LEADER
+    // so the final confirmation questions (served while the meter ramps the last bit to 100%)
+    // stay squarely on the user's confirmed taste — never random filler.
+    // Once the taste is LOCKED the confirmed term needs no more proof. Re-asking it produced the
+    // "last nine questions were all slashers I rated 5 — zero new information" complaint. The
+    // remaining questions (the quiz cannot end before the meter reaches 96 at <=4%/step) are
+    // spent on genuinely new ground instead: an undrilled rival first, then — via the EXPLORE
+    // branch below — sub-genres never probed. That keeps every question informative AND widens
+    // the loved set the recommendations are drawn from.
+    // Drilling a leader whose siblings were never asked just piles more evidence onto a term
+    // that may not even be the family's best fit. Explore the siblings first; the drill resumes
+    // once the family is fully mapped.
+    const siblingsPending = !!leader && familyHasUnasked(leader.t);
+    // Post-lock the leftover contenders are drilled to widen the loved set, but a contender from
+    // ANOTHER family is not a rival any more — that is how an anime fan was drilled with Friday
+    // the 13th and a fantasy fan with End of Evangelion, nine questions after being read
+    // correctly. Once locked, only same-family contenders are worth another question.
+    const lockFamNow = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
+    // Once locked, the quiz needs one more confirming hit on the LEADER before it can finish
+    // (see `surgical` below). Drilling rivals instead left the leader's evidence frozen, so the
+    // quiz kept going with nothing left to prove and ran past fifty questions. Confirm the thing
+    // we are about to recommend first; the rivals get the questions after that.
+    const needsMoreProof = !!lockedLove && lockedLove.hi < LOCK_HITS + 1;
+    // LENGTH HAS TO BUY PRECISION. Once the leader has its confirming hit, another film of the same
+    // term buys nothing — the twenty-to-forty-question quiz measured no better than a ten-question
+    // one for exactly this reason: the tail re-proved the FAMILY it had already proved. What is
+    // still unknown at that point is WHICH sub-genre inside the family it is, so the next question
+    // goes to the sibling term with the thinnest evidence (one rating, or none of the two it needs)
+    // — slasher against supernatural against body horror — rather than to a fourth slasher. Rivals
+    // sort to the front of that list on their own, since it orders by average.
+    const thinSibling = lockFamNow
+      ? stats.filter(s => s.t !== lockedLove?.t && subGenreFamily(s.t) === lockFamNow
+            && s.n < 2 && !disliked.includes(s.t))
+          .sort((a, b) => a.n - b.n || b.avg - a.avg)[0] || null
+      : null;
+    // A second taste comes before refining the first. Once the locked term has the proof it needs,
+    // the sibling question only decides WHICH shelf of the family this is — worth asking, but the
+    // untouched love in another family is worth more, and it costs a single question because it
+    // stops the moment the term has its hits.
+    const postLockDrill = needsMoreProof ? lockedLove
+      : (crossFamLove || thinSibling || needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null);
+    // Pre-lock, an undrilled contender from ANOTHER family is not worth a question either: a
+    // quiz already closing in on mecha anime spent question 20 on Re-Animator and World War Z.
+    // With no same-family rival left, confirm the leader instead.
+    const sameFamDrill = needDrill.find(d => subGenreFamily(d.t) === leadFamForDrill) || null;
+    // The leader is confirmed first — a cross-family love must widen the read, never replace the
+    // thread the quiz is already pulling. Once the leader has the hits the lock asks for, the
+    // second taste takes the next question.
+    // `siblingsPending` guards the LEADER's family: don't pile evidence on one term while its
+    // siblings are unmapped. It says nothing about a love in another family, and waiting for the
+    // leader's whole family to be swept is how that second love reached the cap with one film.
+    const drillTarget = (exploitNow && !siblingsPending)
+      ? (lockedLove ? postLockDrill
+         : (sameFamDrill
+            || (leader && leader.hi < LOCK_HITS ? leader : null)
+            || crossFamLove || leader))
+      : crossFamLove;
+    // Every pool must pass the same gate. The family ban was only applied to the EXPLORE sweep,
+    // so the drill pool and the fallback pool kept serving rejected styles — a rom-com fan was
+    // shown Friday the 13th at question 16 and an anime fan got Chicago at question 14. Those
+    // two screens were 7 of the 8 recorded abandonments.
     const rejectsUser = (c: { id: string; _genreIds?: number[] }) => {
       if (unsafeForKids(c)) return true;
       const t = samplerProbeOf(c.id);
@@ -681,11 +816,17 @@ export async function POST(req: Request) {
       // "hand-drawn anime" returned a Greek murder mystery, which is exactly the kind of screen
       // that ends a session after the taste is already read. Judge those by their genres.
       const locked = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
+      // …unless this very question IS the second taste. The locked family is the right fence for
+      // every other pool, and it silently emptied the one pool that has to leave it: drilling a
+      // courtroom love for a locked horror fan filtered out every courtroom film, fell through to
+      // the family fallback, and served horror instead — so the second taste could never earn its
+      // hits. Only the film this question is FOR gets out; every other pool keeps the fence.
+      const drillFam = drillTarget ? subGenreFamily(drillTarget.t) : undefined;
       // A curated exemplar belongs to its TERM's family, whatever TMDB tagged it. King Kong is a
       // creature feature but carries the Action genre, so a genre-only check let it through to
       // three different locked users; 12 Angry Men (courtroom) reached locked drama fans the same
       // way. Judge a termed candidate by its term.
-      if (locked && fam && fam !== locked) return true;
+      if (locked && fam && fam !== locked && fam !== drillFam) return true;
       const fam2 = familyOfGenres(c._genreIds);
       if (fam2 && rejectedFamilies.includes(fam2)) return true;
       // A film with no curated term is judged by the company it keeps: if every sub-genre of its
@@ -699,7 +840,7 @@ export async function POST(req: Request) {
         // that film, and blocking the family's untagged neighbours off it cost accuracy.
         if (kin.length >= 2 && kin.every(([, v]) => !v.hi && v.sum / v.n <= 2)) return true;
       }
-      if (locked && !fam && fam2 && fam2 !== locked) return true;
+      if (locked && !fam && fam2 && fam2 !== locked && fam2 !== drillFam) return true;
       return false;
     };
     let pool: Awaited<ReturnType<typeof fetchCandidatePool>>;
@@ -798,23 +939,56 @@ export async function POST(req: Request) {
         if (oldSkips >= 2 && recentSkips === 0 && y < 1990) return 1;
         return 0;
       };
-      // COVERAGE FIRST, BRIEFLY. Keeping untouched families askable is not enough on its own:
-      // the lead-family preference below sank them to the back of the queue, so the westerns fan
-      // did reach his shelf — at question 56, twenty questions past the point he would have left.
-      // For the opening only, a family we have never asked about outranks the current lead, so
-      // every family gets its first look while the quiz is still young and cheap. After that the
-      // lead family takes over again and the quiz narrows as before.
-      const famNeverAsked = (c: { id: string }) =>
-        probedFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || '') ? 1 : 0;
-      // Every OTHER question in the opening, not every one. Running the coverage flat-out put
-      // seven films a focused fan does not care about back to back, and the walk-outs from plain
-      // boredom doubled — the quiz read everyone correctly and lost them doing it. Alternating
-      // keeps a film from their own shelf between the probes, so the dull run never builds, and
-      // nine families still get their first look inside the opening.
-      // 16, measured: at 12 the coverage does not finish inside the opening, the sweep drags the
-      // leftovers through the middle of the quiz instead, and the westerns fan ran 32-63 questions
-      // instead of 22-37 — a shorter window made the quiz longer.
-      const coverageTurn = history.length < 16 && history.length % 2 === 1;
+      // COVERAGE IS A ROUND ROBIN OVER THE MAP, NOT A SAMPLE OF IT. Ordering by tier and then by a
+      // seeded rank meant the sweep drew films, and a draw leaves holes: across fourteen measured
+      // sessions the opening touched seventeen genre families but the rare sub-genres inside them
+      // never came up at all — documentary 0 of 168 films, parody 4, musical 2, against romance 25.
+      // Documentary's own case shows the mechanism: not one of its curated openers clears
+      // OPENER_MIN_VOTES (its best known film, Bowling for Columbine, has 1,717 votes), so every
+      // documentary film was tier 2, and tier 2 sat behind thirty-five tier-1 families.
+      // So the queue is walked by how much of a family has already been probed: fewest probed
+      // sub-genres first. Twelve families over twelve opening questions means every family — the
+      // documentary shelf included — gets its first look in the opening, and the later passes then
+      // work through each family's remaining sub-genres. Tier still decides WITHIN a family, so the
+      // household-name film is the one that opens it and "didn't see it" stays rare.
+      const famProbed: Record<string, number> = {};
+      for (const t of Object.keys(probe)) { const f = subGenreFamily(t); if (f) famProbed[f] = (famProbed[f] || 0) + 1; }
+      // BROAD FIRST, THEN DEEP ONLY WHERE IT IS WARM. Walking the map by fewest-probed-family is
+      // right for the OPENING and wrong for everything after it: it is a round robin, so the
+      // leader's family — the one the lock is waiting on — finishes LAST. Measured on the
+      // production build: a slasher fan who had said "slasher" by question ten still answered 66
+      // questions, because horror's eleventh shelf only came up after every other family had been
+      // walked eleven times. Sixty-six questions is eight minutes of clicking against a promise of
+      // "20-30", and the census it bought included the shelves he had just rated 1.
+      // So the queue is walked in three passes, and only the first is a census:
+      //   1. a family nobody has been asked about — every family gets its first look, which is what
+      //      made documentary and parody visible at all and must not regress;
+      //   2. the family we are currently trying to resolve — its remaining sub-genres, so the read
+      //      becomes surgical and the lock can actually fire;
+      //   3. everything else, warmest first — a family whose films were rated 1 sorts last but is
+      //      never struck off, so a taste hiding behind a cold opener (the parody fan whose only
+      //      comedy so far was slapstick) is still reached when nothing better is left to ask.
+      // Nothing is pruned here; what changed is only the ORDER, so the quiz ends when the taste is
+      // settled rather than when the catalogue runs out.
+      const famWarmth: Record<string, number> = {};
+      for (const s of stats) {
+        const f = subGenreFamily(s.t); if (!f) continue;
+        const w = s.hi5 * 100 + s.hi * 20 + s.mid * 2 + s.avg;
+        if (w > (famWarmth[f] ?? -Infinity)) famWarmth[f] = w;
+      }
+      // Deliberately NOT sinking `rejectedFamilies` to the bottom here. A narrow taste rejects its
+      // OWN family on the way in: a slasher fan rates two other horror shelves a 2, which is
+      // exactly the "two terms averaging under 2.2" that marks a family cold — and pushing horror
+      // behind every family he rates 1 cost him six questions (72 against 66) before the quiz
+      // reached the one shelf he loves. The average is already the ordering; a family rated 1
+      // throughout sits below one rated 2 without any extra rule.
+      const depthFam = lockedFam || (leader ? subGenreFamily(leader.t) : undefined);
+      const famRank = (c: { id: string }) => {
+        const f = subGenreFamily(samplerProbeOf(c.id) || '') || '';
+        if (!famProbed[f]) return -1e9;                 // pass 1 — never offered
+        if (f && f === depthFam) return -1e6;           // pass 2 — the family being resolved
+        return -(famWarmth[f] ?? 0);                    // pass 3 — warmest of the rest
+      };
       // Serving a broad crowd-pleaser after three refusals was measured and rejected: a blockbuster
       // is not relief to someone with a narrow taste — a musical fan turns down Jurassic Park too —
       // so the walk-outs it targeted went UP (6 to 11 of fifty) while the shallower probing cost
@@ -825,8 +999,15 @@ export async function POST(req: Request) {
         chosenFams.size === 0 ? 0 : (chosenFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || '') ? 0 : 1);
       const nextUp = [...uncovered].sort((a, b) =>
         (notChosen(a) - notChosen(b)) ||
+        // The family pass decides BEFORE the boredom memory, which used to outrank it and undo the
+        // whole point: a slasher fan rates the other horror shelves a 2, every one of those counts
+        // as a refusal, and horror was therefore pushed behind twelve families he had rated 1 —
+        // his own family arrived one film at a time and the quiz ran to the cap. Boredom is a
+        // one-question memory for the OPENING (its own note below says so), so it still shuffles
+        // the families in the breadth pass, where they all rank equal; it no longer decides which
+        // shelf we deepen.
+        (famRank(a) - famRank(b)) ||
         (boredomPenalty(a) - boredomPenalty(b)) ||
-        (coverageTurn ? famNeverAsked(a) - famNeverAsked(b) : 0) ||
         (inLeadFam(a) - inLeadFam(b)) ||
         (eraPenalty(a) - eraPenalty(b)) ||
         (samplerTier(a.id) - samplerTier(b.id)) ||
@@ -834,7 +1015,17 @@ export async function POST(req: Request) {
       // Take the first candidate that survives the taste gate rather than the first candidate
       // outright: when the head of the queue is off-taste, dropping the whole turn skipped that
       // sub-genre's only first look and the read came back one niche off.
-      pool = [nextUp.find(c => !rejectsUser(c)) || nextUp[0]];
+      // The gate here is NOT the full rejectsUser: that one refuses a whole family once the family
+      // looks cold, and applying it to a first look is what deleted parody from a parody fan's quiz
+      // — the shelf was condemned on the evidence of its neighbours. During the sweep only the two
+      // judgements we have actually earned apply: a sub-genre they themselves rated low, and the
+      // child-safety mode. Everything downstream keeps the full gate.
+      const sweepBlocked = (c: { id: string; _genreIds?: number[] }) => {
+        if (unsafeForKids(c)) return true;
+        const t = samplerProbeOf(c.id);
+        return !!t && disliked.includes(t);
+      };
+      pool = [nextUp.find(c => !sweepBlocked(c)) || nextUp[0]];
       poolSrc = 'sweep';
       nextHint = ''; // sampler movies carry their own term via samplerProbeMap
 
@@ -1052,7 +1243,10 @@ export async function POST(req: Request) {
       contenders.every(s => s.n >= 2);
     const surgical = !!lockedLove &&
       lockedLove.hi >= LOCK_HITS + (emphatic ? 0 : 1) + (lockedLove.contra || 0);
-    const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && surgical);
+    // …and the read is not finished while another family is still saying "there is something here"
+    // (see `chasingSecondTaste`). The caps still end the quiz; this only spends questions we would
+    // otherwise have spent walking shelves the person rated 1.
+    const wantFinish = userAsked || mustFinish || (history.length >= MIN_Q && surgical && !chasingSecondTaste);
 
     // DISPLAY METER: during normal play the target IS the raw confidence, so the meter moves
     // freely UP *and DOWN* (≤4 points per answer) — a taste-reversing / uncertain answer drops
@@ -1277,7 +1471,23 @@ export async function POST(req: Request) {
       // Family genre — the one label that separates the children's shelf from adult anime.
       return !names.includes('Family');
     };
-    const isBad = (m: Rec, onTaste = false) => {
+    // THE ON-TASTE EXEMPTION IS FOR THEIR SHELF, NOT FOR WHATEVER TMDB CALLS SIMILAR TO IT.
+    // recommendBySubGenre seeds from two curated titles and then WIDENS with TMDB's own
+    // similar/recommended lists, which are ranked by popularity — so a 32-question all-horror quiz
+    // was handed Live Free or Die Hard at 95%, and a measured slasher run got Copycat (crime /
+    // thriller / mystery). Those films arrived through the same call as the curated ones and
+    // inherited the exemption that exists for a completely different case: the giallo fan who rates
+    // mainstream horror low and would otherwise have their own locked niche filtered out. Both are
+    // served by asking what the film actually IS: a candidate whose genre family matches the term
+    // keeps the exemption, one that has drifted to another family is dropped, and one TMDB gives no
+    // family for falls through to the ordinary guards.
+    const onTasteOf = (m: Rec, term: string): 'keep' | 'drop' | 'unknown' => {
+      const fam = subGenreFamily(term);
+      const mf = familyOfGenres(m._genreIds);
+      if (!fam || !mf) return 'unknown';
+      return mf === fam ? 'keep' : 'drop';
+    };
+    const isBad = (m: Rec, onTasteTerm: string | false = false) => {
       if (askedMovieIds.includes(m.id) || hatedIds.has(m.id)) return true;
       // Recommending a film under a name they were just asked about reads as the engine forgetting
       // the last twenty minutes, whether or not TMDB considers it the same title.
@@ -1293,12 +1503,20 @@ export async function POST(req: Request) {
       // The safety signal outranks the on-taste exemption for the same reason a hard-rejected
       // genre does: a confirmed sub-genre is not a licence to hand a child an adult film.
       if (unsafeRecForKids(m)) return true;
-      if (onTaste) return false;
+      if (onTasteTerm) {
+        const verdict = onTasteOf(m, onTasteTerm);
+        if (verdict === 'drop') return true;   // widened out of their family entirely
+        if (verdict === 'keep') return false;  // genuinely their niche — the exemption stands
+      }
       if (names.length > 0 && names.some(n => hatedGenres.has(n)) && !names.some(n => lovedGenres.has(n))) return true;
       if (hatedCombos.some(combo => combo.every(g => names.includes(g)))) return true;
       return false;
     };
-    const add = (m: Rec | null) => { if (m && !resolved.some(x => x.id === m.id) && !isBad(m)) resolved.push(m); };
+    // `term` is the sub-genre the candidate came from, when it came from one — a film that IS of
+    // their confirmed shelf is judged as such, exactly as it was when it entered the pool.
+    const add = (m: Rec | null, term: string | false = false) => {
+      if (m && !resolved.some(x => x.id === m.id) && !isBad(m, term)) resolved.push(m);
+    };
 
     // Build the LOVED candidate pool: curated seeds from the confirmed term + any OTHER loved
     // sub-genre (never a disliked term, never a generic popular pool — that's what leaked a
@@ -1317,16 +1535,57 @@ export async function POST(req: Request) {
     // entries per term once the user has demonstrated real depth (an emphatic 5 in that term),
     // so an expert gets the deeper cut and a newcomer still gets the classics.
     const depthOf = (term: string) => (probe[term]?.hi5 || 0) >= 1 ? 2 : 0;
+    // A PERSON CAN HOLD MORE THAN ONE TASTE. The engine resolved a single leading sub-genre and
+    // filled all three cards from it, so someone who loves slashers AND heist films AND anime was
+    // told they love slashers, three times over. A term earns its own card when it has real hits of
+    // its own and nothing contradicting them — two or three of those and the three films come one
+    // per taste instead of three from the winner. With only one such term nothing changes.
+    const multiTerms = loved
+      .filter(s => s.hi >= LOCK_HITS && !s.contra && !dislikedSet.has(s.t))
+      .sort((a, b) => (a.t === confirmedTerm ? -1 : 0) - (b.t === confirmedTerm ? -1 : 0)
+        || b.hi5 - a.hi5 || b.hi - a.hi || b.avg - a.avg)
+      .map(s => s.t)
+      .slice(0, 3);
+    const multiTaste = multiTerms.length >= 2;
+    // With several tastes to represent, no single term may eat the pool — the first term's eight
+    // curated seeds would fill all twelve slots and the other tastes would never reach a card.
+    const perTerm = multiTaste ? 4 : 12;
     for (const term of lovedTerms) {
       if (candPool.length >= 12) break;
+      let fromTerm = 0;
       // askedMovieIds only covers THIS quiz, so a returning customer with the same taste got the
       // same three films back — visit 3 of a slasher fan repeated two of visit 2's picks. `seen`
       // carries the cross-quiz window (x-recent-ids) as well, which is what makes the second
       // visit feel like the engine remembers them.
-      const seeds = await recommendBySubGenre(term, seen, locale, 8);
-      for (const m of seeds.slice(depthOf(term))) {
-        if (candPool.length >= 12) break;
-        if (!candPool.some(x => x.id === m.id) && !isBad(m, true)) { candPool.push(m); termOfPick.set(m.id, term); }
+      // THE CANON FIRST, TMDB'S WIDENING SECOND. recommendBySubGenre anchors on two curated titles
+      // and then widens with TMDB's own similar/recommended lists, which are ranked by popularity —
+      // and `depthOf` skips the two most canonical entries for anyone who gave the term an emphatic
+      // 5, which is precisely the surgical customer. Those two entries WERE the curated anchors, so
+      // the expert's whole pool became the popularity widening: a slasher quiz came back with two
+      // 2025 horror releases that are not slashers. The curated list is eight deep, so the expert
+      // gets its deeper cuts — Sleepaway Camp rather than Halloween — and the widening is what
+      // takes over when the canon runs out, not what replaces it.
+      const canon: Rec[] = [];
+      for (const c of await fetchSeedCandidates(term, seen, 8)) {
+        if (canon.length >= perTerm + depthOf(term)) break;
+        const m = await movieById(c.id, locale);
+        if (m) canon.push(m);
+      }
+      const seeds = [...canon.slice(depthOf(term)), ...await recommendBySubGenre(term, seen, locale, 8)];
+      for (const m of seeds) {
+        if (candPool.length >= 12 || fromTerm >= perTerm) break;
+        if (!candPool.some(x => x.id === m.id) && !isBad(m, term)) {
+          candPool.push(m); termOfPick.set(m.id, term); fromTerm++;
+        }
+      }
+    }
+    // One card per confirmed taste, chosen before anything else can fill the screen. The director
+    // below still runs for whatever is left over — with three tastes it has nothing to do, which is
+    // the point: it picks the best match for ONE taste and that is not what this user has.
+    if (multiTaste) {
+      for (const term of multiTerms) {
+        if (resolved.length >= 3) break;
+        add(candPool.find(m => termOfPick.get(m.id) === term && !resolved.some(x => x.id === m.id)) || null, term);
       }
     }
     // AI TASTE DIRECTOR (gemma2): picks the final 3 FROM the real candidate pool, steered by
@@ -1336,10 +1595,18 @@ export async function POST(req: Request) {
     const lovedTitles = history.filter(h => h.rating >= HI).map(h => h.title);
     const hatedTitles = history.filter(h => h.rating <= LO).map(h => h.title);
     const byTitle = new Map(candPool.map(m => [m.title, m] as const));
-    const directed = await directRecs({ candidates: candPool.map(m => m.title), lovedTitles, hatedTitles, term: confirmedTerm || 'this taste', mock });
-    if (directed) for (const t of directed) { if (resolved.length >= 3) break; add(byTitle.get(t) || null); }
+    // Only when there is a card left to fill. Three confirmed tastes already used all three, and
+    // the director is an LLM round-trip on the slowest request in the quiz.
+    const directed = resolved.length < 3
+      ? await directRecs({ candidates: candPool.map(m => m.title), lovedTitles, hatedTitles, term: confirmedTerm || 'this taste', mock })
+      : null;
+    if (directed) for (const t of directed) {
+      if (resolved.length >= 3) break;
+      const m = byTitle.get(t) || null;
+      add(m, (m && termOfPick.get(m.id)) || false);
+    }
     // deterministic order of the same safe pool if the director under-filled.
-    for (const m of candPool) { if (resolved.length >= 3) break; add(m); }
+    for (const m of candPool) { if (resolved.length >= 3) break; add(m, termOfPick.get(m.id) || false); }
     // The family's TMDB shelf. A one-term family (western) can have every curated seed used up
     // AS A QUESTION by the time the quiz ends — a western fan reached the results screen with
     // zero recommendations on it, which is the worst possible ending. This shelf is effectively
@@ -1349,7 +1616,7 @@ export async function POST(req: Request) {
       if (fam) for (const c of await fetchFamilyPool(fam, seen, locale, 16)) {
         if (resolved.length >= 3) break;
         const m = await movieById(c.id, locale);
-        if (m && !isBad(m, true)) add(m);
+        if (m && !isBad(m, confirmedTerm)) add(m, confirmedTerm);
       }
     }
     // keyword pool on the confirmed term (still squarely on-taste).
@@ -1377,7 +1644,7 @@ export async function POST(req: Request) {
         if (resolved.length >= 3) break;
         for (const m of await recommendBySubGenre(term, [], locale, 8)) {
           if (resolved.length >= 3) break;
-          if (isBad(m, true) || resolved.some(x => x.id === m.id)) continue;
+          if (isBad(m, term) || resolved.some(x => x.id === m.id)) continue;
           resolved.push(m);
         }
       }
@@ -1487,7 +1754,9 @@ export async function POST(req: Request) {
       }
     }
 
-    const tasteSummary = confirmedTerm ? `Loves ${confirmedTerm}` : 'Eclectic taste';
+    // Name every taste the picks were drawn from, or the screen claims one taste while showing three.
+    const tasteSummary = multiTaste ? `Loves ${multiTerms.join(', ')}`
+      : confirmedTerm ? `Loves ${confirmedTerm}` : 'Eclectic taste';
     // The final screen used to recompute its percentage from scratch and ignore what the user had
     // just been shown: a quiz sitting at 99% ended on 71%, one at 35% ended on 100%. Whatever the
     // engine believes, the number can only move by the same small step as every other answer — it

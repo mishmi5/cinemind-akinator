@@ -42,10 +42,13 @@ export default function DailyChallengePage() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [streak, setStreak] = useState(0);
   const [shareState, setShareState] = useState<string | null>(null);
+  // Same failure shape as the pulse's black screen: the catch swallowed the error and the page
+  // sat on "Loading today's film..." forever, with no way to retry and nothing to read.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     fetch(`/api/daily-challenge?locale=${locale}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then((d: DailyPayload) => {
         setData(d);
         setSecondsLeft(d.secondsUntilNextDrop);
@@ -56,7 +59,7 @@ export default function DailyChallengePage() {
           if (voted[d.date] !== undefined) setMyRating(voted[d.date]);
         } catch {}
       })
-      .catch(() => {});
+      .catch(() => setLoadFailed(true));
   }, [locale]);
 
   useEffect(() => {
@@ -109,7 +112,22 @@ export default function DailyChallengePage() {
         <h1 className="text-4xl md:text-5xl font-black mb-2">{he ? 'סרט אחד. כל העולם מדרג.' : 'One film. The whole world rates.'}</h1>
         <p className="text-zinc-400 text-lg mb-10">{he ? 'דרגו לפני חצות והשוו את עצמכם לעולם.' : 'Rate before midnight and see how you compare.'}</p>
 
-        {!data ? (
+        {loadFailed ? (
+          <div className="bg-[#111113] border border-white/5 rounded-[2.5rem] px-8 py-12">
+            <div className="text-5xl mb-4">🎬</div>
+            <p className="text-zinc-300 font-bold mb-6">
+              {he ? 'הסרט של היום לא נטען. זו תקלה אצלנו, לא אצלכם.' : "Today's film did not load. That is on us, not on you."}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={() => window.location.reload()} className="px-8 py-3 bg-rose-600 hover:bg-rose-500 rounded-2xl font-black transition-all">
+                {he ? 'נסו שוב' : 'Try again'}
+              </button>
+              <Link href="/scan" className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-2xl font-black transition-all">
+                {he ? '🧠 גלו את הארכיטיפ שלכם' : '🧠 Discover your archetype'}
+              </Link>
+            </div>
+          </div>
+        ) : !data ? (
           <div className="animate-pulse text-zinc-400 font-bold py-20">{he ? 'טוען את הסרט של היום...' : "Loading today's film..."}</div>
         ) : (
           <div className="bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">

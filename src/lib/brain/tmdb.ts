@@ -16,6 +16,17 @@ export const genreNames = (ids?: number[]) => (ids || []).map(id => GENRE_NAMES[
 export interface BrainCandidate { id: string; title: string; year?: string; genres: string[]; _genreIds?: number[]; votes?: number; }
 
 const langOf = (locale: string) => (locale === 'en' ? 'en-US' : 'he-IL');
+/** Hebrew is every locale that is not English here, so this is the one language test the file
+ *  needs: does this string actually contain Hebrew letters. */
+const hasHebrew = (t: string) => /[֐-׿]/.test(t || '');
+
+// Every call below runs inside a serverless function on a user's critical path. None of them had
+// a timeout, so a TMDB that accepts the connection and then goes quiet held the function open
+// until the platform killed it — the user got a hung page instead of a degraded one. Bounded
+// wait; on abort the surrounding catch returns empty/null, which every caller already handles.
+const TMDB_TIMEOUT_MS = 6000;
+const tfetch = (url: string, init?: RequestInit) =>
+  fetch(url, { ...init, signal: AbortSignal.timeout(TMDB_TIMEOUT_MS) });
 
 /** A broad, popular, real candidate pool for the brain to choose the next question
  *  from. Random year keeps successive quizzes fresh. Excludes already-seen ids. */
@@ -26,7 +37,7 @@ export async function fetchCandidatePool(seenIds: string[], locale = 'he', size 
   const page = 1 + Math.floor(Math.random() * 5);
   const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}&sort_by=popularity.desc&vote_count.gte=500&vote_average.gte=6.2&primary_release_year=${year}&page=${page}&include_adult=false`;
   try {
-    const res = await fetch(url, { next: { revalidate: 0 } });
+    const res = await tfetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.results || [])
@@ -49,7 +60,7 @@ async function keywordIdForHint(hint: string): Promise<number | null> {
   const k = hint.trim().toLowerCase();
   if (hintKeywordCache.has(k)) return hintKeywordCache.get(k)!;
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/search/keyword?api_key=${KEY}&query=${encodeURIComponent(k)}`, { next: { revalidate: 604800 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/search/keyword?api_key=${KEY}&query=${encodeURIComponent(k)}`, { next: { revalidate: 604800 } });
     const data = res.ok ? await res.json() : { results: [] };
     const id = data.results?.[0]?.id ?? null;
     hintKeywordCache.set(k, id);
@@ -73,7 +84,7 @@ export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 
     const kwId = await keywordIdForHint(hint);
     if (kwId) {
       const page = 1 + Math.floor(Math.random() * 3);
-      const res = await fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&vote_average.gte=6&with_keywords=${kwId}&page=${page}&include_adult=false`, { next: { revalidate: 0 } });
+      const res = await tfetch(`https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${lang}&sort_by=popularity.desc&vote_count.gte=80&vote_average.gte=6&with_keywords=${kwId}&page=${page}&include_adult=false`, { next: { revalidate: 0 } });
       if (res.ok) {
         const data = await res.json();
         const out = (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
@@ -81,7 +92,7 @@ export async function fetchPoolByHint(hint: string, seenIds: string[], locale = 
       }
     }
     // fallback: free-text movie search on the hint
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=${lang}&query=${encodeURIComponent(hint)}&include_adult=false`, { next: { revalidate: 86400 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=${lang}&query=${encodeURIComponent(hint)}&include_adult=false`, { next: { revalidate: 86400 } });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.results || []).filter((m: any) => m.poster_path && m.overview && !seen.has(m.id.toString())).slice(0, size).map(toCand);
@@ -148,10 +159,20 @@ const SUBGENRE_EXEMPLARS: { term: string; titles: [string, string] }[] = [
   // Comedy — distinctive first.
   // Without the year, TMDB's exact-title bonus handed "Dr. Strangelove" to a 2026 entry with zero
   // votes — the card rendered 0 stars and no trailer.
+  // Parody was missing entirely, and it is the owner's own example: liking Scary Movie says he
+  // likes PARODY, not comedy at large — and until now no parody film ever entered a quiz, so that
+  // taste had nowhere to land and scored as slapstick. Mockumentary and teen comedy were the same
+  // gap one shelf over. Parody is listed first: it is the narrowest of the four and its exemplars
+  // are the ones a slapstick or satire fan is likeliest to also rate high.
+  // "The Naked Gun" (no year) resolved to the 2025 remake, so the film the engine actually
+  // showed was not the one the list means; the year pins it, as it does for Dr. Strangelove.
+  { term: 'parody spoof', titles: ['Scary Movie', 'The Naked Gun (1988)'] },
+  { term: 'mockumentary', titles: ['This Is Spinal Tap', 'What We Do in the Shadows'] },
   { term: 'satire', titles: ['Dr. Strangelove (1964)', 'Thank You for Smoking'] },
   { term: 'black comedy', titles: ['In Bruges', 'Fargo'] },
   { term: 'deadpan comedy', titles: ['The Grand Budapest Hotel', 'The Lobster'] },
-  { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Naked Gun'] },
+  { term: 'teen comedy', titles: ['American Pie', 'Mean Girls'] },
+  { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'Ace Ventura: Pet Detective'] },
   { term: 'romantic comedy', titles: ['Notting Hill', 'When Harry Met Sally'] },
   { term: 'holiday christmas', titles: ['Elf', 'Home Alone'] },
   // Drama / other.
@@ -194,6 +215,7 @@ const FAMILY_OF: Record<string, string> = {
   'spaghetti western': 'western',
   'classic film noir': 'crime', 'psychological thriller': 'crime', 'whodunit mystery': 'crime', 'neo-noir': 'crime', 'cerebral spy thriller': 'crime', 'action spy thriller': 'crime', 'courtroom drama': 'crime', 'erotic thriller': 'crime',
   'satire': 'comedy', 'black comedy': 'comedy', 'deadpan comedy': 'comedy', 'slapstick comedy': 'comedy', 'romantic comedy': 'comedy', 'holiday christmas': 'comedy',
+  'parody spoof': 'comedy', 'mockumentary': 'comedy', 'teen comedy': 'comedy',
   'coming-of-age': 'drama', 'period costume drama': 'drama', 'sports drama': 'drama', 'slow cinema arthouse': 'drama', 'musical': 'drama',
   'epic high fantasy': 'fantasy', 'sword and sorcery fantasy': 'fantasy',
   'bittersweet romance': 'romance', 'sweeping romance': 'romance',
@@ -242,6 +264,11 @@ const POPULAR_OPENERS: { term: string; titles: string[] }[] = [
   { term: 'epic high fantasy', titles: ['The Lord of the Rings: The Fellowship of the Ring', 'The Lord of the Rings: The Two Towers', 'The Lord of the Rings: The Return of the King', "Harry Potter and the Philosopher's Stone", 'The Hobbit: An Unexpected Journey', 'The Chronicles of Narnia: The Lion, the Witch and the Wardrobe', 'Stardust', 'Willow'] },
   { term: 'romantic comedy', titles: ['When Harry Met Sally', 'Notting Hill', 'Pretty Woman', 'Crazy Rich Asians', "Bridget Jones's Diary", '10 Things I Hate About You', 'The Proposal', 'Love Actually'] },
   { term: 'slapstick comedy', titles: ['Dumb and Dumber', 'The Hangover', 'Ace Ventura: Pet Detective', 'Anchorman: The Legend of Ron Burgundy', 'Step Brothers', 'Superbad', '21 Jump Street', "We're the Millers"] },
+  // The owner's complaint, exactly: "I never saw a parody film touch the quiz." Parody had no
+  // term and therefore no opener, so Scary Movie could not be asked about and liking it could
+  // only ever read as "likes comedy". Teen comedy was the same hole.
+  { term: 'parody spoof', titles: ['Scary Movie', 'Airplane!', 'The Naked Gun (1988)', 'Spaceballs', 'Austin Powers: International Man of Mystery', 'Hot Shots!', 'Young Frankenstein', 'Robin Hood: Men in Tights'] },
+  { term: 'teen comedy', titles: ['American Pie', 'Mean Girls', 'Clueless', "Ferris Bueller's Day Off", 'Easy A', 'Pitch Perfect', 'Booksmart', 'Dazed and Confused'] },
   { term: 'holiday christmas', titles: ['Home Alone', 'Elf', 'The Polar Express', 'How the Grinch Stole Christmas', 'Home Alone 2: Lost in New York', 'The Santa Clause', 'A Christmas Carol', 'Klaus'] },
   { term: 'coming-of-age', titles: ['Stand By Me', 'The Breakfast Club', 'Lady Bird', 'Boyhood', 'Dead Poets Society', 'The Perks of Being a Wallflower', 'Juno', 'Call Me by Your Name'] },
   { term: 'sports drama', titles: ['Rocky', 'The Blind Side', 'Coach Carter', 'Remember the Titans', 'Moneyball', 'Rush', 'Million Dollar Baby', 'Ford v Ferrari'] },
@@ -274,7 +301,7 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
   const title = ym ? ym[1] : raw;
   const yq = ym ? `&year=${ym[2]}` : '';
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}${yq}&include_adult=false`, { next: { revalidate: 604800 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${encodeURIComponent(title)}${yq}&include_adult=false`, { next: { revalidate: 604800 } });
     if (!res.ok) return null;
     const d = await res.json();
     // Taking TMDB's FIRST usable result made curated blockbusters resolve to obscure
@@ -307,6 +334,22 @@ async function candidateByTitle(raw: string): Promise<BrainCandidate | null> {
 // sweep rather than dropped — it is still a fine probe, just not an opener.
 const OPENER_MIN_VOTES = 2500;
 
+/** Take one title from each FAMILY in turn, then go round again. Groups arrive per sub-genre
+ *  term; families with many terms (horror has eleven) would otherwise dominate the head. */
+function roundRobinByFamily<T extends { term: string }>(groups: T[][]): T[] {
+  const byFamily = new Map<string, T[]>();
+  for (const g of groups) {
+    const fam = subGenreFamily(g[0]?.term || '') || g[0]?.term || '';
+    (byFamily.get(fam) || byFamily.set(fam, []).get(fam)!).push(...g);
+  }
+  const queues = [...byFamily.values()];
+  const out: T[] = [];
+  for (let i = 0; queues.some(q => i < q.length); i++) {
+    for (const q of queues) if (i < q.length) out.push(q[i]);
+  }
+  return out;
+}
+
 export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandidate[]> {
   if (samplerCache) return samplerCache;
   if (!KEY) return [];
@@ -314,8 +357,16 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
   // tier-1 tag and opens). ~290 titles → resolve in batches to avoid TMDB rate-limiting
   // (429s would silently drop openers). Cached after the first build (candidateByTitle is
   // revalidate-cached too), so this cost is paid once.
+  // Openers walk the FAMILIES round-robin — one superhero film, then one horror, then one comedy —
+  // instead of the authoring order, which listed four sci-fi shelves in a row and then four horror
+  // ones. The sweep sorts this list before serving it, so this is not the final sequence; what it
+  // guarantees is that the list handed to the sweep is not itself clustered, and that every family
+  // has an opener in the first pass over it rather than eight films from one family up front.
+  const openerJobs = roundRobinByFamily(
+    POPULAR_OPENERS.map(({ term, titles }) => titles.map(title => ({ term, tier: 1 as const, title })))
+  );
   const jobs: { term: string; tier: 1 | 2; title: string }[] = [
-    ...POPULAR_OPENERS.flatMap(({ term, titles }) => titles.map(title => ({ term, tier: 1 as const, title }))),
+    ...openerJobs,
     ...SUBGENRE_EXEMPLARS.flatMap(({ term, titles }) => titles.map(title => ({ term, tier: 2 as const, title }))),
   ];
   const byId = new Map<string, BrainCandidate>();
@@ -329,8 +380,13 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
       }
     }
   }
-  samplerCache = Array.from(byId.values());
-  return samplerCache;
+  // NEVER CACHE AN EMPTY SAMPLER. One TMDB outage (or one rate-limited first build) at process
+  // start used to blind the engine for the life of the process: the empty array was cached and
+  // every later quiz swept a catalogue of nothing. An empty build is a failure, not an answer,
+  // so it is returned once and re-attempted on the next request.
+  const built = Array.from(byId.values());
+  if (built.length) samplerCache = built;
+  return built;
 }
 
 // Canonical, PURE recommendation seeds per sub-genre. The deterministic engine confirms a
@@ -376,7 +432,12 @@ const SUBGENRE_RECS: Record<string, string[]> = {
   'satire': ['Dr. Strangelove (1964)', 'Thank You for Smoking', 'In the Loop', 'Wag the Dog', 'Network', 'Idiocracy', 'The Death of Stalin', 'Election'],
   'black comedy': ['In Bruges', 'Fargo', 'Burn After Reading', 'Three Billboards Outside Ebbing, Missouri', 'Seven Psychopaths', 'Jojo Rabbit', 'The Death of Stalin', 'A Serious Man'],
   'deadpan comedy': ['The Grand Budapest Hotel', 'The Lobster', 'Moonrise Kingdom', 'The Royal Tenenbaums', 'Napoleon Dynamite', 'The Favourite', 'Dogtooth', 'Rushmore'],
-  'slapstick comedy': ['Dumb and Dumber', 'The Naked Gun', 'Airplane!', 'Hot Shots!', 'The Pink Panther', 'Tommy Boy', 'Ace Ventura: Pet Detective', "Mr. Bean's Holiday"],
+  // Airplane!, The Naked Gun and Hot Shots! moved to 'parody spoof' where they belong; leaving
+  // them here meant a parody fan's own films were recommended to him under someone else's name.
+  'slapstick comedy': ['Dumb and Dumber', 'Ace Ventura: Pet Detective', 'The Pink Panther', 'Tommy Boy', 'Happy Gilmore', 'Johnny English', "Mr. Bean's Holiday", 'Dumb and Dumber To'],
+  'parody spoof': ['Scary Movie', 'Airplane!', 'The Naked Gun (1988)', 'Spaceballs', 'Hot Shots!', 'Austin Powers: International Man of Mystery', 'Young Frankenstein', 'Robin Hood: Men in Tights'],
+  'mockumentary': ['This Is Spinal Tap', 'What We Do in the Shadows', 'Best in Show', 'Borat', 'Waiting for Guffman', 'A Mighty Wind', 'Popstar: Never Stop Never Stopping', 'Drop Dead Gorgeous'],
+  'teen comedy': ['American Pie', 'Mean Girls', 'Clueless', "Ferris Bueller's Day Off", 'Easy A', 'Booksmart', 'Dazed and Confused', 'Pitch Perfect'],
   'romantic comedy': ['Notting Hill', 'When Harry Met Sally', '10 Things I Hate About You', "Bridget Jones's Diary", 'Crazy Rich Asians', 'The Proposal', 'Pretty Woman', 'Love Actually'],
   'holiday christmas': ['Elf', 'Home Alone', 'The Holiday', 'Love Actually', 'The Santa Clause', 'Miracle on 34th Street', 'The Polar Express', "National Lampoon's Christmas Vacation"],
   'coming-of-age': ['Lady Bird', 'Stand By Me', 'Boyhood', 'Call Me by Your Name', 'The Perks of Being a Wallflower', 'Eighth Grade', 'Moonlight', 'The Edge of Seventeen'],
@@ -421,7 +482,7 @@ export async function fetchFamilyPool(family: string, seenIds: string[], locale 
   const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=${langOf(locale)}`
     + `&sort_by=popularity.desc&vote_count.gte=300&vote_average.gte=6.3&with_genres=${genres.join('|')}&page=${page}&include_adult=false`;
   try {
-    const res = await fetch(url, { next: { revalidate: 0 } });
+    const res = await tfetch(url, { next: { revalidate: 0 } });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.results || [])
@@ -472,7 +533,7 @@ async function relatedIds(id: string, locale: string): Promise<string[]> {
   const out: string[] = [];
   for (const kind of ['similar', 'recommendations']) {
     try {
-      const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/${kind}?api_key=${KEY}&language=${langOf(locale)}&page=1`, { next: { revalidate: 604800 } });
+      const res = await tfetch(`https://api.themoviedb.org/3/movie/${id}/${kind}?api_key=${KEY}&language=${langOf(locale)}&page=1`, { next: { revalidate: 604800 } });
       if (!res.ok) continue;
       const d = await res.json();
       for (const m of d.results || []) {
@@ -498,6 +559,10 @@ export async function recommendBySubGenre(term: string, seenIds: string[], local
   // The curated seed name is the readable fallback when BOTH the localized and the original title
   // are CJK (e.g. Mobile Suit Gundam) and a Hebrew results card would otherwise show 機動戦士ガンダム.
   const curatedName = new Map<string, string>();
+  // A film with no synopsis in the user's language is a weaker card, not a disqualified one.
+  // Held back here and used only if the shelf cannot be filled without it — an empty results
+  // screen is worse than a card that shows a poster, a title and no blurb.
+  const noSynopsis: MovieContext[] = [];
   const anchors: string[] = [];
   for (const title of order.slice(0, 2)) {
     const cand = await candidateByTitle(title);
@@ -508,12 +573,12 @@ export async function recommendBySubGenre(term: string, seenIds: string[], local
   const widened = shuffle((await Promise.all(anchors.map(id => relatedIds(id, locale)))).flat());
   const queue = [...anchors, ...widened].filter((id, i, a) => a.indexOf(id) === i);
   const push = async (id: string) => {
-    if (seen.has(id) || out.some(m => m.id === id)) return;
+    if (seen.has(id) || out.some(m => m.id === id) || noSynopsis.some(m => m.id === id)) return;
     const m = await movieById(id, locale);
     if (!m) return;
     const curated = curatedName.get(id);
     if (curated && /[　-鿿가-힯]/.test(m.title)) m.title = curated;
-    out.push(m);
+    (m.overview.trim() ? out : noSynopsis).push(m);
   };
   for (const id of queue) {
     if (out.length >= n) break;
@@ -527,6 +592,7 @@ export async function recommendBySubGenre(term: string, seenIds: string[], local
     curatedName.set(cand.id, title.replace(/\s*\(\d{4}\)\s*$/, ''));
     await push(cand.id);
   }
+  for (const m of noSynopsis) { if (out.length >= n) break; out.push(m); }
   return out;
 }
 
@@ -534,7 +600,7 @@ export async function recommendBySubGenre(term: string, seenIds: string[], local
 export async function movieById(id: string, locale = 'he'): Promise<MovieContext | null> {
   if (!KEY || !/^\d+$/.test(id)) return null;
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=${langOf(locale)}`, { next: { revalidate: 3600 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=${langOf(locale)}`, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     const m = await res.json();
     if (!m.poster_path) return null;
@@ -563,12 +629,21 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
     // English title in that case — one extra call, only for the handful of films that need it.
     let sub = m.original_title as string;
     let overview = (m.overview || '') as string;
-    // One English lookup covers both gaps: an unreadable original-title line, and a film TMDB has
-    // no Hebrew synopsis for — the card then rendered as a bare title over a poster (seen on Rudy
-    // and on I giorni dell'ira). An English synopsis beats no synopsis.
-    if (unreadableHere(sub) || !overview.trim()) {
+    // NO ENGLISH PROSE ON A HEBREW CARD. TMDB's he-IL response leaves the overview empty for a
+    // film with no Hebrew translation, and we used to fill it from en-US on the grounds that an
+    // English synopsis beats no synopsis. It does not: the owner photographed a results card for
+    // The Dogs (2025) reading "After fleeing his psychotic father..." in the middle of a Hebrew
+    // page. There is no translator in production, so the honest options are Hebrew prose or none,
+    // and the callers already prefer a film that HAS a synopsis over one that does not.
+    // The test is on the text, not on TMDB's promise about it — a stray English line stored in
+    // the Hebrew field would otherwise still reach the card.
+    const wantHebrew = locale !== 'en';
+    if (wantHebrew && !hasHebrew(overview)) overview = '';
+    // One English lookup, now only for the title lines: an unreadable original-title line, or a
+    // film whose localized title is itself in a script the reader cannot read.
+    if (unreadableHere(sub) || unreadableHere(title) || (!wantHebrew && !overview.trim())) {
       try {
-        const en = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=en-US`, { next: { revalidate: 604800 } });
+        const en = await tfetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${KEY}&language=en-US`, { next: { revalidate: 604800 } });
         const ed = en.ok ? await en.json() : null;
         if (unreadableHere(sub)) {
           if (ed?.title && !unreadableHere(ed.title)) sub = ed.title;
@@ -577,7 +652,7 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
         // When BOTH titles are Japanese there was nothing to fall back to and the card printed
         // 機動戦士ガンダム 逆襲のシャア as the film's name. The English title covers it.
         if (unreadableHere(title) && ed?.title && !unreadableHere(ed.title)) title = ed.title;
-        if (!overview.trim() && ed?.overview) overview = ed.overview;
+        if (!wantHebrew && !overview.trim() && ed?.overview) overview = ed.overview;
       } catch { /* keep what we have rather than lose the line */ }
     }
     return {
@@ -598,7 +673,7 @@ export async function resolveByTitle(title: string, year: string | null, locale 
   try {
     const q = encodeURIComponent(title);
     const yq = year ? `&year=${encodeURIComponent(year)}` : '';
-    const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${q}${yq}&include_adult=false`, { next: { revalidate: 86400 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/search/movie?api_key=${KEY}&language=en-US&query=${q}${yq}&include_adult=false`, { next: { revalidate: 86400 } });
     if (!res.ok) return null;
     const data = await res.json();
     const hit = (data.results || []).find((m: any) => m.poster_path && m.overview) || (data.results || [])[0];
@@ -613,7 +688,7 @@ export async function getTrailer(id: string): Promise<string> {
     // No language filter: the old `language=en-US` silently dropped anime/foreign/older
     // titles that have no en-US video (e.g. Evangelion), leaving the card with NO trailer
     // button. Query ALL videos, then degrade gracefully so almost every film gets a clip.
-    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/videos?api_key=${KEY}`, { next: { revalidate: 3600 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/movie/${id}/videos?api_key=${KEY}`, { next: { revalidate: 3600 } });
     if (!res.ok) return '';
     const data = await res.json();
     const yt = (data.results || []).filter((v: any) => v.site === 'YouTube');
@@ -643,7 +718,7 @@ export interface WatchAvailability {
 export async function getWatchProviders(id: string, region = 'IL'): Promise<WatchAvailability | null> {
   if (!KEY || !/^\d+$/.test(id)) return null;
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${KEY}`, { next: { revalidate: 86400 } });
+    const res = await tfetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${KEY}`, { next: { revalidate: 86400 } });
     if (!res.ok) return null;
     const data = await res.json();
     const r = data?.results?.[region];

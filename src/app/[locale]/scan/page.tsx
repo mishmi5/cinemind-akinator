@@ -90,6 +90,15 @@ const RESUME_KEY = 'cinemind_active_session';
 // error never settled. Six seconds is the point past which a visitor has already decided the
 // product is broken. Init falls back to the local pool, mid-quiz surfaces the retry toast.
 const QUIZ_FETCH_TIMEOUT_MS = 6000;
+// THE LAST REQUEST IS NOT A QUESTION. Six seconds is right for "give me the next film", which the
+// server answers in 2-200ms. It is wrong for the closing request, which is where the three films are
+// chosen AND their Hebrew reasons are written by the language model: measured 5159ms for a forced
+// finish on an idle machine, 6228ms letting a quiz end naturally at 40 answers, and 6205/8386/10480/
+// 12919ms with four quizzes running at once. So the one request the whole quiz exists for was the
+// one being aborted — and an AbortSignal rejection throws past the retry loop, landing in the catch
+// that says "התשובה לא נשלחה — כנראה החיבור" with the same film still on screen. The person rated
+// twenty films and was told their connection failed. A single visitor was already enough to hit it.
+const FINISH_FETCH_TIMEOUT_MS = 45000;
 
 const SOUNDS = {
   // Dead Google Sounds API removed to prevent CORB / Uncaught promise errors
@@ -411,7 +420,16 @@ export default function ScanMovieEvaluation() {
           // valid ISO-8859-1 header values.
           askedTitles: seenTitlesRef.current.slice(-60)
         }),
-        signal: AbortSignal.timeout(QUIZ_FETCH_TIMEOUT_MS),
+        // The closing request gets its own budget. The client cannot know for certain that this is
+        // the last answer — the server decides — so it uses the long budget whenever finishing is
+        // plausible: the user pressed "enough", or the engine has already said it could stop
+        // (readyToFinish), or the meter is in the closing ramp. Everywhere else the short budget
+        // stays, so a genuinely hung mid-quiz request still surfaces in six seconds.
+        signal: AbortSignal.timeout(
+          finishNow || session!.readyToFinish || (session!.confidenceScore ?? 0) >= 0.8
+            ? FINISH_FETCH_TIMEOUT_MS
+            : QUIZ_FETCH_TIMEOUT_MS,
+        ),
       });
 
       let response = await doFetch();
@@ -981,6 +999,16 @@ export default function ScanMovieEvaluation() {
                     so every Hebrew rating reached the engine INVERTED. Inheriting the page's
                     direction keeps star #1 next to "שונא" and star #5 next to "אוהב" in both
                     locales, so the value always matches the label the user aimed at. */}
+                {/* The closing request can take tens of seconds — it is where the three films are
+                    chosen and their reasons written. Without this the screen just froze: the stars
+                    went dim and nothing said why, which reads as a broken product rather than as
+                    work happening. Only shown when the engine is actually in its closing ramp. */}
+                {loading && (session.readyToFinish || (session.confidenceScore ?? 0) >= 0.8) && (
+                  <div className="flex items-center gap-2 text-sm font-bold text-accent-soft animate-pulse" role="status">
+                    <span aria-hidden="true">🎬</span>
+                    {he ? 'מרכיבים את שלושת הסרטים שלכם…' : 'Putting your three films together…'}
+                  </div>
+                )}
                 <div className="stars-container flex gap-2 sm:gap-4 md:gap-6">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button 
