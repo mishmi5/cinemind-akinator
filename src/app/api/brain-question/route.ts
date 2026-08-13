@@ -1551,14 +1551,22 @@ export async function POST(req: Request) {
     // Three cards on one screen carrying the identical sentence read as a template rather than a
     // recommendation, and a two-word reason reads as a bug. Either way the fallback — which names
     // the film itself and one of theirs — is a better card than the repeat.
+    // Dedup on the whole string is not enough. Two cards opening "אם אהבת את …" with different film
+    // names are two different strings and one sentence, and that is what a reader sees: the same
+    // card twice. Asking the model for a different angle per card gets it most of the time and not
+    // always, so the guarantee lives here rather than in the prompt — a repeated OPENING is treated
+    // exactly like a repeated reason, and falls back to the template, whose shapes differ by index.
+    const opening = (t: string) => t.trim().replace(/["'״]/g, '').split(/\s+/).slice(0, 2).join(' ');
     const usedReasons = new Set<string>();
+    const usedOpenings = new Set<string>();
     const finalReasons = reasons.map((r, i) => {
-      const ok = r && r.length >= 40 && !usedReasons.has(r);
+      const ok = r && r.length >= 40 && !usedReasons.has(r) && !usedOpenings.has(opening(r));
       const text = ok ? r : recReasonFallback({
         title: picks[i].title, term: termOfPick.get(picks[i].id) || confirmedTerm || '',
-        locale, loved: anchorTitles,
+        locale, loved: rotated(i), variant: i,
       });
       usedReasons.add(text);
+      usedOpenings.add(opening(text));
       return text;
     });
 

@@ -272,12 +272,22 @@ export const termInLocale = (term: string, locale: string) =>
  *  film with no resolved sub-genre, and the template wrapped it in "בסגנון ...", so a real
  *  recommendation shipped reading "בחירה קלאסית ומדויקת בסגנון הסגנון שלך". An empty term now
  *  selects a sentence that does not have the word in it at all. */
-export function recReasonFallback(opts: { title: string; term?: string; locale: string; loved?: string[] }): string {
-  const { title, term = '', locale, loved = [] } = opts;
+export function recReasonFallback(opts: { title: string; term?: string; locale: string; loved?: string[]; variant?: number }): string {
+  const { title, term = '', locale, loved = [], variant = 0 } = opts;
   const anchor = loved.find(t => t && t.trim());
   const heTerm = term ? termInLocale(term, locale) : '';
+  // THE FALLBACK NEEDS SHAPES TOO. Varying the model's angle per card fixed nothing on the runs
+  // where two cards fell back — the template had exactly one Hebrew form, so the screen showed
+  // "אם אהבת את X…" three times over. Any card can fall back independently (a short answer, a
+  // stock word, a code-switch), so the template has to carry the same three shapes the prompt asks
+  // the model for, or it undoes them.
+  const HE_ANCHORED = [
+    (a: string) => `אם אהבת את "${a}", ${title} יושב כמעט באותו מקום.`,
+    (a: string) => `${title} הולך לאותו מקום ש"${a}" לקח אותך אליו.`,
+    (a: string) => `שונה מ"${a}" במה שקורה על המסך, קרוב אליו במה שנשאר אחר כך.`,
+  ];
   if (locale === 'he') {
-    if (anchor) return `אם אהבת את "${anchor}", ${title} יושב כמעט באותו מקום.`;
+    if (anchor) return HE_ANCHORED[variant % HE_ANCHORED.length](anchor);
     if (heTerm) return `בחירה קלאסית בסגנון ${heTerm}, מהסוג שהדירוגים שלך הצביעו עליו.`;
     return `הבחירה הזאת יושבת על מה שדירגת הכי גבוה לאורך השאלון.`;
   }
@@ -311,7 +321,7 @@ export async function recReason(opts: { title: string; year?: string; term: stri
   // would have read the same for any two customers.
   const lovedTop = loved.filter(t => t && t.trim()).slice(0, 4);
   const hatedTop = hated.filter(t => t && t.trim()).slice(0, 3);
-  const fallback = recReasonFallback({ title, term, locale, loved: lovedTop });
+  const fallback = recReasonFallback({ title, term, locale, loved: lovedTop, variant });
   if (mock) return fallback;
   const model = tasteModel();
   if (!model) return fallback;
