@@ -824,12 +824,17 @@ export default function ScanMovieEvaluation() {
                       )}
                       <p className="text-zinc-400 mb-8 text-lg font-medium leading-relaxed">
                         {locale === 'he'
-                          ? 'מסלול מייסד: ₪99 פעם אחת, גישה לכל החיים. הפרופיל שלך נשמר, אפשר לעשות את החידון שוב מתי שרוצים, ומדי שבוע מגיע מייל עם סרט שמתאים לך. 200 מקומות.'
-                          : 'Founder: ₪99 once, lifetime access. Your taste profile is saved, retake the quiz whenever you want, and a matching film lands in your inbox every week. 200 seats.'}
+                          /* Round eight took the unqualified "your profile is saved" off the pricing
+                             card, because sign-in is disabled and the profile lives in one browser.
+                             The same claim was still here, on the screen where the sale actually
+                             happens — a copy fix applied in one place and not the other. */
+                          ? 'מסלול מייסד: ₪99 פעם אחת, גישה לכל החיים. פרופיל הטעם נשמר בדפדפן הזה, אפשר לעשות את החידון שוב מתי שרוצים, ומדי שבוע מגיע מייל עם סרט שמתאים לך. 200 מקומות.'
+                          : 'Founder: ₪99 once, lifetime access. Your taste profile is saved in this browser, retake the quiz whenever you want, and a matching film lands in your inbox every week. 200 seats.'}
                       </p>
 
                       <div className="flex flex-col gap-4 w-full relative">
                         <Link
+                          data-chat-avoid
                           href="/pricing"
                           onClick={() => posthog.capture('paywall_click_starter')}
                           className="w-full py-4 bg-accent-strong hover:bg-accent text-white rounded-control font-black text-xl transition-all shadow-accent hover:scale-[1.02] flex items-center justify-center gap-2"
@@ -873,7 +878,7 @@ export default function ScanMovieEvaluation() {
                 </p>
                 {/* The one glow left on this screen: it is the only thing here we are asking
                     anybody to press. */}
-                <Link href="/pricing" className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-control font-bold transition-all shadow-[0_0_30px_rgba(99,102,241,0.35)] hover:scale-105 active:scale-95">
+                <Link data-chat-avoid href="/pricing" className="inline-block px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-control font-bold transition-all shadow-[0_0_30px_rgba(99,102,241,0.35)] hover:scale-105 active:scale-95">
                   {t('upgrade_elite')}
                 </Link>
               </div>

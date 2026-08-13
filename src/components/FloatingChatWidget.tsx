@@ -78,8 +78,36 @@ export default function FloatingChatWidget() {
   };
 
 
+  // GET OUT OF THE WAY OF THE BUTTON THAT MATTERS. On a 375px phone this launcher sits over the
+  // bottom-right corner of the page, and at one scroll position it covered "לקחת מקום מייסד — ₪99"
+  // outright: elementFromPoint returned the launcher, so a tap on the purchase button opened the
+  // chat instead. Text passing underneath is the accepted cost of a floating launcher; the one
+  // control the product's revenue depends on is not. Anything marked data-chat-avoid hides the
+  // launcher while it is on screen, and an open chat is left alone so it never vanishes mid-sentence.
+  const [ctaVisible, setCtaVisible] = useState(false);
+  useEffect(() => {
+    const targets = document.querySelectorAll('[data-chat-avoid]');
+    if (!targets.length) return;
+    // The observer reports only what CHANGED, so the set of currently-visible targets is kept here
+    // rather than recomputed from each batch of entries.
+    const onScreen = new Set<Element>();
+    const io = new IntersectionObserver(entries => {
+      for (const e of entries) {
+        if (e.isIntersecting) onScreen.add(e.target); else onScreen.delete(e.target);
+      }
+      setCtaVisible(onScreen.size > 0);
+    });
+    targets.forEach(t => io.observe(t));
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <div className="fixed bottom-6 right-6 z-30 font-sans" dir="rtl">
+    <div
+      className={`fixed bottom-6 right-6 z-30 font-sans transition-opacity duration-200 ${
+        ctaVisible && !isOpen ? 'pointer-events-none opacity-0' : 'opacity-100'
+      }`}
+      dir="rtl"
+    >
       {/* Chat Window — pinned bottom-RIGHT so it never overlaps the user avatar (bottom-left). */}
       {isOpen && (
         <div className="bg-[#111113] border border-zinc-800 rounded-2xl w-80 h-96 flex flex-col shadow-2xl mb-4 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300">
