@@ -181,6 +181,28 @@ const familyOfGenreNames = (names?: string[]): string | undefined => {
 
 const CONTENDER_AVG = 4.5; // a 5★-level love; close contenders at/above this drill-off
 
+// A FAMILY IS A BAG OF VERY DIFFERENT TASTES, AND ITS SIZE IS HOW BADLY ONE REPRESENTATIVE
+// SPEAKS FOR IT. Comedy owns nine shelves — parody, slapstick, rom-com, mockumentary, satire… —
+// so the single comedy film the opening serves has roughly a one-in-nine chance of being the one
+// the person actually loves, and the eight-in-nine case reads as "this person does not watch
+// comedy". That is the owner's own example: liking Scary Movie means parody, not comedy.
+// Measured before this: across fourteen sessions × twelve opening questions only 3 of 168 films
+// were parody, and a parody fan finished with wuxia.
+// So a family is not "asked about" until SEVERAL of its distinct shelves have been, and how many
+// depends on how much variety it holds. Half the family — horror's six of eleven, comedy's five of
+// nine, western's one of two — so the whole span budget is thirty-odd shelves rather than sixty.
+// The cap matters: at four, horror's four looks went to its four household-name shelves and a
+// slasher fan's own shelf came up in two runs of five.
+const FAMILY_SIZE: Record<string, number> = (() => {
+  const n: Record<string, number> = {};
+  for (const t of allSubGenreTerms()) { const f = subGenreFamily(t); if (f) n[f] = (n[f] || 0) + 1; }
+  return n;
+})();
+const spanNeed = (fam: string) => {
+  const n = FAMILY_SIZE[fam] || 1;
+  return n <= 2 ? 1 : Math.ceil(n / 2);
+};
+
 // Stable per-session pseudo-random rank (FNV-1a). Seeds the EXPLORE sweep ORDER off the
 // sessionId so two users never get the same opening sequence — variety — while a single
 // session's order stays consistent across its turns (sessionId round-trips in the body).
@@ -268,8 +290,17 @@ function computeTaste(probe: ProbeScores) {
   // already been shown several films from a style they clearly do not watch, and that screen is
   // what ends sessions. A family that two different sub-genres in has averaged below 2.2 with no
   // emphatic love anywhere inside it is cold — stop asking about it now, not three misses later.
+  // …but ONE shelf may never speak for the whole bag. `v.lo >= 3` could be three low ratings on a
+  // single drilled term, and `v.terms >= 2` is two shelves out of comedy's nine — either way a
+  // parody fan who shrugs at slapstick and rom-com had comedy struck off before parody was ever
+  // offered, which is the defect this file is fixing. A family is cold only once it has been
+  // sampled ACROSS itself: half its shelves (capped at three, and never more than it owns), all
+  // of them cold. A two-term family still settles on two, so westerns and romance are unchanged.
+  const coldEnough = (fam: string, terms: number) =>
+    terms >= Math.min(3, Math.max(1, Math.ceil((FAMILY_SIZE[fam] || 1) / 2)));
   const rejectedFamilies = Object.entries(famAgg)
-    .filter(([, v]) => v.hi5 === 0 && (v.lo >= 3 || (v.terms >= 2 && v.n >= 2 && v.sum / v.n <= 2.2)))
+    .filter(([f, v]) => v.hi5 === 0 && coldEnough(f, v.terms)
+      && (v.lo >= 3 || (v.n >= 2 && v.sum / v.n <= 2.2)))
     .map(([f]) => f);
   return { stats, candidates, leader, contenders, loved, disliked, lockedLove, totalContra, rejectedFamilies };
 }
@@ -493,7 +524,7 @@ export async function POST(req: Request) {
     const seen = Array.from(new Set([...askedMovieIds, ...recentIds,
       ...history.map(h => String(h.id || '')).filter(Boolean)]));
     const seenSet = new Set(seen);
-    const { stats, loved, leader, contenders, disliked, lockedLove: lockedRaw, totalContra, rejectedFamilies } = computeTaste(probe);
+    const { stats, candidates, loved, leader, contenders, disliked, lockedLove: lockedRaw, totalContra, rejectedFamilies } = computeTaste(probe);
 
     // ── Decide the next move DETERMINISTICALLY: EXPLORE before EXPLOIT. ──
     // EXPLORE: walk EVERY distinct sub-genre once (iconic exemplar each) before committing
@@ -501,13 +532,29 @@ export async function POST(req: Request) {
     // Thing" a 4) from hijacking the quiz before its true love (hard-SF) is ever shown.
     // EXPLOIT: only once the full sweep is done, DRILL the strongest explored sub-genre
     // to confirm it (LOCK_HITS strong hits). Recommend only from the confirmed sub-genre.
-    const samplerAll = (await fetchSubGenreSampler(locale)).filter(c => !seenSet.has(c.id));
+    const samplerFull = await fetchSubGenreSampler(locale);
+    const samplerAll = samplerFull.filter(c => !seenSet.has(c.id));
+    // A sub-genre's own tier: 1 if it owns a household-name opener, 2 if it only exists in the
+    // niche exemplar list. Tier is stored per FILM, and a term whose films have all been shown is
+    // gone from samplerAll — so this is read off the unfiltered sampler, which is what lets the
+    // sweep reason about shelves it has already offered.
+    const termTier = new Map<string, 1 | 2>();
+    for (const c of samplerFull) {
+      const t = samplerProbeOf(c.id); if (!t) continue;
+      const tier = samplerTier(c.id);
+      if (tier < (termTier.get(t) ?? 3)) termTier.set(t, tier);
+    }
     // SURGICAL LOCK GATE — never crown a family's winner while its SIBLINGS are still unasked.
     // The opening sweep serves ONE blockbuster per family, so a rom-com fan who rated Elf a 4 had
     // "holiday christmas" locked at question 8 and Notting Hill was never shown; an anime fan was
     // locked onto stop-motion the same way. Every term inside the leader's family gets a first
     // look before that family's winner is declared, which is what makes the read surgical rather
     // than "whichever member we happened to ask about first".
+    // Deliberately still EVERY term, not the span standard used elsewhere in this file. Relaxing
+    // it to "several shelves" was measured: the lock fired earlier and a three-taste session fell
+    // from ~41 questions to 26, which sounds like a win and is not — those fifteen questions were
+    // the ones that found the second and third tastes, and the picks came back on one axis again.
+    // The leader's own family is the one place where exhaustive is worth its price.
     const familyHasUnasked = (term: string) => {
       const fam = subGenreFamily(term);
       if (!fam) return false;
@@ -676,11 +723,36 @@ export async function POST(req: Request) {
     const unresolvedFams = new Set(Object.entries(famRoll)
       .filter(([f, v]) => f !== lockFamHere && v.hi === 0 && v.n > 0 && v.sum / v.n >= 3)
       .map(([f]) => f));
+    // …AND THE FAMILY THAT CAME BACK COLD FROM ONE SHELF. The rule above reads a family that was
+    // LIKED, and that is the easy half. The owner's own case is the other one: a family rated 2
+    // that nonetheless holds a love, because the shelf we happened to open was not the shelf they
+    // watch. Left alone, the lock ends the census and the tail becomes eight more films of the
+    // taste already found — measured: a viewer who loves slashers, courtroom drama and parody was
+    // served eight slashers and one of each of the others.
+    // Loosening the rule for everyone is the census again, so it is spent only on the person it is
+    // for, and that person is identifiable: someone who rated one shelf of a family high and
+    // another shelf of the SAME family low has PROVED their taste is shelf-level, which is the
+    // owner's sentence made measurable. A viewer who simply loves a whole family shows no such
+    // split — a child rating every animation five never triggers this, and their quiz still ends
+    // when it locks. Families already written off (`rejectedFamilies`, which now needs several
+    // cold shelves of its own) do not hold it open either.
+    const splitTaste = !!lockedLove && stats.some(s =>
+      s.t !== lockedLove.t && subGenreFamily(s.t) === lockFamHere && !s.hi && s.avg <= 2);
+    const probedPerFam: Record<string, number> = {};
+    for (const t of Object.keys(probe)) { const f = subGenreFamily(t); if (f) probedPerFam[f] = (probedPerFam[f] || 0) + 1; }
+    // Deliberately NOT excluding `rejectedFamilies`: for this one viewer a rejected family is the
+    // whole point — the shelves that made it look cold are not the shelf they watch, and that is
+    // the sentence the owner wrote the requirement in. The span is what bounds it: at most a few
+    // looks per family, and MAX_Q behind that.
+    const owesSpan = (f: string) => !!f && f !== lockFamHere
+      && !famRoll[f]?.hi && (probedPerFam[f] || 0) < spanNeed(f);
     // `firstLook` is used rather than the raw sampler because it is already what the sweep is
     // WILLING to offer — a child's profile must not be held open by horror shelves it will never
     // be shown.
-    const chasingSecondTaste = !!lockedLove && firstLook.some(c =>
-      unresolvedFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || ''));
+    const chasingSecondTaste = !!lockedLove && firstLook.some(c => {
+      const f = subGenreFamily(samplerProbeOf(c.id) || '') || '';
+      return unresolvedFams.has(f) || (splitTaste && owesSpan(f));
+    });
     // THE EARLY-STOP IS GONE, ON PURPOSE. It used to let a perfect 5★ leader skip the rest of the
     // sweep once its own family and the adjacent ones were explored, which is what made a sharp
     // taste finish in ~13 questions — and it is also why a viewer who loves slashers AND courtroom
@@ -782,8 +854,16 @@ export async function POST(req: Request) {
     // the sibling question only decides WHICH shelf of the family this is — worth asking, but the
     // untouched love in another family is worth more, and it costs a single question because it
     // stops the moment the term has its hits.
+    // …and the sibling question yields to a taste we have not FOUND yet. `thinSibling` decides
+    // which shelf of the confirmed family this is, which is worth asking when there is nothing
+    // better; while another family still owes a look at itself it is not the better question, and
+    // a traced three-taste run spent nine of its last fifteen questions on further slashers while
+    // courtroom drama and parody sat unopened. Returning nothing here hands the turn back to the
+    // sweep, which is where an unopened shelf lives.
     const postLockDrill = needsMoreProof ? lockedLove
-      : (crossFamLove || thinSibling || needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null);
+      : (crossFamLove
+         || (chasingSecondTaste ? null : thinSibling)
+         || needDrill.find(d => subGenreFamily(d.t) === lockFamNow) || null);
     // Pre-lock, an undrilled contender from ANOTHER family is not worth a question either: a
     // quiz already closing in on mecha anime spent question 20 on Re-Animator and World War Z.
     // With no same-family rival left, confirm the leader instead.
@@ -952,7 +1032,16 @@ export async function POST(req: Request) {
       // work through each family's remaining sub-genres. Tier still decides WITHIN a family, so the
       // household-name film is the one that opens it and "didn't see it" stays rare.
       const famProbed: Record<string, number> = {};
-      for (const t of Object.keys(probe)) { const f = subGenreFamily(t); if (f) famProbed[f] = (famProbed[f] || 0) + 1; }
+      // …and how many of those shelves came back COLD, which is what tells a family that merely
+      // has not been asked much from one whose mainstream this person has already refused.
+      const famProbedCold: Record<string, { n: number; cold: number }> = {};
+      for (const t of Object.keys(probe)) {
+        const f = subGenreFamily(t); if (!f) continue;
+        famProbed[f] = (famProbed[f] || 0) + 1;
+        const v = famProbedCold[f] || (famProbedCold[f] = { n: 0, cold: 0 });
+        const p = probe[t]; v.n++;
+        if (!p.hi && p.sum / p.n <= 2) v.cold++;
+      }
       // BROAD FIRST, THEN DEEP ONLY WHERE IT IS WARM. Walking the map by fewest-probed-family is
       // right for the OPENING and wrong for everything after it: it is a round robin, so the
       // leader's family — the one the lock is waiting on — finishes LAST. Measured on the
@@ -983,11 +1072,32 @@ export async function POST(req: Request) {
       // reached the one shelf he loves. The average is already the ordering; a family rated 1
       // throughout sits below one rated 2 without any extra rule.
       const depthFam = lockedFam || (leader ? subGenreFamily(leader.t) : undefined);
+      // SPAN THE FAMILY BEFORE JUDGING IT. Pass 3 used to order the rest by warmth, and warmth
+      // after ONE look is an opinion about one shelf: a parody fan rates the comedy he was shown a
+      // 2, comedy sinks to the bottom of the queue behind the families he also rated 2, and the
+      // quiz ends before his own shelf is ever offered. Worse, the boredom memory below then made
+      // the sweep STICK to whichever family it had just refused, so a traced three-taste session
+      // spent four questions inside crime and offered slasher and parody exactly zero times —
+      // whichever family won the early slots decided the whole answer.
+      // So a family with no strong hit anywhere in it owes `spanNeed` looks across its DISTINCT
+      // shelves, and those debts are walked round-robin: every family's second shelf before any
+      // family's third. A family that has already landed a strong hit owes nothing — it is
+      // resolved, and pass 2 is what deepens it. Warmth still separates families with equal debt,
+      // and still orders everything once the debts are paid.
+      const spanDebt = (f: string) => (famRoll[f]?.hi ? 0 : spanNeed(f) - (famProbed[f] || 0));
       const famRank = (c: { id: string }) => {
         const f = subGenreFamily(samplerProbeOf(c.id) || '') || '';
         if (!famProbed[f]) return -1e9;                 // pass 1 — never offered
-        if (f && f === depthFam) return -1e6;           // pass 2 — the family being resolved
-        return -(famWarmth[f] ?? 0);                    // pass 3 — warmest of the rest
+        // Pass 2 and pass 3 are ONE queue, ordered by how many looks each family has already had.
+        // The family being resolved used to win outright, and it emptied the sweep: a traced
+        // three-taste session landed a slasher 5 at question 18 and then spent questions 19 to 27
+        // walking all eleven horror shelves back to back, so comedy was offered twice in the whole
+        // quiz and crime twice, and the other two loves were never asked about. The resolving
+        // family still moves at roughly twice the rate of the rest — mapping it is what makes the
+        // read surgical — but it no longer starves them.
+        if (f === depthFam) return -1e6 + famProbed[f] * 100;
+        if (spanDebt(f) > 0) return -1e6 + 250 + famProbed[f] * 200;
+        return -(famWarmth[f] ?? 0);                    // pass 4 — warmest of the rest
       };
       // Serving a broad crowd-pleaser after three refusals was measured and rejected: a blockbuster
       // is not relief to someone with a narrow taste — a musical fan turns down Jurassic Park too —
@@ -997,6 +1107,38 @@ export async function POST(req: Request) {
       // refused, not the one they named.
       const notChosen = (c: { id: string }) =>
         chosenFams.size === 0 ? 0 : (chosenFams.has(subGenreFamily(samplerProbeOf(c.id) || '') || '') ? 0 : 1);
+      // TIER-1 IS THE MAINSTREAM OF A FAMILY, AND THE MAINSTREAM IS WHAT THIS PERSON JUST TURNED
+      // DOWN. Household-name openers come first everywhere else in the sweep, for a good reason:
+      // they are the films someone has actually seen. But a family whose every offered shelf came
+      // back cold has said something specific — the ordinary version of this genre is not for them
+      // — and going back for a fourth household name asks the same question again. Courtroom drama
+      // has no blockbuster opener at all, which is why a viewer who loves 12 Angry Men was offered
+      // Se7en, Knives Out and Skyfall and then nothing else from crime. Once a family's shown
+      // shelves are all cold, its niche ones go first.
+      // Inverting the preference outright was measured and dropped: horror's slasher shelf IS a
+      // household name, so flipping the order for a cold horror family buried slasher behind seven
+      // niche shelves and a slasher fan was offered none. Balance instead — inside a family whose
+      // shown shelves are all cold, whichever tier has been sampled LESS goes next. Both a
+      // household name the sweep has not tried and a shelf that has no household name get their
+      // turn, which is the only way one quiz can reach both slasher and courtroom drama.
+      const coldSpanFams = new Set<string>();
+      for (const [f, v] of Object.entries(famProbedCold)) {
+        if (v.cold >= 2 && v.cold === v.n && !famRoll[f]?.hi) coldSpanFams.add(f);
+      }
+      const famTierSeen: Record<string, [number, number]> = {};
+      for (const t of Object.keys(probe)) {
+        const f = subGenreFamily(t); if (!f) continue;
+        const slot = famTierSeen[f] || (famTierSeen[f] = [0, 0]);
+        slot[(termTier.get(t) ?? 2) - 1]++;
+      }
+      const tierPref = (c: { id: string }) => {
+        const tier = samplerTier(c.id);
+        const f = subGenreFamily(samplerProbeOf(c.id) || '') || '';
+        if (!coldSpanFams.has(f)) return tier;
+        const [n1, n2] = famTierSeen[f] || [0, 0];
+        // The under-sampled tier first; a tie keeps the household name in front, as everywhere else.
+        return (tier === 1 ? n1 : n2) * 2 + (tier - 1);
+      };
       const nextUp = [...uncovered].sort((a, b) =>
         (notChosen(a) - notChosen(b)) ||
         // The family pass decides BEFORE the boredom memory, which used to outrank it and undo the
@@ -1010,7 +1152,7 @@ export async function POST(req: Request) {
         (boredomPenalty(a) - boredomPenalty(b)) ||
         (inLeadFam(a) - inLeadFam(b)) ||
         (eraPenalty(a) - eraPenalty(b)) ||
-        (samplerTier(a.id) - samplerTier(b.id)) ||
+        (tierPref(a) - tierPref(b)) ||
         (seededRank(sessionId + a.id) - seededRank(sessionId + b.id)));
       // Take the first candidate that survives the taste gate rather than the first candidate
       // outright: when the head of the queue is off-taste, dropping the whole turn skipped that
@@ -1522,7 +1664,52 @@ export async function POST(req: Request) {
     // sub-genre (never a disliked term, never a generic popular pool — that's what leaked a
     // hated style like Guardians before). Every candidate is a real, on-taste film.
     const dislikedSet = new Set(disliked);
-    const lovedTerms = [confirmedTerm, ...loved.map(s => s.t)]
+    // A PERSON CAN HOLD MORE THAN ONE TASTE. The engine resolved a single leading sub-genre and
+    // filled all three cards from it, so someone who loves slashers AND heist films AND anime was
+    // told they love slashers, three times over. A term earns its own card when it has real hits of
+    // its own and nothing contradicting them — two or three of those and the three films come one
+    // per taste instead of three from the winner. With only one such term nothing changes.
+    // TWO STRONG HITS ON ONE TERM IS THE WRONG PRICE FOR A TASTE THAT IS NOT THE LEADER. The
+    // confirmed taste gets drilled until it has them; a second love gets one film per shelf, and
+    // the shelves are usually neighbours — a viewer who loves parody rated Airplane! AND This Is
+    // Spinal Tap five, which is one emphatic hit on "parody spoof" and one on "mockumentary" and
+    // therefore, under the old rule, no second taste at all. Measured: five sessions each shown
+    // both slasher and parody films, every one answered on a single axis.
+    // The evidence is still two emphatic 5s — it is simply counted across the FAMILY rather than
+    // inside one term. Counting a single 5 was tried and reverted the same hour: a parody fan who
+    // rated one horror-comedy five was handed Train to Busan, so one stray answer bought a card.
+    // Only the family's strongest shelf takes the card, so a second taste costs one of the three,
+    // never two.
+    const confirmedFam = confirmedTerm ? subGenreFamily(confirmedTerm) : undefined;
+    const famHi5: Record<string, number> = {};
+    const famHiAll: Record<string, number> = {};
+    for (const s of stats) {
+      const f = subGenreFamily(s.t); if (!f) continue;
+      famHi5[f] = (famHi5[f] || 0) + s.hi5; famHiAll[f] = (famHiAll[f] || 0) + s.hi;
+    }
+    // Two emphatic 5s across the family, or one 5 that a second strong rating stands behind. Both
+    // are two answers; a single 5 with nothing beside it is one, and that is the line.
+    const secondTasteFam = (f: string) => (famHi5[f] || 0) >= 2
+      || ((famHi5[f] || 0) >= 1 && (famHiAll[f] || 0) >= 2);
+    const claimedFam = new Set<string>();
+    const multiTerms = candidates
+      .filter(s => !s.contra && !dislikedSet.has(s.t))
+      .sort((a, b) => (a.t === confirmedTerm ? -1 : 0) - (b.t === confirmedTerm ? -1 : 0)
+        || b.hi5 - a.hi5 || b.hi - a.hi || b.avg - a.avg)
+      .filter(s => {
+        if (s.hi >= LOCK_HITS) return true;
+        const f = subGenreFamily(s.t);
+        if (!f || !confirmedFam || f === confirmedFam || !secondTasteFam(f)) return false;
+        if (claimedFam.has(f)) return false;   // one card per second taste, not two
+        claimedFam.add(f);
+        return true;
+      })
+      .map(s => s.t)
+      .slice(0, 3);
+    const multiTaste = multiTerms.length >= 2;
+    // A term that earns a card has to be in the pool the cards are drawn from — a second taste
+    // recognised here but absent from `lovedTerms` reached the screen as an empty slot.
+    const lovedTerms = [confirmedTerm, ...multiTerms, ...loved.map(s => s.t)]
       .filter((t, i, a) => !!t && !dislikedSet.has(t) && a.indexOf(t) === i);
     const candPool: Rec[] = [];
     // Which sub-genre each candidate actually came from. The reason used to name the CONFIRMED
@@ -1535,18 +1722,6 @@ export async function POST(req: Request) {
     // entries per term once the user has demonstrated real depth (an emphatic 5 in that term),
     // so an expert gets the deeper cut and a newcomer still gets the classics.
     const depthOf = (term: string) => (probe[term]?.hi5 || 0) >= 1 ? 2 : 0;
-    // A PERSON CAN HOLD MORE THAN ONE TASTE. The engine resolved a single leading sub-genre and
-    // filled all three cards from it, so someone who loves slashers AND heist films AND anime was
-    // told they love slashers, three times over. A term earns its own card when it has real hits of
-    // its own and nothing contradicting them — two or three of those and the three films come one
-    // per taste instead of three from the winner. With only one such term nothing changes.
-    const multiTerms = loved
-      .filter(s => s.hi >= LOCK_HITS && !s.contra && !dislikedSet.has(s.t))
-      .sort((a, b) => (a.t === confirmedTerm ? -1 : 0) - (b.t === confirmedTerm ? -1 : 0)
-        || b.hi5 - a.hi5 || b.hi - a.hi || b.avg - a.avg)
-      .map(s => s.t)
-      .slice(0, 3);
-    const multiTaste = multiTerms.length >= 2;
     // With several tastes to represent, no single term may eat the pool — the first term's eight
     // curated seeds would fill all twelve slots and the other tastes would never reach a card.
     const perTerm = multiTaste ? 4 : 12;

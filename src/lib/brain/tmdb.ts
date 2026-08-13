@@ -257,6 +257,11 @@ const POPULAR_OPENERS: { term: string; titles: string[] }[] = [
   { term: 'spaghetti western', titles: ['The Good, the Bad and the Ugly', 'A Fistful of Dollars', 'For a Few Dollars More', 'Once Upon a Time in the West', 'Django Unchained', 'The Magnificent Seven', 'True Grit', 'Tombstone'] },
   { term: 'psychological thriller', titles: ['Se7en', 'Shutter Island', 'Gone Girl', 'The Silence of the Lambs', 'Prisoners', 'Memento', 'Fight Club', 'Joker'] },
   { term: 'whodunit mystery', titles: ['Knives Out', 'Murder on the Orient Express', 'Glass Onion', 'Death on the Nile', 'Clue', 'Sherlock Holmes', 'The Girl with the Dragon Tattoo', 'Gosford Park'] },
+  // Courtroom drama had exemplars but no OPENER, so it sat as crime's seventh shelf in tier 2 and
+  // was offered in one of five sessions — a person who loves it was answered on somebody else's
+  // taste. These are household names in Israel as everywhere: the shelf only needs a film the
+  // visitor recognises well enough to rate, which is the whole point of the opener tier.
+  { term: 'courtroom drama', titles: ['A Few Good Men', '12 Angry Men', 'The Devil\'s Advocate', 'Philadelphia', 'A Time to Kill', 'My Cousin Vinny', 'The Firm', 'Erin Brockovich'] },
   // Titanic is a romance that happens to sink a ship: as a disaster opener it reached locked
   // heist and superhero fans (same family) and read as pure noise. The Perfect Storm is the
   // household-name disaster film that actually behaves like one.
@@ -661,6 +666,12 @@ export async function movieById(id: string, locale = 'he'): Promise<MovieContext
       rating: m.vote_average, posterUrl: `/api/poster?path=${m.poster_path}`,
       overview, trailerId: '', easterEgg: { type: 'oscar' },
       _genreIds: (m.genres || []).map((g: any) => g.id),
+      // The card knew the film's language and release date and told nobody. The persona suite could
+      // not check world-cinema coverage at all — "no film in 168 carried original_language" — and a
+      // taste for Korean thrillers or Israeli cinema is exactly the kind of thing this engine claims
+      // to find, so it has to be measurable. Underscored like _genreIds: engine/QA data, not copy.
+      _lang: m.original_language || undefined,
+      _year: m.release_date ? Number(m.release_date.slice(0, 4)) : undefined,
     };
   } catch { return null; }
 }

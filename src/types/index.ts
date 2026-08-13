@@ -18,6 +18,12 @@ export interface MovieContext {
   easterEgg?: EasterEgg;
   /** TMDB genre IDs used internally by the recommendation engine */
   _genreIds?: number[];
+  /** TMDB original_language. Not shown to anyone — it exists so world-cinema coverage can be
+   *  measured. The persona suite could not check it at all before: "no film in 168 carried
+   *  original_language", which made a whole dimension of taste invisible to every test. */
+  _lang?: string;
+  /** Release year as a number, for the same reason: era coverage was unmeasurable. */
+  _year?: number;
   /** Curated sub-genre niches (from TMDB keywords) — the individuality layer */
   _niches?: string[];
   /** Micro-genre tags from the formula engine's own tagger (text + genre-id matching) */
