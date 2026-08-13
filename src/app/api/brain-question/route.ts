@@ -1534,11 +1534,19 @@ export async function POST(req: Request) {
     // "בחירה קלאסית ומדויקת בסגנון הסגנון שלך" on a shipped results card, because the template
     // wraps whatever it is given in "בסגנון ...". With no term the reason is written around the
     // user's own films instead.
-    const reasons = await Promise.all(picks.map(p =>
+    // A DIFFERENT ANCHOR FILM PER PICK. All three calls run in parallel, so no one of them can see
+    // what the others wrote — and given the same list of loved films they all reached for the same
+    // one. A measured results screen read "כי כמו בפני צלקת…" three times, once per card: three
+    // recommendations, one sentence, which is exactly the template feel the reason exists to avoid.
+    // Rotating the list gives each card a different film to hang on without making the calls
+    // sequential, which would add seconds to the slowest request in the quiz.
+    const rotated = (i: number) =>
+      anchorTitles.length ? anchorTitles.slice(i).concat(anchorTitles.slice(0, i)) : anchorTitles;
+    const reasons = await Promise.all(picks.map((p, i) =>
       recReason({
         title: p.title, year: yearOf(p), term: termOfPick.get(p.id) || confirmedTerm || '',
         locale, mock, genres: genreNames(p._genreIds || []), overview: p.overview,
-        loved: anchorTitles, hated: hatedTitles,
+        loved: rotated(i), hated: hatedTitles, variant: i,
       })));
     // Three cards on one screen carrying the identical sentence read as a template rather than a
     // recommendation, and a two-word reason reads as a bug. Either way the fallback — which names

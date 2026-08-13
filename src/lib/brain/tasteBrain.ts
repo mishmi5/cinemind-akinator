@@ -286,8 +286,25 @@ export function recReasonFallback(opts: { title: string; term?: string; locale: 
   return `This one sits squarely on what you rated highest during the quiz.`;
 }
 
-export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string; loved?: string[]; hated?: string[] }): Promise<string> {
-  const { title, year, term, locale, mock, genres = [], overview = '', loved = [], hated = [] } = opts;
+export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string; loved?: string[]; hated?: string[]; variant?: number }): Promise<string> {
+  const { title, year, term, locale, mock, genres = [], overview = '', loved = [], hated = [], variant = 0 } = opts;
+  // THREE CARDS, THREE SHAPES. Giving each card a different film to hang on was not enough: the
+  // three calls still received an identical instruction, so the model settled on one phrasing and
+  // wrote it three times — first "כי כמו ב…", and after that constraint was lifted, "תתחבר לסרט
+  // הזה כמו…". A model asked the same question the same way answers it the same way. So the SHAPE
+  // of the sentence is what varies per card, not just its subject matter.
+  const ANGLES_HE = [
+    'פתח בשם הסרט שהוא אהב, ומשם עבור לסרט המומלץ.',
+    'פתח במה שהסרט המומלץ עושה, ורק אחר כך קשר אותו לסרט שהוא אהב.',
+    'פתח בניגוד: מה שונה כאן מהסרט שהוא אהב, ולמה זה יעבוד עליו בכל זאת.',
+  ];
+  const ANGLES_EN = [
+    'Open with the name of the film they loved, then move to this one.',
+    'Open with what the recommended film does, and only then connect it to the film they loved.',
+    'Open with the contrast: what is different here from the film they loved, and why it still works.',
+  ];
+  const angleHe = ANGLES_HE[variant % ANGLES_HE.length];
+  const angleEn = ANGLES_EN[variant % ANGLES_EN.length];
   const heTerm = term ? termInLocale(term, locale) : '';
   // The films THIS person rated highest, and the ones they rejected. Without them the model knew
   // the film and nothing about the reader, so every reason was a description of the movie that
@@ -312,16 +329,19 @@ export async function recReason(opts: { title: string; year?: string; term: stri
 ${facts}
 
 כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה דווקא האדם הזה יתחבר לסרט הזה.
-חוקים: הזכר בשם לפחות אחד מהסרטים שהוא דירג גבוה, וקשר אותו לסרט המומלץ. אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. אל תזכיר סרט שהוא דחה. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב"). התחל במילים "כי" או "אם".
+${angleHe}
+חוקים: הזכר בשם את הסרט הראשון ברשימה שדירג גבוה, וקשר אותו לסרט המומלץ. אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. אל תזכיר סרט שהוא דחה. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב").
+אסור להשתמש במילים: מרתק, מסע, לצלול, עדות ל, אבן דרך, בעידן שבו, עולם ומלואו, חוויה בלתי נשכחת.
 החזר רק את המשפט עצמו.`
     : `${term ? `The user loves ${term} films. ` : ''}The films they rated highest: ${lovedTop.join(', ') || '(none)'}.${hatedTop.length ? `\nFilms they rejected: ${hatedTop.join(', ')}.` : ''}
 Facts about "${title}"${year ? ` (${year})` : ''}:
 ${factsEn}
 
-In ONE short natural sentence, explain why THIS person will love it. Name at least one of the
-films they rated highest and connect it to this one. Use ONLY the facts above — do not invent
-scenes, battles or details that are not there, and never mention a film they rejected. Return
-just the sentence.`;
+In ONE short natural sentence, explain why THIS person will love it. ${angleEn}
+Name the first film in their list and connect it to this one. Use ONLY the facts above — do not
+invent scenes, battles or details that are not there, and never mention a film they rejected.
+Do not use: delve, tapestry, testament to, a journey, unforgettable, captivating. Return just the
+sentence.`;
   try {
     const { text } = await generateText({ model, prompt, temperature: 0.6, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
@@ -345,6 +365,14 @@ just the sentence.`;
     // a film of the user's own. The fallback satisfies both, so failing here costs nothing.
     if (clean.length < 40) return fallback;
     if (lovedTop.length && !lovedTop.some(t => clean.includes(t))) return fallback;
+    // Telling a 9B model not to use a word is a request, not a guarantee — "מרתק" reached a shipped
+    // results card despite the instruction above. These are the stock phrases that make Hebrew read
+    // as machine-written, and the results screen is the one place the product has to sound like a
+    // person. The template fallback is plain but never reaches for them.
+    const STOCK_HE = ['מרתק', 'מסע', 'לצלול', 'עדות ל', 'אבן דרך', 'בעידן שבו', 'עולם ומלואו', 'בלתי נשכח'];
+    const STOCK_EN = ['delve', 'tapestry', 'testament to', 'a journey', 'unforgettable', 'captivating'];
+    const stock = locale === 'he' ? STOCK_HE : STOCK_EN;
+    if (stock.some(w => clean.toLowerCase().includes(w.toLowerCase()))) return fallback;
     return clean.slice(0, 240);
   } catch { return fallback; }
 }
