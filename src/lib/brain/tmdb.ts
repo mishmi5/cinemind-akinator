@@ -222,6 +222,12 @@ const FAMILY_OF: Record<string, string> = {
   'israeli cinema': 'world', 'east asian drama': 'world', 'european arthouse': 'world',
   'latin american cinema': 'world', 'indian cinema': 'world',
   'crime epic': 'crime', 'classic western': 'western', 'documentary feature': 'documentary',
+  // "What came out lately" is a taste, and it was the one taste this catalogue could not hold:
+  // every shelf above is a hand-written list of titles, so the newest film in 75 questions was
+  // years old and a person who watches current cinema was invisible. These two shelves carry no
+  // titles at all — they are filled from TMDB at build time off today's date (see RECENT_SHELVES),
+  // so they cannot go stale the way a hard-coded list of 2026 releases would by 2028.
+  'recent crowd-pleaser': 'recent', 'recent acclaimed': 'recent',
 };
 export function subGenreFamily(term: string): string | undefined { return FAMILY_OF[term]; }
 /** Every sub-genre term the engine knows, for callers that need to walk a family. */
@@ -355,6 +361,48 @@ function roundRobinByFamily<T extends { term: string }>(groups: T[][]): T[] {
   return out;
 }
 
+// The two runtime-filled shelves. `window` is how far back "recent" reaches, counted from the day
+// the process builds its sampler — never a literal year, so this stays true without being edited.
+// The vote floors are what makes each shelf answerable: a crowd-pleaser nobody has heard of is a
+// wasted slot (OPENER_MIN_VOTES exists for exactly that reason), and "acclaimed" has to be widely
+// enough seen to rate, so it asks for a high average AND a real audience behind it.
+const RECENT_SHELVES: { term: string; years: number; minVotes: number; minScore: number }[] = [
+  { term: 'recent crowd-pleaser', years: 3, minVotes: 2500, minScore: 6.0 },
+  { term: 'recent acclaimed', years: 4, minVotes: 1200, minScore: 7.4 },
+];
+
+/** Fill a recent shelf from TMDB. Returns candidates; the caller also writes their titles into
+ *  SUBGENRE_RECS so the seed-question and recommendation paths read this shelf like any other. */
+async function fetchRecentShelf(s: (typeof RECENT_SHELVES)[number]): Promise<BrainCandidate[]> {
+  if (!KEY) return [];
+  const from = new Date();
+  from.setFullYear(from.getFullYear() - s.years);
+  const gte = from.toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    // Ask in English: these become curated-equivalent seeds, and every other seed in this file is
+    // resolved from an English title. The card the user finally sees is localized elsewhere.
+    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${KEY}&language=en-US`
+      + `&sort_by=popularity.desc&include_adult=false&vote_count.gte=${s.minVotes}`
+      + `&vote_average.gte=${s.minScore}&primary_release_date.gte=${gte}&primary_release_date.lte=${today}`;
+    const res = await tfetch(url, { next: { revalidate: 86400 } });
+    if (!res.ok) return [];
+    const d = await res.json();
+    return (d.results || [])
+      .filter((m: any) => m.poster_path && m.overview)
+      // Four, not ten. The opening is twelve slots wide and every family competes for them, so a
+      // twenty-film recent shelf did not add a direction, it evicted one: documentary went from
+      // fourteen openings in 168 to zero the moment this shelf was fat. A new direction has to pay
+      // for itself at the size of the others, and four is what the smallest curated shelves carry.
+      .slice(0, 4)
+      .map((m: any) => ({
+        id: m.id.toString(), title: m.title || m.original_title,
+        year: m.release_date ? m.release_date.split('-')[0] : undefined,
+        genres: genreNames(m.genre_ids), _genreIds: m.genre_ids, votes: m.vote_count || 0,
+      }));
+  } catch { return []; }
+}
+
 export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandidate[]> {
   if (samplerCache) return samplerCache;
   if (!KEY) return [];
@@ -383,6 +431,44 @@ export async function fetchSubGenreSampler(_locale = 'he'): Promise<BrainCandida
         const effectiveTier = (tier === 1 && (cand.votes ?? 0) < OPENER_MIN_VOTES) ? 2 : tier;
         byId.set(cand.id, cand); samplerProbeMap.set(cand.id, term); samplerTierMap.set(cand.id, effectiveTier);
       }
+    }
+  }
+  // A VOTE FLOOR MUST NEVER EMPTY A SHELF. OPENER_MIN_VOTES demotes a curated opener that turns out
+  // not to be household-name, which is right per film and wrong per shelf: every documentary opener
+  // sits under it (Free Solo, Man on Wire and the rest are famous without being widely rated), so
+  // documentary had no tier-1 film at all and survived only on scraps of the tier-2 queue — it read
+  // as fourteen openings in 168 until one more family joined that queue and it fell to zero. The
+  // direction becoming undetectable is the exact failure the owner named. So a shelf that loses
+  // every opener to the floor keeps its best-known title as the opener regardless: a shelf's
+  // strongest film is by definition the most rateable one it has.
+  const tier1Terms = new Set(POPULAR_OPENERS.map(o => o.term));
+  const bestPerTerm = new Map<string, BrainCandidate>();
+  const termHasOpener = new Set<string>();
+  for (const cand of byId.values()) {
+    const term = samplerProbeMap.get(cand.id);
+    if (!term || !tier1Terms.has(term)) continue;
+    if (samplerTierMap.get(cand.id) === 1) { termHasOpener.add(term); continue; }
+    const best = bestPerTerm.get(term);
+    if (!best || (cand.votes ?? 0) > (best.votes ?? 0)) bestPerTerm.set(term, cand);
+  }
+  for (const [term, cand] of bestPerTerm) {
+    if (!termHasOpener.has(term)) samplerTierMap.set(cand.id, 1);
+  }
+
+  // Fill the recent shelves and register them exactly like a curated one: tier 1 so they open (the
+  // vote floors above already guarantee they are recognisable), and their titles written into
+  // SUBGENRE_RECS so the seed and recommendation paths need no special case for them. A shelf that
+  // comes back empty — TMDB down, or a window with nothing in it — simply does not exist this
+  // build; it is never cached as an answer, same rule as the sampler itself.
+  for (const shelf of RECENT_SHELVES) {
+    const found = await fetchRecentShelf(shelf);
+    if (!found.length) continue;
+    SUBGENRE_RECS[shelf.term] = found.map(c => (c.year ? `${c.title} (${c.year})` : c.title));
+    for (const cand of found) {
+      if (byId.has(cand.id)) continue;
+      byId.set(cand.id, cand);
+      samplerProbeMap.set(cand.id, shelf.term);
+      samplerTierMap.set(cand.id, 1);
     }
   }
   // NEVER CACHE AN EMPTY SAMPLER. One TMDB outage (or one rate-limited first build) at process
