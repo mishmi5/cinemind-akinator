@@ -75,8 +75,17 @@ export default function DailyPulsePage() {
     setTimeout(() => setActiveToast(null), 3000);
   };
 
+  // NO ACCOUNT IS NOT A FAILURE. Sign-in is disabled across the product, so `user` is null for every
+  // visitor — and treating that as a failed claim told each of them "ה-XP לא נשמר הפעם, והרצף לא
+  // עודכן" with a retry button that could only fail again. Reporting a broken reward is worse than
+  // never offering it: the pulse's real payoff is the three films and the summary, and those work.
+  // The claim runs only when there is somebody to credit.
+  // `user` is not the test — AuthContext signs every visitor in ANONYMOUSLY, so it is almost always
+  // truthy while /api/user/pulse answers 401 for exactly those sessions. An anonymous visitor has no
+  // ledger to credit, so the claim is skipped for them rather than run and reported as failed.
+  const canEarnXP = !!user && !user.isAnonymous;
   const claimPulse = async () => {
-    if (!user) { setClaimFailed(true); return; }
+    if (!canEarnXP) return;
     setLoading(true);
     setClaimFailed(false);
     try {
@@ -167,12 +176,17 @@ export default function DailyPulsePage() {
 
         {/* The reward is reported, not assumed. When the grant fails the person still gets an
             ending and a retry, instead of a page that pretends nothing happened. */}
+        {/* Three states, not two. A signed-in visitor sees the XP they earned; a signed-in visitor
+            whose grant failed sees that plainly and can retry. A visitor with no account — which is
+            everyone, while sign-in is disabled — sees NEITHER, because there is no ledger to credit
+            and an error about a reward that was never available is just noise on a screen that
+            otherwise worked. The summary below is the payoff in that case, and it is a real one. */}
         {earnedXP !== null ? (
           <div className="bg-orange-500/10 border border-orange-500/30 rounded-3xl px-8 py-6 text-center shadow-[0_0_50px_rgba(249,115,22,0.2)] mb-10">
             <div className="text-orange-500 font-black text-4xl mb-1">+{earnedXP} XP</div>
             <div className="text-orange-400/80 font-bold">{t('reward')}</div>
           </div>
-        ) : (
+        ) : canEarnXP ? (
           <div className="bg-white/5 border border-white/10 rounded-3xl px-8 py-6 text-center mb-10 max-w-md">
             <p className="text-zinc-300 font-bold mb-4">{claimFailed ? t('claim_failed') : t('claiming')}</p>
             {claimFailed && (
@@ -181,7 +195,7 @@ export default function DailyPulsePage() {
               </button>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* What the three answers actually were. This is the only thing the pulse truly knows
             about the user — three films is a taste sample, not a profile, and the note says so
