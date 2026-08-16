@@ -717,11 +717,11 @@ export async function POST(req: Request) {
     // a family that has ALREADY landed a hit is resolved (which is why rating everything 5 does
     // not trigger this — every family has its hit), and a family rated 1 throughout is not a
     // taste, it is a refusal. Both stop the quiz on time.
-    const famRoll: Record<string, { sum: number; n: number; hi: number }> = {};
+    const famRoll: Record<string, { sum: number; n: number; hi: number; hi5: number }> = {};
     for (const s of stats) {
       const f = subGenreFamily(s.t); if (!f) continue;
-      const a = famRoll[f] || (famRoll[f] = { sum: 0, n: 0, hi: 0 });
-      a.sum += s.avg * s.n; a.n += s.n; a.hi += s.hi;
+      const a = famRoll[f] || (famRoll[f] = { sum: 0, n: 0, hi: 0, hi5: 0 });
+      a.sum += s.avg * s.n; a.n += s.n; a.hi += s.hi; a.hi5 += s.hi5;
     }
     const lockFamHere = lockedLove ? subGenreFamily(lockedLove.t) : undefined;
     const unresolvedFams = new Set(Object.entries(famRoll)
@@ -753,9 +753,19 @@ export async function POST(req: Request) {
     // `firstLook` is used rather than the raw sampler because it is already what the sweep is
     // WILLING to offer — a child's profile must not be held open by horror shelves it will never
     // be shown.
+    // A LOVE WITH ONE ANSWER BEHIND IT IS NOT YET A TASTE, AND MUST NOT BE DROPPED EITHER. A second
+    // taste earns a card on two strong answers inside its family (`secondTasteFam`), but the sweep
+    // stopped chasing a family the moment it landed a single hit — `unresolvedFams` reads families
+    // with NO hit. So a viewer who loves slashers and courtroom drama, shown one courtroom film and
+    // rating it 5, had that love recorded and then never asked about again: one strong answer, one
+    // short of the bar, and all three cards came back slashers. The family stays open until it has
+    // the second answer that either confirms the taste or withdraws it.
+    const unconfirmedLoveFams = new Set(Object.entries(famRoll)
+      .filter(([f, v]) => f !== lockFamHere && v.hi5 >= 1 && v.hi < 2)
+      .map(([f]) => f));
     const chasingSecondTaste = !!lockedLove && firstLook.some(c => {
       const f = subGenreFamily(samplerProbeOf(c.id) || '') || '';
-      return unresolvedFams.has(f) || (splitTaste && owesSpan(f));
+      return unresolvedFams.has(f) || unconfirmedLoveFams.has(f) || (splitTaste && owesSpan(f));
     });
     // THE EARLY-STOP IS GONE, ON PURPOSE. It used to let a perfect 5★ leader skip the rest of the
     // sweep once its own family and the adjacent ones were explored, which is what made a sharp
