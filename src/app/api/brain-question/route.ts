@@ -38,7 +38,7 @@ const MIN_Q = 5;        // never finish before this many ratings
 // taste and 45 for the hardest case — a love hiding inside a family whose other shelves they rate
 // 1. 55 leaves that case room to breathe and still bounds the one person nothing settles for.
 // It is a safety net again, not the normal case.
-const MAX_Q = 55;       // hard cap on RATED answers
+const MAX_Q = 75;       // hard cap on RATED answers
 // Films SHOWN, including "didn't see" — the real backstop so a session cannot run forever.
 const SHOWN_CAP = 95;   // hard cap on TOTAL movies shown (incl "didn't see") — guarantees the
                         // quiz always terminates even for a user who's seen few films
@@ -198,10 +198,14 @@ const FAMILY_SIZE: Record<string, number> = (() => {
   for (const t of allSubGenreTerms()) { const f = subGenreFamily(t); if (f) n[f] = (n[f] || 0) + 1; }
   return n;
 })();
-const spanNeed = (fam: string) => {
-  const n = FAMILY_SIZE[fam] || 1;
-  return n <= 2 ? 1 : Math.ceil(n / 2);
-};
+// A FAMILY IS ONLY REFUSED ONCE EVERY SHELF IN IT HAS BEEN OFFERED. Half a family was still a
+// guess about the other half: crime carries eight shelves, ceil(8/2) probed four, and courtroom
+// drama was among the four nobody looked at — a person who loves it was offered zero courtroom
+// films in 140 questions, twice in a row, and got answered on somebody else's taste. That is the
+// owner's own complaint one level down: not "you missed my genre" but "you missed my shelf inside
+// the genre". He ruled the trade-off himself — a longer session beats an imprecise hit — so a
+// family with no strong hit owes a look at all of its shelves, not half of them.
+const spanNeed = (fam: string) => FAMILY_SIZE[fam] || 1;
 
 // Stable per-session pseudo-random rank (FNV-1a). Seeds the EXPLORE sweep ORDER off the
 // sessionId so two users never get the same opening sequence — variety — while a single
