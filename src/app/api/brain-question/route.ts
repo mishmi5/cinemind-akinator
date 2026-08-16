@@ -760,6 +760,10 @@ export async function POST(req: Request) {
     // rating it 5, had that love recorded and then never asked about again: one strong answer, one
     // short of the bar, and all three cards came back slashers. The family stays open until it has
     // the second answer that either confirms the taste or withdraws it.
+    // Holding the SHELF open rather than the family was tried here and reverted on measurement: it
+    // bought the confirming courtroom question at the cost of the taste already found, and a
+    // slasher fan who had rejected nine horror shelves was handed Whistle and Dracula. The family
+    // rule below is the one that measures better.
     const unconfirmedLoveFams = new Set(Object.entries(famRoll)
       .filter(([f, v]) => f !== lockFamHere && v.hi5 >= 1 && v.hi < 2)
       .map(([f]) => f));
@@ -1110,7 +1114,17 @@ export async function POST(req: Request) {
         // family still moves at roughly twice the rate of the rest — mapping it is what makes the
         // read surgical — but it no longer starves them.
         if (f === depthFam) return -1e6 + famProbed[f] * 100;
-        if (spanDebt(f) > 0) return -1e6 + 250 + famProbed[f] * 200;
+        // ORDER THE DEBT BY HOW MUCH OF IT IS LEFT, NOT BY HOW MANY LOOKS IT HAS HAD. Counting
+        // looks makes every family's second shelf come before any family's seventh, which quietly
+        // decides that a big family's tail is unreachable: crime holds eight shelves, western one,
+        // and with eighteen families in the queue the seventh crime shelf needs ~126 questions to
+        // come up. Courtroom drama sits in that tail, so a viewer who loves slashers AND courtroom
+        // drama was offered zero courtroom films and got three slashers — the same lock-on one
+        // level further in. A fraction makes the shelves comparable instead of the counts: crime
+        // four-of-eight and western one-of-two are both half done and take turns, so a large family
+        // is walked to its end inside the same budget that walks a small one to its end.
+        if (spanDebt(f) > 0)
+          return -1e6 + 250 + Math.round(((famProbed[f] || 0) / Math.max(1, spanNeed(f))) * 800);
         return -(famWarmth[f] ?? 0);                    // pass 4 — warmest of the rest
       };
       // Serving a broad crowd-pleaser after three refusals was measured and rejected: a blockbuster
@@ -1705,6 +1719,20 @@ export async function POST(req: Request) {
     // are two answers; a single 5 with nothing beside it is one, and that is the line.
     const secondTasteFam = (f: string) => (famHi5[f] || 0) >= 2
       || ((famHi5[f] || 0) >= 1 && (famHiAll[f] || 0) >= 2);
+    // …OR ONE 5 WITH THE FAMILY AROUND IT RATED COLD. Two answers is the right bar and this is the
+    // second answer, read the other way round: a viewer who loves slashers and courtroom drama can
+    // never clear the family bar inside crime, because the only crime shelf he likes is courtroom —
+    // every other crime film the sweep offers him is a 2 by construction, so the family sits at one
+    // 5 forever and all three cards came back slashers. But those 2s are not silence. Rating one
+    // shelf 5 and two sibling shelves cold is the owner's own sentence made measurable — "liking
+    // Scream does not mean I like all horror, maybe I only like slashers" — and the engine already
+    // trusts exactly this reading inside the locked family (`splitTaste`). It is not the single
+    // stray 5 that was tried and reverted: that one had no cold siblings behind it, which is
+    // precisely what separates a taste from an accident.
+    const coldSiblings = (f: string, term: string) =>
+      stats.filter(s => s.t !== term && subGenreFamily(s.t) === f && s.n >= 1 && !s.hi && s.avg <= 2).length;
+    const shelfLevelTaste = (s: { t: string; hi5: number }, f: string) =>
+      s.hi5 >= 1 && coldSiblings(f, s.t) >= 2;   // one cold sibling was measured and lost a point
     const claimedFam = new Set<string>();
     const multiTerms = candidates
       .filter(s => !s.contra && !dislikedSet.has(s.t))
@@ -1713,7 +1741,8 @@ export async function POST(req: Request) {
       .filter(s => {
         if (s.hi >= LOCK_HITS) return true;
         const f = subGenreFamily(s.t);
-        if (!f || !confirmedFam || f === confirmedFam || !secondTasteFam(f)) return false;
+        if (!f || !confirmedFam || f === confirmedFam) return false;
+        if (!secondTasteFam(f) && !shelfLevelTaste(s, f)) return false;
         if (claimedFam.has(f)) return false;   // one card per second taste, not two
         claimedFam.add(f);
         return true;
