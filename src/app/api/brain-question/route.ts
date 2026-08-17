@@ -1746,7 +1746,12 @@ export async function POST(req: Request) {
     const coldSiblings = (f: string, term: string) =>
       stats.filter(s => s.t !== term && subGenreFamily(s.t) === f && s.n >= 1 && !s.hi && s.avg <= 2).length;
     const shelfLevelTaste = (s: { t: string; hi5: number }, f: string) =>
-      s.hi5 >= 1 && coldSiblings(f, s.t) >= 2;   // one cold sibling was measured and lost a point
+      // Two, and it has been measured twice. One cold sibling was tried before the sweep fix (17/19)
+      // and again after it, when the landscape had changed enough to be worth re-reading: it took
+      // the suite to 18/19 by handing a slasher purist Hunter Hunter, a horror film that is not a
+      // slasher — the same class as the Train to Busan regression the note above records. One 5 and
+      // one cold neighbour is not enough evidence to spend a card on.
+      s.hi5 >= 1 && coldSiblings(f, s.t) >= 2;
     const claimedFam = new Set<string>();
     const multiTerms = candidates
       .filter(s => !s.contra && !dislikedSet.has(s.t))
