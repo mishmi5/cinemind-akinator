@@ -1167,6 +1167,19 @@ export async function POST(req: Request) {
         // The under-sampled tier first; a tie keeps the household name in front, as everywhere else.
         return (tier === 1 ? n1 : n2) * 2 + (tier - 1);
       };
+      // A FAMILY'S TURN MUST BUY A SHELF IT HAS NOT SEEN. `famRank` decides which family goes next
+      // and nothing below it distinguished a shelf already probed from one never probed, so crime's
+      // hard-won turn could be spent on a second psychological thriller while courtroom drama — the
+      // shelf the whole span debt exists to reach — stayed unasked. Measured: a session that gave
+      // crime four slots still offered courtroom zero times. Only for families that still owe span;
+      // the family being deepened is asking a different question, and it needs the SAME shelf again
+      // to earn its confirming hit, so it is deliberately exempt.
+      const unseenShelfFirst = (c: { id: string }) => {
+        const t = samplerProbeOf(c.id) || '';
+        const f = subGenreFamily(t) || '';
+        if (f === depthFam || spanDebt(f) <= 0) return 0;
+        return probe[t] ? 1 : 0;
+      };
       const nextUp = [...uncovered].sort((a, b) =>
         (notChosen(a) - notChosen(b)) ||
         // The family pass decides BEFORE the boredom memory, which used to outrank it and undo the
@@ -1177,6 +1190,7 @@ export async function POST(req: Request) {
         // the families in the breadth pass, where they all rank equal; it no longer decides which
         // shelf we deepen.
         (famRank(a) - famRank(b)) ||
+        (unseenShelfFirst(a) - unseenShelfFirst(b)) ||
         (boredomPenalty(a) - boredomPenalty(b)) ||
         (inLeadFam(a) - inLeadFam(b)) ||
         (eraPenalty(a) - eraPenalty(b)) ||
@@ -1800,10 +1814,23 @@ export async function POST(req: Request) {
     // One card per confirmed taste, chosen before anything else can fill the screen. The director
     // below still runs for whatever is left over — with three tastes it has nothing to do, which is
     // the point: it picks the best match for ONE taste and that is not what this user has.
+    // A SECOND TASTE GETS ONE CARD, SO IT HAS TO BE SQUARELY ON THE SHELF. `candPool` holds each
+    // term's curated canon AND the TMDB widening behind it, and the widening is ranked by
+    // popularity, not by shelf: the parody slot came back as Celebrity — a Woody Allen satire that
+    // is not a parody — and the one chance to show the viewer his second taste was spent on it.
+    // The widening is right for the CONFIRMED taste, which has two more cards to be broad with.
+    // A single card has no room to be approximately right, so it is drawn from the curated seeds
+    // only, and falls back to the pool if the canon is exhausted rather than leaving the slot empty.
+    const canonIds = new Set<string>();
     if (multiTaste) {
       for (const term of multiTerms) {
+        for (const c of await fetchSeedCandidates(term, seen, 8)) canonIds.add(c.id);
+      }
+      for (const term of multiTerms) {
         if (resolved.length >= 3) break;
-        add(candPool.find(m => termOfPick.get(m.id) === term && !resolved.some(x => x.id === m.id)) || null, term);
+        const ofTerm = (m: Rec) => termOfPick.get(m.id) === term && !resolved.some(x => x.id === m.id);
+        add(candPool.find(m => ofTerm(m) && canonIds.has(m.id))
+          || candPool.find(ofTerm) || null, term);
       }
     }
     // AI TASTE DIRECTOR (gemma2): picks the final 3 FROM the real candidate pool, steered by
