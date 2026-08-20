@@ -2130,6 +2130,24 @@ export async function POST(req: Request) {
     // token is a receipt for XP; the recommendation is the product. Failing to mint the receipt
     // must not destroy the thing it is a receipt for. No token still means no grant downstream,
     // so nothing is loosened; the misconfiguration is logged loudly instead of silently.
+    // "WE CRACKED YOU" OVER AN EMPTY SCREEN IS THE WORST ANSWER THIS ROUTE CAN GIVE. With TMDB
+    // unreachable the sampler comes back empty, the sweep has nothing to offer, and the quiz fell
+    // straight through to here — returning HTTP 200 with isComplete:true and zero films on the very
+    // FIRST request. The results screen then rendered "✅ פיצחנו אותך" above nothing at all, which
+    // tells the person the product worked and that their taste is the empty set.
+    //
+    // The floor tier is built to always produce three films, and it ignores the taste guards to do
+    // it, so an empty list here is never a taste that could not be matched — it is the catalogue
+    // being unreachable. That is a failure and it says so, loudly in the log and honestly to the
+    // caller, instead of dressing itself up as a completed quiz. The client retries a 5xx twice
+    // before giving up, which is the right shape for an upstream that is usually only briefly down.
+    if (!finalMovies.length) {
+      console.error('[brain] refusing to complete a quiz with zero films — TMDB is unreachable or ' +
+        'returned nothing. The person answered ' + history.length + ' films and gets an honest ' +
+        'error rather than an empty "we cracked you" screen.');
+      return NextResponse.json({ error: 'catalogue-unavailable' }, { status: 503 });
+    }
+
     let proofToken: string | undefined;
     if (isVerified(sessionKey)) {
       try {

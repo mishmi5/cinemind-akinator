@@ -15,6 +15,13 @@ import { useAuth } from '@/context/AuthContext';
 // reads now comes from the message catalogue, keyed by the TMDB id below.
 type StartingMovie = Omit<MovieContext, 'title' | 'overview'>;
 
+/** The film catalogue is unreachable, so the picks could not be built. Distinct from a failed
+ *  request because the person's rating DID land — telling them to tap the same star again would
+ *  send them into a control that cannot help. */
+class CatalogueDownError extends Error {
+  constructor() { super('catalogue-unavailable'); this.name = 'CatalogueDownError'; }
+}
+
 // Engine switch. The DETERMINISTIC sub-genre brain is now the DEFAULT for every user
 // (surgical sub-genre resolution, adaptive length). Opt OUT to the legacy v12 formula
 // with `?engine=formula` (or `?brain=0`); `?brain=mock` runs the brain's offline mock.
@@ -441,6 +448,15 @@ export default function ScanMovieEvaluation() {
         response = await doFetch();
       }
 
+      // THE CATALOGUE BEING DOWN IS NOT THE ANSWER FAILING TO SEND. The engine now refuses to
+      // finish a quiz with zero films and answers 503 instead of claiming success over an empty
+      // screen, but the generic handler below tells the person "tap the same rating again" — and
+      // tapping again cannot help, because their answer arrived and it is the film catalogue that
+      // is unreachable. Say the true thing, and point at the one action that can work: waiting.
+      if (response.status === 503) {
+        const body = await response.json().catch(() => null);
+        if (body && body.error === 'catalogue-unavailable') throw new CatalogueDownError();
+      }
       if (!response.ok) throw new Error('Failed');
       const newState: SessionState = await response.json();
       // Union with everything this session has already seen — after using "Back",
@@ -496,6 +512,16 @@ export default function ScanMovieEvaluation() {
       // stayed on screen, and nothing told the user their answer had not been recorded. They
       // clicked again into a dead control. Say what happened and let them retry.
       console.error('[scan] answer failed', error);
+      if (error instanceof CatalogueDownError) {
+        // The rating DID land, so the back-stack entry above is a real step and stays. Only the
+        // films could not be fetched.
+        showToast([locale === 'he'
+          ? 'קטלוג הסרטים לא זמין כרגע, אז אי אפשר להרכיב את ההמלצות. הדירוגים שלך נשמרו — נסו שוב בעוד רגע.'
+          : "The film catalogue is unavailable right now, so we can't build your picks. Your ratings are saved — try again in a moment."], '🎬');
+        setLoading(false);
+        setAnimateCard(false);
+        return;
+      }
       // The answer never landed, so the snapshot pushed above is not a step the user took. Left
       // in place it duplicates the current question in the back stack, and "back" appears to do
       // nothing the first time it is pressed.
@@ -737,7 +763,32 @@ export default function ScanMovieEvaluation() {
           cards under it ran into both edges of the screen. */}
       <div className="max-w-2xl mx-auto px-4 flex flex-col items-center">
 
-        {session.isComplete ? (
+        {/* NEVER CELEBRATE OVER AN EMPTY LIST. The engine refuses to complete a quiz with no films
+            now, so this state should be unreachable — but it is what the person saw for months when
+            TMDB was down, a "✅ פיצחנו אותך" headline above nothing, and the screen the whole quiz
+            builds toward is not the place to trust one guard. If the picks are missing, say so and
+            keep their answers, rather than rendering the triumph with a hole in it. */}
+        {session.isComplete && !(session.finalMovies?.length) ? (
+          <div className="w-full mt-12 animate-in fade-in duration-500 text-center max-w-2xl mx-auto">
+            <span className="inline-block px-6 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-full text-base font-bold mb-6">
+              {he ? '🎬 לא הצלחנו למשוך את הסרטים' : "🎬 We couldn't fetch the films"}
+            </span>
+            <h1 className="text-3xl sm:text-4xl font-black mb-4">
+              {he ? 'הטעם שלך נקרא. הסרטים לא הגיעו.' : 'We read your taste. The films did not arrive.'}
+            </h1>
+            <p className="text-zinc-400 text-lg mb-8">
+              {he
+                ? 'קטלוג הסרטים לא זמין כרגע — זה אצלנו, לא אצלך. התשובות שלך נשמרו, אפשר לנסות שוב בעוד רגע.'
+                : 'The film catalogue is unavailable right now — that is on us, not you. Your answers are saved, so try again in a moment.'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-8 py-4 bg-accent-strong text-white rounded-control font-black text-lg min-h-[44px]"
+            >
+              {he ? 'לנסות שוב' : 'Try again'}
+            </button>
+          </div>
+        ) : session.isComplete ? (
           <div className="w-full mt-12 animate-in fade-in zoom-in duration-700">
             <div className="text-center mb-12">
               <span className="inline-block px-6 py-2 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full text-base font-bold mb-6">
