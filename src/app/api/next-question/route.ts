@@ -30,19 +30,21 @@ async function generateDynamicQuestion(title: string, overview: string, locale: 
       ? `Create a hilarious, crazy, and brilliant "yes/no/stars" question about the movie "${title}".
 Movie overview for context: ${overview}.
 The question will be shown in a lighthearted and sarcastic movie quiz app. The goal is to make the user laugh at the twisted description of the movie when they answer.
-Example: "Would you go with the flow to watch a movie where [something messed up from the plot]? How many stars would you give to such stupidity?"
+Example: "Seen the one where [something messed up from the plot]? How many stars does that stupidity get?"
 Must follow:
 1. Very short (1 to 2 sentences).
 2. Sarcastic humor, light, and stupid in a good way.
-3. No quotes and no intros - just the question!`
+3. The question must ask them to RATE a film they have already seen — never whether they would like to watch it. The stars measure how much they liked it, and there is a separate "not seen" button.
+4. No quotes and no intros - just the question!`
       : `צור שאלת "כן/לא/כוכבים" קורעת מצחוק, מטורללת וגאונית לגבי הסרט "${title}". 
 תקציר הסרט לעזרתך: ${overview}.
 השאלה תוצג באפליקציית חידון קולנוע קלילה ועוקצנית. המטרה היא לגרום למשתמש לצחוק מהתיאור העקום של הסרט כשהוא עונה.
-דוגמה לאיך זה צריך להיראות: "היית זורם לראות סרט שבו [משהו דפוק ומצחיק מהעלילה]? כמה כוכבים תיתן לטמטום כזה?"
+דוגמה לאיך זה צריך להיראות: "ראית את הסרט שבו [משהו דפוק ומצחיק מהעלילה]? כמה כוכבים תיתן לטמטום כזה?"
 חובה:
 1. קצר מאוד (משפט אחד עד שניים).
 2. הומור עוקצני, קליל, ומטומטם בקטע טוב.
-3. בלי מרכאות ובלי הקדמות - רק השאלה נטו!`;
+3. השאלה חייבת לבקש דירוג של סרט שהמשתמש כבר ראה — לא לשאול אם היה רוצה לראות אותו. הכוכבים מודדים כמה אהב, ויש כפתור נפרד ל"לא ראיתי".
+4. בלי מרכאות ובלי הקדמות - רק השאלה נטו!`;
 
     const { text } = await generateText({
       model: openai('gpt-4o'),
@@ -51,19 +53,25 @@ Must follow:
     });
     return text.trim();
   } catch (error) {
+    // ASK WHAT THE STARS MEASURE. The controls under these are a 1-5 scale running שונא→אוהב with a
+    // separate "לא ראיתי" button, so the answer is always a rating of a film the person has already
+    // watched. Three of these asked something else — "היית זורם על סרט כמו X", "היית רואה?" — which
+    // anyone can answer about a film they have never seen, and the answer then reaches the engine as
+    // if they had seen and rated it. The same defect was fixed in the brain engine's questionText;
+    // /pulse runs on THIS route, so the owner met it there. The jokes stay, the question does not.
     const fallbackTemplatesHe = [
       `בוא נראה, כמה כוכבים היית נותן ל"${title}"? (רמז: זה סרט, לא מדע טילים)`,
-      `תכלס, היית זורם על סרט כמו "${title}" או שזה בזבוז פופקורן?`,
+      `ראית את "${title}"? תכלס, כמה כוכבים זה שווה?`,
       `אומרים ש-"${title}" הוא יצירת מופת. או קשקוש מוחלט. מה הדירוג שלך?`,
-      `אם היו מכריחים אותך לראות את "${title}", כמה כוכבים היית נותן לו מהרגע שיצאת מהשוק?`,
-      `נניח שאתה תקוע במעלית. ויש שם טלוויזיה. שמשדרת את "${title}". היית רואה?`
+      `"${title}" — אם ראית אותו, כמה כוכבים הוא חוטף ממך?`,
+      `נניח שאתה תקוע במעלית ומישהו שואל אותך כמה כוכבים מגיעים ל"${title}". מה אתה עונה?`
     ];
     const fallbackTemplatesEn = [
       `Let's see, how many stars would you give "${title}"? (Hint: it's a movie, not rocket science)`,
-      `Honestly, would you flow with a movie like "${title}" or is it a waste of popcorn?`,
+      `Seen "${title}"? Honestly, how many stars is it worth?`,
       `They say "${title}" is a masterpiece. Or total garbage. What's your rating?`,
-      `If you were forced to watch "${title}", how many stars would you give it after recovering from the shock?`,
-      `Suppose you're stuck in an elevator. There's a TV playing "${title}". Would you watch?`
+      `"${title}" — if you've seen it, how many stars does it get from you?`,
+      `Say you're stuck in a lift and someone asks how many stars "${title}" deserves. What do you say?`
     ];
     const pool = locale === 'en' ? fallbackTemplatesEn : fallbackTemplatesHe;
     return pool[Math.floor(Math.random() * pool.length)];
@@ -236,7 +244,7 @@ export async function POST(req: Request) {
         seed,
         isComplete: false, confidenceScore: 0.01, historyCount: 0,
         askedMovieIds, userAffinities: {},
-        currentVectorState: { possibleMoviesRemaining: 85432, leadingMicroGenres: [locale === 'en' ? 'Initializing global scan...' : 'מאתחל סריקה גלובלית...'] },
+        currentVectorState: { leadingMicroGenres: [locale === 'en' ? 'Initializing global scan...' : 'מאתחל סריקה גלובלית...'] },
         currentQuestion: { id: `init_${Date.now()}`, text: await generateDynamicQuestion(selected.title, selected.overview, locale), movie: selected }
       }, { status: 200 });
     }
@@ -250,7 +258,9 @@ export async function POST(req: Request) {
     
     if (payload.movieId && !askedMovieIds.includes(payload.movieId)) {
       askedMovieIds.push(payload.movieId);
-      if (typeof payload.answer === 'number') {
+      // A rating outside 1..5 was taken at face value — answer:99 wrote an affinity of 96.
+      if (typeof payload.answer === 'number'
+          && Number.isInteger(payload.answer) && payload.answer >= 1 && payload.answer <= 5) {
         const weight = (payload.answer - 3); 
         
         if (payload.answer === 5 || payload.answer === 1) {
@@ -384,20 +394,33 @@ export async function POST(req: Request) {
         return { movie: m, score: s };
       });
       
+      // The picks are kept with their scores, not stripped down to the films. The badge on the
+      // results card used to read 99% for every pick of every user — a number nobody computed.
+      // The scores that ranked these three are right here; a match figure derived from them and
+      // from the confidence the quiz actually reached is a measurement rather than a decoration.
+      const top3scored: { movie: MovieContext; score: number }[] = [];
       const top3: MovieContext[] = [];
       const pool = [...scoredRecs];
       while (top3.length < 3 && pool.length) {
         pool.sort((a, b) =>
           (b.score + diversityPenalty(b.movie, top3, userAffinities)) - (a.score + diversityPenalty(a.movie, top3, userAffinities))
         );
-        top3.push(pool.shift()!.movie);
+        const next = pool.shift()!;
+        top3scored.push(next);
+        top3.push(next.movie);
       }
-      
+
       for (const match of top3) {
         if (!match.trailerId) match.trailerId = await getTrailerForMovieId(match.id);
       }
-      finalMoviesResult = top3.map(bestMatch => ({
-        id: `res_${bestMatch.id}`, title: bestMatch.title, matchScore: 99, 
+      // Relative to the best pick, so the second and third read as slightly weaker matches — which
+      // is what they are — and scaled by the confidence the quiz reached, so a person who stopped
+      // early is not told the read was as sure as a completed one. Floored at 60 because a figure
+      // below that would be telling someone we recommended a film we do not believe in.
+      const bestScore = Math.max(1, top3scored[0]?.score ?? 1);
+      finalMoviesResult = top3scored.map(({ movie: bestMatch, score }) => ({
+        id: `res_${bestMatch.id}`, title: bestMatch.title,
+        matchScore: Math.max(60, Math.round(Math.min(1, score / bestScore) * Math.max(newConfidence, 0.6) * 100)),
         posterUrl: bestMatch.posterUrl, trailerId: bestMatch.trailerId, overview: bestMatch.overview,
         _microTags: bestMatch._microTags || [],
         _genreIds: bestMatch._genreIds || []
@@ -405,18 +428,26 @@ export async function POST(req: Request) {
     }
 
     // 👑 Sales Psychology: Dramatic reduction in remaining movies to build massive FOMO
-    const remainingMovies = isComplete ? 1 : Math.max(2, Math.floor(85432 * Math.pow(1 - newConfidence, 4.5)));
+    // `possibleMoviesRemaining` used to be emitted here as 85432 × (1-confidence)^4.5 — a count of
+    // films "still in play" derived from the progress bar rather than from any pool this engine
+    // holds. Nothing in the interface ever rendered it, so it was a fabricated number kept alive
+    // for no reader at all. The field is gone from both responses; the coaching line below is what
+    // the screen actually shows, and it says how the read is going without quoting a fake count.
     
     let psychologicalMessage = locale === 'en' ? 'Catching your vibe...' : 'קולט את הווייב שלך...';
     if (newConfidence > 0.8) psychologicalMessage = locale === 'en' ? 'Wow, you have a very specific taste. Only a few movies match...' : 'אוקיי, יש לך טעם ממש מיוחד. נשארו סרטים בודדים שיכולים להתאים...';
     else if (newConfidence > 0.5) psychologicalMessage = locale === 'en' ? 'Filtering out thousands of irrelevant movies...' : 'מעיף עכשיו אלפי סרטים שלא בכיוון שלך בכלל...';
     else if (newConfidence > 0.3) psychologicalMessage = locale === 'en' ? 'Starting to understand you...' : 'מתחיל להבין אותך...';
 
-    // Generate proof token if complete
-    let proofToken = null;
-    if (isComplete) {
+    // A proofToken is what /api/user/bootstrap exchanges for XP and Popcorn Tokens, and this
+    // route handed one out for a single request claiming historyCount:99 — no quiz, infinite
+    // currency, one loop. The gate that closed this on the brain engine was never applied to its
+    // sibling. This route keeps no server-side session, so it cannot prove anything: it issues no
+    // token at all, and the brain engine remains the only way to earn one.
+    const proofToken = null;
+    if (false) {
       const { signSessionState } = await import('@/lib/sessionToken');
-      proofToken = signSessionState({
+      signSessionState({
         sessionId: payload.sessionId || `session_${Date.now()}`,
         totalAnswers: currentCount + 1,
         affinities: userAffinities,
@@ -429,7 +460,7 @@ export async function POST(req: Request) {
       seed,
       isComplete, confidenceScore: isComplete ? 1.0 : newConfidence,
       historyCount: currentCount + 1, askedMovieIds, userAffinities, seenMovieIds,
-      currentVectorState: { possibleMoviesRemaining: remainingMovies, leadingMicroGenres: [psychologicalMessage] },
+      currentVectorState: { leadingMicroGenres: [psychologicalMessage] },
       currentQuestion: isComplete ? null : nextMovie,
       finalMovies: finalMoviesResult,
       proofToken

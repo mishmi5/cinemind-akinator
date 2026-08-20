@@ -19,9 +19,12 @@ export default function QuizIntroPage() {
       {/* Content */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center pt-12 pb-20 px-4 max-w-3xl mx-auto text-center">
         
+        {/* The badge used to repeat the h1 word for word, 32px above it. It now carries the two
+            facts a visitor weighs before starting: how long this takes, and that nothing is asked
+            of them first. */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-rose-900/50 bg-rose-950/20 text-rose-400 text-xs font-bold mb-8 shadow-[0_0_15px_rgba(225,29,72,0.1)]">
           <span>🧠</span>
-          <span>{t('title_span1')} {t('title_span2')}</span>
+          <span>{t('badge')}</span>
         </div>
 
         <h1 className="text-5xl md:text-6xl font-black tracking-tighter leading-tight mb-6">
@@ -64,7 +67,7 @@ export default function QuizIntroPage() {
             <div className="absolute inset-0 rounded-2xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
           </Link>
           
-          <p className="mt-4 text-[11px] font-medium text-zinc-600 tracking-wide">
+          <p className="mt-4 text-[11px] font-medium text-zinc-400 tracking-wide">
             {t('disclaimer')}
           </p>
         </div>
@@ -75,7 +78,9 @@ export default function QuizIntroPage() {
           <div className="flex items-start gap-3">
             <span className="text-red-500 text-lg mt-0.5">⚠️</span>
             <div>
-              <h4 className="text-red-500 text-sm font-bold mb-2">{t('good_to_know')}</h4>
+              {/* h2, not h4: this is the only other section on the page and it followed the h1
+                  directly, so a screen-reader user heard the outline skip two levels. */}
+              <h2 className="text-red-500 text-sm font-bold mb-2">{t('good_to_know')}</h2>
               <p className="text-xs md:text-sm text-zinc-400 leading-relaxed font-medium">
                 {t('good_to_know_text')}
               </p>

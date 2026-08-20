@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocale } from 'next-intl';
 
 export default function FloatingChatWidget() {
+  const locale = useLocale();
+  const he = locale !== 'en';
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
@@ -13,40 +16,10 @@ export default function FloatingChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    
-    const resetTimer = () => {
-      clearTimeout(timeout);
-      // Open after 60s of inactivity if not already opened and no messages yet
-      if (!isOpen && messages.length === 0) {
-        timeout = setTimeout(() => {
-          setIsOpen(true);
-          setMessages([{
-            id: 'system-1', 
-            role: 'assistant', 
-            content: 'פסססט... 🍿 עוד מתלבט מה לראות? עם מינוי Elite כבר היית באמצע הסרט עכשיו. אבל היי, אני פה לעזור, במה תרצה שנדון היום? 😎'
-          }]);
-        }, 60000);
-      }
-    };
-
-    // Track user activity
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keypress', resetTimer);
-    window.addEventListener('click', resetTimer);
-    window.addEventListener('scroll', resetTimer);
-    
-    resetTimer();
-
-    return () => {
-      clearTimeout(timeout);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keypress', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      window.removeEventListener('scroll', resetTimer);
-    };
-  }, [isOpen, messages.length]);
+  // The widget used to open ITSELF after sixty seconds of inactivity. On a 360px phone the panel
+  // is 320x384 — 89% of the width — and it landed on top of the film poster and the question,
+  // during the one activity the product asks for: thinking about a film. It also opened with a
+  // line selling "מינוי Elite", a plan that no longer exists. It opens when the user asks it to.
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,14 +78,46 @@ export default function FloatingChatWidget() {
   };
 
 
+  // GET OUT OF THE WAY OF THE BUTTON THAT MATTERS. On a 375px phone this launcher sits over the
+  // bottom-right corner of the page, and at one scroll position it covered "לקחת מקום מייסד — ₪99"
+  // outright: elementFromPoint returned the launcher, so a tap on the purchase button opened the
+  // chat instead. Text passing underneath is the accepted cost of a floating launcher; the one
+  // control the product's revenue depends on is not. Anything marked data-chat-avoid hides the
+  // launcher while it is on screen, and an open chat is left alone so it never vanishes mid-sentence.
+  const [ctaVisible, setCtaVisible] = useState(false);
+  useEffect(() => {
+    const targets = document.querySelectorAll('[data-chat-avoid]');
+    if (!targets.length) return;
+    // The observer reports only what CHANGED, so the set of currently-visible targets is kept here
+    // rather than recomputed from each batch of entries.
+    const onScreen = new Set<Element>();
+    const io = new IntersectionObserver(entries => {
+      for (const e of entries) {
+        if (e.isIntersecting) onScreen.add(e.target); else onScreen.delete(e.target);
+      }
+      setCtaVisible(onScreen.size > 0);
+    });
+    targets.forEach(t => io.observe(t));
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <div className="fixed bottom-6 right-6 z-30 font-sans" dir="rtl">
+    <div
+      className={`fixed bottom-6 right-6 z-30 font-sans transition-opacity duration-200 ${
+        ctaVisible && !isOpen ? 'pointer-events-none opacity-0' : 'opacity-100'
+      }`}
+      dir="rtl"
+    >
       {/* Chat Window — pinned bottom-RIGHT so it never overlaps the user avatar (bottom-left). */}
       {isOpen && (
         <div className="bg-[#111113] border border-zinc-800 rounded-2xl w-80 h-96 flex flex-col shadow-2xl mb-4 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300">
           <div className="bg-gradient-to-r from-indigo-600 to-rose-600 p-4 text-white font-bold flex justify-between items-center shadow-md">
             <span>תמיכה מהירה - CineMind 🍿</span>
-            <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white transition-colors">
+            {/* Was a 13x24px hit area, and the only way out — no backdrop, no Escape. */}
+            <button
+              onClick={() => setIsOpen(false)}
+              aria-label="סגירת חלון התמיכה"
+              className="text-white/80 hover:text-white transition-colors min-w-11 min-h-11 flex items-center justify-center -me-2">
               ✕
             </button>
           </div>
@@ -142,18 +147,23 @@ export default function FloatingChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="הקלד הודעה..."
-              className="w-full bg-zinc-900 text-white rounded-xl px-4 py-2 outline-none focus:ring-1 focus:ring-rose-500 text-sm transition-all"
+              aria-label="הודעה לתמיכה"
+              className="w-full bg-zinc-900 text-white rounded-xl px-4 py-3 outline-none focus:ring-1 focus:ring-rose-500 text-base transition-all"
             />
           </form>
         </div>
       )}
 
       {/* Toggle Button */}
-      <button 
+      {/* An emoji is not a name. To a screen reader this was an unlabelled button on every single
+          page of the site — the one control that follows the visitor everywhere. */}
+      <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={he ? (isOpen ? 'סגירת הצ׳אט' : 'פתיחת הצ׳אט') : (isOpen ? 'Close the chat' : 'Open the chat')}
+        aria-expanded={isOpen}
         className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-rose-600 rounded-full flex items-center justify-center text-white text-2xl shadow-[0_5px_20px_rgba(225,29,72,0.4)] hover:scale-110 active:scale-95 transition-transform"
       >
-        💬
+        <span aria-hidden="true">💬</span>
       </button>
     </div>
   );

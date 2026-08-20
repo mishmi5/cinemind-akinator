@@ -3,9 +3,17 @@
 import React, { useState } from 'react';
 import { Link } from '@/i18n/routing';
 import { CineMindLogo } from '@/components/Navbar';
+import { notFound } from 'next/navigation';
+
+// The dashboard was served to anyone who typed /admin, complete with an invented ₪12,450 MRR and
+// a table of user emails. Until it is wired to real data behind a real admin claim, it is not a
+// page — it is a screenshot waiting to happen.
+const ADMIN_ENABLED = process.env.NEXT_PUBLIC_ENABLE_ADMIN === 'true';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+
+  if (!ADMIN_ENABLED) return notFound();
 
   // נתוני דמי ללוח הבקרה (יחוברו ל-Firebase/Stripe בהמשך)
   const stats = {
@@ -32,9 +40,9 @@ export default function AdminDashboard() {
           </Link>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setActiveTab('overview')} className={`w-full text-right px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'overview' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>סקירה כללית</button>
-          <button onClick={() => setActiveTab('users')} className={`w-full text-right px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'users' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>ניהול משתמשים</button>
-          <button onClick={() => setActiveTab('settings')} className={`w-full text-right px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>הגדרות אלגוריתם</button>
+          <button onClick={() => setActiveTab('overview')} className={`w-full text-right px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'overview' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-300'}`}>סקירה כללית</button>
+          <button onClick={() => setActiveTab('users')} className={`w-full text-right px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'users' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-300'}`}>ניהול משתמשים</button>
+          <button onClick={() => setActiveTab('settings')} className={`w-full text-right px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'settings' ? 'bg-white/10 text-white' : 'text-zinc-400 hover:text-zinc-300'}`}>הגדרות אלגוריתם</button>
         </nav>
       </aside>
 
@@ -52,19 +60,19 @@ export default function AdminDashboard() {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
           <div className="bg-[#111113] p-6 rounded-2xl border border-white/5">
-            <div className="text-zinc-500 text-sm font-bold mb-2">הכנסה חודשית (MRR)</div>
+            <div className="text-zinc-400 text-sm font-bold mb-2">הכנסה חודשית (MRR)</div>
             <div className="text-4xl font-black text-emerald-400">{stats.mrr}</div>
           </div>
           <div className="bg-[#111113] p-6 rounded-2xl border border-white/5">
-            <div className="text-zinc-500 text-sm font-bold mb-2">משתמשים פעילים</div>
+            <div className="text-zinc-400 text-sm font-bold mb-2">משתמשים פעילים</div>
             <div className="text-4xl font-black">{stats.activeUsers}</div>
           </div>
           <div className="bg-[#111113] p-6 rounded-2xl border border-white/5">
-            <div className="text-zinc-500 text-sm font-bold mb-2">סריקות AI החודש</div>
+            <div className="text-zinc-400 text-sm font-bold mb-2">סריקות AI החודש</div>
             <div className="text-4xl font-black text-indigo-400">{stats.totalScans}</div>
           </div>
           <div className="bg-[#111113] p-6 rounded-2xl border border-white/5">
-            <div className="text-zinc-500 text-sm font-bold mb-2">קרבות זירה (Arena)</div>
+            <div className="text-zinc-400 text-sm font-bold mb-2">קרבות זירה (Arena)</div>
             <div className="text-4xl font-black text-rose-400">{stats.arenaMatches}</div>
           </div>
         </div>
@@ -77,7 +85,7 @@ export default function AdminDashboard() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-right">
-              <thead className="bg-white/[0.02] text-zinc-500 text-sm">
+              <thead className="bg-white/[0.02] text-zinc-400 text-sm">
                 <tr>
                   <th className="p-4 font-bold">אימייל</th>
                   <th className="p-4 font-bold">מסלול</th>
@@ -96,7 +104,7 @@ export default function AdminDashboard() {
                       </span>
                     </td>
                     <td className="p-4 text-rose-400 font-bold">{user.tokens} 👾</td>
-                    <td className="p-4 text-zinc-500">{user.joined}</td>
+                    <td className="p-4 text-zinc-400">{user.joined}</td>
                     <td className="p-4">
                       <button className="text-xs border border-white/10 px-3 py-1.5 rounded hover:bg-white/10 transition-colors">ערוך פרופיל</button>
                     </td>

@@ -229,9 +229,99 @@ sub-genre. tasteSummary must name the precise loved sub-genre.`;
 // models drift into Chinese/French mid-sentence). The model writes ONLY the prose reason
 // over an already-chosen film — it never picks the film, so it can't break the surgical
 // selection. Falls back to a clean template if the model is unavailable.
-export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string }): Promise<string> {
-  const { title, year, term, locale, mock, genres = [], overview = '' } = opts;
-  const fallback = locale === 'he' ? `בחירה קלאסית ומדויקת בסגנון ${term}` : `A canonical ${term} pick`;
+// The sub-genre names the engine works in are English, and they were being printed inside Hebrew
+// sentences on the results screen: "בחירה קלאסית ומדויקת בסגנון spaghetti western", "כי אם אתה
+// אוהב found-footage horror". Twenty-three of forty test quizzes ended with a line like that. The
+// engine keeps its English terms; the customer reads Hebrew.
+const HE_TERM: Record<string, string> = {
+  'giallo': "ג'אלו איטלקי", 'slasher': 'סלאשר', 'splatter horror comedy': 'אימה-קומדיה עקובה מדם',
+  'body horror': 'אימת גוף', 'zombie': 'זומבים', 'creature feature': 'מפלצות',
+  'kaiju monster': 'מפלצות ענק', 'cosmic horror': 'אימה קוסמית',
+  'found-footage horror': 'אימה בסגנון תיעוד מצולם', 'psychological horror': 'אימה פסיכולוגית',
+  'supernatural horror': 'אימה על-טבעית', 'cosmic sci-fi epic': 'מד"ב חללי אפי',
+  'hard science fiction': 'מד"ב קשה', 'cyberpunk': 'סייברפאנק', 'time travel': 'מסע בזמן',
+  'space opera': 'אופרת חלל', 'stop-motion animation': 'אנימציית סטופ-מושן',
+  'mecha anime': 'אנימת רובוטים', 'hand-drawn anime': 'אנימה מצוירת ביד',
+  'wuxia': 'ווקסיה', 'martial arts': 'אמנויות לחימה', 'heist': 'סרטי שוד',
+  'war epic': 'אפוס מלחמה', 'superhero': 'גיבורי-על', 'disaster': 'סרטי אסון',
+  'spaghetti western': 'מערבון ספגטי', 'classic film noir': 'פילם נואר קלאסי',
+  'psychological thriller': 'מותחן פסיכולוגי', 'whodunit mystery': 'תעלומת בלשים',
+  'neo-noir': 'ניאו-נואר', 'cerebral spy thriller': 'מותחן ריגול איטי',
+  'action spy thriller': 'מותחן ריגול אקשן', 'courtroom drama': 'דרמה משפטית',
+  'erotic thriller': 'מותחן ארוטי', 'satire': 'סאטירה', 'black comedy': 'קומדיה שחורה',
+  'deadpan comedy': 'קומדיה מאופקת', 'slapstick comedy': 'קומדיית סלפסטיק',
+  'romantic comedy': 'קומדיה רומנטית', 'holiday christmas': 'סרטי חג',
+  'coming-of-age': 'סרטי התבגרות', 'period costume drama': 'דרמה תקופתית',
+  'sports drama': 'דרמת ספורט', 'slow cinema arthouse': 'קולנוע איטי ארטהאוס',
+  'musical': 'מחזמר', 'epic high fantasy': 'פנטזיה אפית',
+  'sword and sorcery fantasy': 'פנטזיית חרב וכישוף',
+  'bittersweet romance': 'רומן מריר-מתוק', 'sweeping romance': 'רומן סוחף',
+  'israeli cinema': 'קולנוע ישראלי', 'east asian drama': 'דרמה מזרח-אסייתית',
+  'european arthouse': 'ארטהאוס אירופי', 'latin american cinema': 'קולנוע לטינו-אמריקאי',
+  'indian cinema': 'קולנוע הודי', 'crime epic': 'אפוס פשע',
+  'classic western': 'מערבון קלאסי', 'documentary feature': 'סרט תיעודי',
+};
+export const termInLocale = (term: string, locale: string) =>
+  locale === 'he' ? (HE_TERM[term] || term) : term;
+
+/** The written reason when the model is unavailable, times out, or comes back unusable.
+ *  It names the user's OWN highest-rated film wherever we have one, so even the fallback says
+ *  something about this person rather than only about the film. Exported because the caller needs
+ *  the same sentence to replace a reason that came back too short or identical to another one.
+ *  The seam this fixes: the caller used to pass the Hebrew words "הסגנון שלך" as the `term` for a
+ *  film with no resolved sub-genre, and the template wrapped it in "בסגנון ...", so a real
+ *  recommendation shipped reading "בחירה קלאסית ומדויקת בסגנון הסגנון שלך". An empty term now
+ *  selects a sentence that does not have the word in it at all. */
+export function recReasonFallback(opts: { title: string; term?: string; locale: string; loved?: string[]; variant?: number }): string {
+  const { title, term = '', locale, loved = [], variant = 0 } = opts;
+  const anchor = loved.find(t => t && t.trim());
+  const heTerm = term ? termInLocale(term, locale) : '';
+  // THE FALLBACK NEEDS SHAPES TOO. Varying the model's angle per card fixed nothing on the runs
+  // where two cards fell back — the template had exactly one Hebrew form, so the screen showed
+  // "אם אהבת את X…" three times over. Any card can fall back independently (a short answer, a
+  // stock word, a code-switch), so the template has to carry the same three shapes the prompt asks
+  // the model for, or it undoes them.
+  const HE_ANCHORED = [
+    (a: string) => `אם אהבת את "${a}", ${title} יושב כמעט באותו מקום.`,
+    (a: string) => `${title} הולך לאותו מקום ש"${a}" לקח אותך אליו.`,
+    (a: string) => `שונה מ"${a}" במה שקורה על המסך, קרוב אליו במה שנשאר אחר כך.`,
+  ];
+  if (locale === 'he') {
+    if (anchor) return HE_ANCHORED[variant % HE_ANCHORED.length](anchor);
+    if (heTerm) return `בחירה קלאסית בסגנון ${heTerm}, מהסוג שהדירוגים שלך הצביעו עליו.`;
+    return `הבחירה הזאת יושבת על מה שדירגת הכי גבוה לאורך השאלון.`;
+  }
+  if (anchor) return `If "${anchor}" worked for you, ${title} lands in much the same place.`;
+  if (term) return `A canonical ${term} pick, straight from what you rated highest.`;
+  return `This one sits squarely on what you rated highest during the quiz.`;
+}
+
+export async function recReason(opts: { title: string; year?: string; term: string; locale: string; mock?: boolean; genres?: string[]; overview?: string; loved?: string[]; hated?: string[]; variant?: number }): Promise<string> {
+  const { title, year, term, locale, mock, genres = [], overview = '', loved = [], hated = [], variant = 0 } = opts;
+  // THREE CARDS, THREE SHAPES. Giving each card a different film to hang on was not enough: the
+  // three calls still received an identical instruction, so the model settled on one phrasing and
+  // wrote it three times — first "כי כמו ב…", and after that constraint was lifted, "תתחבר לסרט
+  // הזה כמו…". A model asked the same question the same way answers it the same way. So the SHAPE
+  // of the sentence is what varies per card, not just its subject matter.
+  const ANGLES_HE = [
+    'פתח בשם הסרט שהוא אהב, ומשם עבור לסרט המומלץ.',
+    'פתח במה שהסרט המומלץ עושה, ורק אחר כך קשר אותו לסרט שהוא אהב.',
+    'פתח בניגוד: מה שונה כאן מהסרט שהוא אהב, ולמה זה יעבוד עליו בכל זאת.',
+  ];
+  const ANGLES_EN = [
+    'Open with the name of the film they loved, then move to this one.',
+    'Open with what the recommended film does, and only then connect it to the film they loved.',
+    'Open with the contrast: what is different here from the film they loved, and why it still works.',
+  ];
+  const angleHe = ANGLES_HE[variant % ANGLES_HE.length];
+  const angleEn = ANGLES_EN[variant % ANGLES_EN.length];
+  const heTerm = term ? termInLocale(term, locale) : '';
+  // The films THIS person rated highest, and the ones they rejected. Without them the model knew
+  // the film and nothing about the reader, so every reason was a description of the movie that
+  // would have read the same for any two customers.
+  const lovedTop = loved.filter(t => t && t.trim()).slice(0, 4);
+  const hatedTop = hated.filter(t => t && t.trim()).slice(0, 3);
+  const fallback = recReasonFallback({ title, term, locale, loved: lovedTop, variant });
   if (mock) return fallback;
   const model = tasteModel();
   if (!model) return fallback;
@@ -244,24 +334,56 @@ export async function recReason(opts: { title: string; year?: string; term: stri
   const factsEn = [genres.length ? `Genres: ${genres.join(', ')}` : '', overview ? `Synopsis: ${overview.slice(0, 300)}` : '']
     .filter(Boolean).join(' · ');
   const prompt = locale === 'he'
-    ? `המשתמש אוהב סרטי ${term}. הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
+    ? `${heTerm ? `המשתמש אוהב סרטי ${heTerm}. ` : ''}הסרטים שהוא דירג הכי גבוה: ${lovedTop.join(', ') || '(אין)'}.${hatedTop.length ? `\nסרטים שהוא דחה: ${hatedTop.join(', ')}.` : ''}
+הנה העובדות על הסרט "${title}"${year ? ` (${year})` : ''}:
 ${facts}
 
-כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה מי שאוהב ${term} יתחבר לסרט הזה.
-חוקים: אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב"). התחל במילים "כי" או "אם".
+כתוב משפט אחד קצר בעברית טבעית בלבד (ללא מילים באנגלית או בשפות אחרות) שמסביר למה דווקא האדם הזה יתחבר לסרט הזה.
+${angleHe}
+חוקים: הזכר בשם את הסרט הראשון ברשימה שדירג גבוה, וקשר אותו לסרט המומלץ. אל תספר את העלילה ואל תסכם אותה — זו המלצה, לא תקציר. אל תמציא סצנות או פרטים שלא מופיעים בעובדות. אל תזכיר סרט שהוא דחה. פנה אל המשתמש בגוף שני ("תתחבר", "תאהב").
+אסור להשתמש במילים: מרתק, מסע, לצלול, עדות ל, אבן דרך, בעידן שבו, עולם ומלואו, חוויה בלתי נשכחת.
 החזר רק את המשפט עצמו.`
-    : `The user loves ${term} films. Facts about "${title}"${year ? ` (${year})` : ''}:
+    : `${term ? `The user loves ${term} films. ` : ''}The films they rated highest: ${lovedTop.join(', ') || '(none)'}.${hatedTop.length ? `\nFilms they rejected: ${hatedTop.join(', ')}.` : ''}
+Facts about "${title}"${year ? ` (${year})` : ''}:
 ${factsEn}
 
-In ONE short natural sentence, explain why they'll love it. Use ONLY the facts above — do not invent scenes, battles or details that are not there. Return just the sentence.`;
+In ONE short natural sentence, explain why THIS person will love it. ${angleEn}
+Name the first film in their list and connect it to this one. Use ONLY the facts above — do not
+invent scenes, battles or details that are not there, and never mention a film they rejected.
+Do not use: delve, tapestry, testament to, a journey, unforgettable, captivating. Return just the
+sentence.`;
   try {
     const { text } = await generateText({ model, prompt, temperature: 0.6, abortSignal: AbortSignal.timeout(LLM_TIMEOUT_MS) });
     const clean = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim().replace(/^["']|["']$/g, '');
     // gemma2 code-switches: a Hebrew sentence comes back with Latin fragments spliced in
     // ("הזombies בו מהירים"). On the flagship results screen that reads as a broken machine
     // translation, so fall back to the clean template rather than ship mixed script.
-    if (locale === 'he' && /[A-Za-z]/.test(clean)) return fallback;
-    return clean.slice(0, 240) || fallback;
+    // The code-switch guard used to reject ANY Latin character, but the sub-genre term and the
+    // film's own name are English by nature — so a correct Hebrew sentence mentioning
+    // "spaghetti western" was thrown away and the second and third cards fell back to the
+    // template while the first got a real reason. Ignore the term and the title, then check.
+    // Splitting on non-alphanumerics means every allowed word is already regex-safe.
+    // Only the film's own NAME may stay Latin. The term used to be whitelisted here too, which is
+    // how the English sub-genre name got a free pass into the Hebrew sentence.
+    // The user's own film titles join the whitelist: the prompt asks the model to name one of
+    // them, and many of those titles are English, so the guard would have thrown away precisely
+    // the sentences it had just asked for.
+    const allowed = [String(title), ...lovedTop].join(' ').split(/[^A-Za-z0-9]+/).filter(w => w.length > 1);
+    const stripped = allowed.length ? clean.replace(new RegExp(allowed.join('|'), 'gi'), '') : clean;
+    if (locale === 'he' && /[A-Za-z]/.test(stripped)) return fallback;
+    // Two things the sentence has to earn its place with: enough of it to be a reason at all, and
+    // a film of the user's own. The fallback satisfies both, so failing here costs nothing.
+    if (clean.length < 40) return fallback;
+    if (lovedTop.length && !lovedTop.some(t => clean.includes(t))) return fallback;
+    // Telling a 9B model not to use a word is a request, not a guarantee — "מרתק" reached a shipped
+    // results card despite the instruction above. These are the stock phrases that make Hebrew read
+    // as machine-written, and the results screen is the one place the product has to sound like a
+    // person. The template fallback is plain but never reaches for them.
+    const STOCK_HE = ['מרתק', 'מסע', 'לצלול', 'עדות ל', 'אבן דרך', 'בעידן שבו', 'עולם ומלואו', 'בלתי נשכח'];
+    const STOCK_EN = ['delve', 'tapestry', 'testament to', 'a journey', 'unforgettable', 'captivating'];
+    const stock = locale === 'he' ? STOCK_HE : STOCK_EN;
+    if (stock.some(w => clean.toLowerCase().includes(w.toLowerCase()))) return fallback;
+    return clean.slice(0, 240);
   } catch { return fallback; }
 }
 

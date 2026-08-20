@@ -82,7 +82,9 @@ self.addEventListener('push', function(event) {
     const data = event.data.json();
     const options = {
       body: data.body || "יש לך עדכון חדש ב-CineMind!",
-      icon: "/icons/icon-192x192.svg",
+      // Raster, not the SVG: the Notifications API rasterises this itself and Chrome on
+      // Android draws nothing for an SVG, which is a blank notification icon.
+      icon: "/icons/icon-192x192.png",
       badge: "/favicon.ico",
       vibrate: [100, 50, 100],
       data: {

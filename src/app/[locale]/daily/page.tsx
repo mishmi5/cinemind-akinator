@@ -42,10 +42,13 @@ export default function DailyChallengePage() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [streak, setStreak] = useState(0);
   const [shareState, setShareState] = useState<string | null>(null);
+  // Same failure shape as the pulse's black screen: the catch swallowed the error and the page
+  // sat on "Loading today's film..." forever, with no way to retry and nothing to read.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     fetch(`/api/daily-challenge?locale=${locale}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then((d: DailyPayload) => {
         setData(d);
         setSecondsLeft(d.secondsUntilNextDrop);
@@ -56,7 +59,7 @@ export default function DailyChallengePage() {
           if (voted[d.date] !== undefined) setMyRating(voted[d.date]);
         } catch {}
       })
-      .catch(() => {});
+      .catch(() => setLoadFailed(true));
   }, [locale]);
 
   useEffect(() => {
@@ -109,8 +112,23 @@ export default function DailyChallengePage() {
         <h1 className="text-4xl md:text-5xl font-black mb-2">{he ? 'סרט אחד. כל העולם מדרג.' : 'One film. The whole world rates.'}</h1>
         <p className="text-zinc-400 text-lg mb-10">{he ? 'דרגו לפני חצות והשוו את עצמכם לעולם.' : 'Rate before midnight and see how you compare.'}</p>
 
-        {!data ? (
-          <div className="animate-pulse text-zinc-500 font-bold py-20">{he ? 'טוען את הסרט של היום...' : "Loading today's film..."}</div>
+        {loadFailed ? (
+          <div className="bg-[#111113] border border-white/5 rounded-[2.5rem] px-8 py-12">
+            <div className="text-5xl mb-4">🎬</div>
+            <p className="text-zinc-300 font-bold mb-6">
+              {he ? 'הסרט של היום לא נטען. זו תקלה אצלנו, לא אצלכם.' : "Today's film did not load. That is on us, not on you."}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={() => window.location.reload()} className="px-8 py-3 bg-rose-600 hover:bg-rose-500 rounded-2xl font-black transition-all">
+                {he ? 'נסו שוב' : 'Try again'}
+              </button>
+              <Link href="/scan" className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-2xl font-black transition-all">
+                {he ? '🧠 גלו את הארכיטיפ שלכם' : '🧠 Discover your archetype'}
+              </Link>
+            </div>
+          </div>
+        ) : !data ? (
+          <div className="animate-pulse text-zinc-400 font-bold py-20">{he ? 'טוען את הסרט של היום...' : "Loading today's film..."}</div>
         ) : (
           <div className="bg-[#111113] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div className="relative w-full h-[420px] bg-zinc-900">
@@ -121,29 +139,43 @@ export default function DailyChallengePage() {
               <h2 className="text-4xl font-black mb-1 drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">{data.movie.title}</h2>
               <p className="text-xs text-zinc-400 font-mono uppercase tracking-[0.2em] mb-6">{data.movie.originalTitle}</p>
 
+              {/* The third copy of the inversion that already ruined every Hebrew rating on
+                  /scan and /pulse: dir="ltr" inside an RTL page puts star 1 — the value that
+                  means "hated" — at the end a Hebrew reader reads last, and there were no labels
+                  here at all to say which end was which. Direction is inherited now and both ends
+                  are named, so the value matches what the user aimed at. The five buttons were
+                  also unnamed to a screen reader. */}
               {myRating === null ? (
-                <div className="flex justify-center gap-3" dir="ltr">
+                <div>
+                <div className="w-full max-w-sm mx-auto flex justify-between items-center mb-2">
+                  <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{he ? 'שונא' : 'Hate'}</span>
+                  <span className="text-sm text-zinc-400 font-black uppercase tracking-widest">{he ? 'אוהב' : 'Love'}</span>
+                </div>
+                <div className="flex justify-center gap-3">
                   {[1, 2, 3, 4, 5].map(star => (
                     <button key={star} onClick={() => vote(star)}
                       onMouseEnter={() => setHovered(star)} onMouseLeave={() => setHovered(null)}
-                      className="p-2 transition-transform hover:scale-110 active:scale-90">
+                      onFocus={() => setHovered(star)} onBlur={() => setHovered(null)}
+                      aria-label={he ? `דירוג ${star} מתוך 5` : `Rate ${star} out of 5`}
+                      className="p-2 rounded-xl transition-transform hover:scale-110 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black">
                       <svg className={`w-12 h-12 transition-all ${hovered !== null && star <= hovered ? 'text-orange-500 fill-orange-500 scale-110' : 'text-zinc-700 fill-transparent stroke-current stroke-1'}`} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
                       </svg>
                     </button>
                   ))}
                 </div>
+                </div>
               ) : (
                 <div className="animate-in fade-in zoom-in duration-500">
                   <div className="flex items-center justify-center gap-8 mb-6">
                     <div className="text-center">
                       <div className="text-5xl font-black text-orange-400">{myRating}/5</div>
-                      <div className="text-zinc-500 text-sm font-bold mt-1">{he ? 'אתה' : 'You'}</div>
+                      <div className="text-zinc-400 text-sm font-bold mt-1">{he ? 'אתה' : 'You'}</div>
                     </div>
-                    <div className="text-3xl text-zinc-600 font-black">VS</div>
+                    <div className="text-3xl text-zinc-400 font-black">VS</div>
                     <div className="text-center">
                       <div className="text-5xl font-black text-cyan-400">{worldHalf.toFixed(1)}/5</div>
-                      <div className="text-zinc-500 text-sm font-bold mt-1">{he ? 'העולם' : 'The World'}</div>
+                      <div className="text-zinc-400 text-sm font-bold mt-1">{he ? 'העולם' : 'The World'}</div>
                     </div>
                   </div>
                   <p className="text-zinc-300 font-bold mb-6">
@@ -165,9 +197,19 @@ export default function DailyChallengePage() {
           </div>
         )}
 
-        <p className="text-zinc-600 text-xs font-bold mt-6 uppercase tracking-widest">
+        <p className="text-zinc-400 text-xs font-bold mt-6 uppercase tracking-widest">
           {he ? 'סרט חדש בכל חצות (שעון ישראל)' : 'New film every midnight (Israel time)'}
         </p>
+        {/* The counter lives in this browser's localStorage and nowhere else, so a new phone or a
+            cleared history starts it over. Saying so beats letting someone build a long streak on
+            the assumption that it is being kept for them somewhere. */}
+        {streak > 0 && (
+          <p className="text-zinc-500 text-xs mt-3">
+            {he
+              ? 'הסטריק נשמר בדפדפן הזה בלבד. במכשיר אחר הוא מתחיל מאפס.'
+              : 'The streak is saved in this browser only. On another device it starts from zero.'}
+          </p>
+        )}
       </div>
     </main>
   );

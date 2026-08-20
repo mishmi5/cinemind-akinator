@@ -127,7 +127,21 @@ Make it hilarious. Reply ONLY with the verdict string.`;
     const p1Ref = adminDb.collection(COLLECTIONS.users).doc(finalDuelData.challenger.uid);
     const p2Ref = adminDb.collection(COLLECTIONS.users).doc(finalDuelData.opponent!.uid);
     
-    // We update XP directly (in a real app we'd use LedgerEvent to ensure idempotency, but this is simple)
+    // CLAIM THE AWARD BEFORE PAYING IT. The guard above ("has this duel got a comparison yet?")
+    // is read outside any transaction and the LLM call sits between the read and the write, so two
+    // finalize requests arriving together both passed it and both credited XP. A single atomic
+    // flag on the duel decides who pays, once.
+    const claimedAward = await adminDb.runTransaction(async (t) => {
+      const snap = await t.get(duelRef);
+      const d = snap.data() as (Duel & { xpAwarded?: boolean }) | undefined;
+      if (!d || d.xpAwarded) return false;
+      t.update(duelRef, { xpAwarded: true });
+      return true;
+    });
+    if (!claimedAward) {
+      return NextResponse.json({ success: true, duelId, alreadyAwarded: true }, { status: 200 });
+    }
+
     await adminDb.runTransaction(async (t) => {
       const u1 = await t.get(p1Ref);
       const u2 = await t.get(p2Ref);

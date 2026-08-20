@@ -18,6 +18,12 @@ export interface MovieContext {
   easterEgg?: EasterEgg;
   /** TMDB genre IDs used internally by the recommendation engine */
   _genreIds?: number[];
+  /** TMDB original_language. Not shown to anyone — it exists so world-cinema coverage can be
+   *  measured. The persona suite could not check it at all before: "no film in 168 carried
+   *  original_language", which made a whole dimension of taste invisible to every test. */
+  _lang?: string;
+  /** Release year as a number, for the same reason: era coverage was unmeasurable. */
+  _year?: number;
   /** Curated sub-genre niches (from TMDB keywords) — the individuality layer */
   _niches?: string[];
   /** Micro-genre tags from the formula engine's own tagger (text + genre-id matching) */
@@ -31,7 +37,10 @@ export interface Question {
 }
 
 export interface VectorState {
-  possibleMoviesRemaining: number;
+  /** How many films are still candidates. Optional because the brain engine cannot measure it and
+   *  no longer sends it: its value there was derived from the progress bar, not from any pool the
+   *  engine holds. Only send this where a real candidate count exists. */
+  possibleMoviesRemaining?: number;
   leadingMicroGenres: string[];
 }
 
@@ -62,6 +71,10 @@ export interface SessionState {
   genreStats?: Record<string, { n: number; s: number }>;
   /** Count of REAL 1–5★ ratings only (NOT_SEEN never counts) — the completion clock. */
   ratedCount?: number;
+  /** True once stopping now would still produce a recommendation worth having. Lets the quiz
+   *  offer the exit in words to a tiring user instead of leaving "close the tab" as the only
+   *  obvious way out. */
+  readyToFinish?: boolean;
   /** Accumulated Fisher information of the taste estimate; SE=1/√(1+infoSum). */
   infoSum?: number;
   /** v12 raw per-genre observations {n,sum,sq} — basis for consistency confidence. */

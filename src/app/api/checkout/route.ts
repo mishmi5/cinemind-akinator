@@ -1,20 +1,35 @@
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { adminDb } from '@/lib/firebase-admin';
+import { COLLECTIONS } from '@/types/firebase';
+import { getStripe } from '@/lib/stripe';
 
-const VALID_PLAN_TYPES = ['credits', 'elite'] as const;
+// One paid plan. 'founder' — ₪99 once, lifetime access, capped at 200 seats.
+const VALID_PLAN_TYPES = ['founder'] as const;
 type PlanType = typeof VALID_PLAN_TYPES[number];
 
-// Lazy init: constructing Stripe at module scope throws when STRIPE_SECRET_KEY
-// is unset, which crashes `next build` during page-data collection.
-let stripeClient: Stripe | null = null;
-function getStripe(): Stripe | null {
-  if (!process.env.STRIPE_SECRET_KEY) return null;
-  if (!stripeClient) {
-    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2026-05-27.dahlia',
-    });
+const FOUNDER_PRICE_AGOROT = 9900; // ₪99.00, VAT included
+
+// The request's own origin wins over the env var: a stale NEXT_PUBLIC_BASE_URL
+// (it is http://localhost:3000 in .env.local) must never send a paying customer
+// back to localhost. If neither is available we throw instead of guessing.
+// Taking the request's Origin verbatim let an attacker create a genuine Stripe session whose
+// success_url pointed at their own domain — the victim really pays us, and Stripe then hands them
+// to the attacker's "one more step" page. Only hosts we own are acceptable.
+// The cap the pricing page promises. Kept next to the price so the two cannot drift.
+const FOUNDER_SEATS = 200;
+
+const ALLOWED_HOSTS = ['cinemind.co.il', 'www.cinemind.co.il', 'localhost:3000', 'localhost:3012'];
+function resolveBaseUrl(req: Request): string {
+  const origin = req.headers.get('origin');
+  if (origin) {
+    try {
+      const { host, protocol } = new URL(origin);
+      if (ALLOWED_HOSTS.includes(host) && (protocol === 'https:' || host.startsWith('localhost'))) return origin;
+    } catch { /* not a URL — fall through to the env value */ }
   }
-  return stripeClient;
+  const fromEnv = process.env.NEXT_PUBLIC_BASE_URL;
+  if (fromEnv) return fromEnv;
+  throw new Error('Cannot resolve base URL: no allowed Origin and NEXT_PUBLIC_BASE_URL is unset');
 }
 
 export async function POST(req: Request) {
@@ -30,59 +45,62 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid plan type' }, { status: 400 });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = resolveBaseUrl(req);
 
-    let sessionParams: Stripe.Checkout.SessionCreateParams;
+    // Who is buying. Without this the webhook has nobody to grant access to — the payment lands
+    // and no account becomes a founder.
+    // TODO(owner): src/app/[locale]/pricing/page.tsx does NOT send uid today, so every session is
+    // created anonymous and the webhook has nobody to grant to. The success page reconciliation
+    // covers it (it binds the session to the signed-in caller), but the webhook path stays blind
+    // until pricing sends `uid: user.uid`. One line there, and both paths work.
+    const uid = typeof body.uid === 'string' && body.uid.length > 0 ? body.uid : undefined;
 
-    if (planType === 'elite') {
-      // מסלול מנוי מתחדש (Subscription) - 34 ש"ח בחודש
-      sessionParams = {
-        payment_method_types: ['card'], // Stripe תומך פה אוטומטית ב-Apple/Google Pay
-        mode: 'subscription',
-        line_items: [
-          {
-            price_data: {
-              currency: 'ils',
-              product_data: {
-                name: 'CineMind Elite (Subscription)',
-                description: 'המלצות ללא הגבלה, פרופיל טעם מתעדכן, טריילרים ללא פרסומות.',
-              },
-              unit_amount: 3400, // אגורות (34.00 ש"ח)
-              recurring: {
-                interval: 'month',
-              },
-            },
-            quantity: 1,
-          },
-        ],
-        success_url: `${baseUrl}/scan?success=true`,
-        cancel_url: `${baseUrl}/pricing?canceled=true`,
-      };
-    } else {
-      // תשלום חד פעמי (One-time) - 50 טוקנים ב-19 ש"ח
-      sessionParams = {
-        payment_method_types: ['card'],
-        mode: 'payment',
-        line_items: [
-          {
-            price_data: {
-              currency: 'ils',
-              product_data: {
-                name: '50 Credits Pack',
-                description: '50 קרדיטים לשימוש בזירת ה-AI שלנו.',
-              },
-              unit_amount: 1900, // אגורות (19.00 ש"ח)
-            },
-            quantity: 1,
-          },
-        ],
-        success_url: `${baseUrl}/scan?success=true`,
-        cancel_url: `${baseUrl}/pricing?canceled=true`,
-      };
+    // THE 200 SEATS ARE A PROMISE, so they have to be enforced somewhere. The pricing page said
+    // "200 מקומות" while checkout would have sold the ten-thousandth one just as happily.
+    try {
+      const sold = await adminDb.collection(COLLECTIONS.users).where('isPremium', '==', true).count().get();
+      if (sold.data().count >= FOUNDER_SEATS) {
+        return NextResponse.json({ error: 'Founder seats are sold out', soldOut: true }, { status: 409 });
+      }
+    } catch (err) {
+      // A counting failure must not block a sale; it is logged and the cap is checked again by
+      // the webhook grant, which is the write that actually consumes a seat.
+      console.error('[checkout] seat count unavailable', err);
     }
 
-    // יצירת חלון התשלום המאובטח של Stripe
-    const session = await stripe.checkout.sessions.create(sessionParams);
+    // No payment_method_types: Stripe Checkout then offers every method enabled on
+    // the account, Apple Pay and Google Pay included. Hardcoding ['card'] blocks them.
+    // ponytail: Bit is not a Stripe method — it needs a local provider (Tranzila /
+    // Cardcom / PayPlus) as a second checkout route. Not wired yet.
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'ils',
+            product_data: {
+              name: 'CineMind מייסד — גישה לכל החיים',
+              description: 'תשלום חד-פעמי. פרופיל טעם שמור, חידונים ללא הגבלה, מייל שבועי והיסטוריית ההמלצות.',
+            },
+            unit_amount: FOUNDER_PRICE_AGOROT,
+          },
+          quantity: 1,
+        },
+      ],
+      client_reference_id: uid,
+      metadata: uid ? { uid } : undefined,
+      // Stripe issues the invoice and mails it to the buyer. We sent nothing at all before, while
+      // the privacy page promises invoices kept for seven years — this is the document that promise
+      // refers to. An invoice needs a Customer, which payment mode only creates when asked.
+      customer_creation: 'always',
+      invoice_creation: { enabled: true },
+      // {CHECKOUT_SESSION_ID} is substituted by Stripe. The success page posts it to
+      // /api/checkout/verify, which asks Stripe whether the money actually arrived and grants the
+      // seat if the webhook did not. Without this the success page is a cosmetic string and a
+      // missing webhook means ₪99 taken with nothing granted.
+      success_url: `${baseUrl}/purchase?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/pricing?canceled=true`,
+    });
 
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {

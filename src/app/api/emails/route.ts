@@ -1,10 +1,33 @@
 import { NextResponse } from 'next/server';
-// In production: import { Resend } from 'resend';
-// const resend = new Resend(process.env.RESEND_API_KEY);
+import { adminAuth } from '@/lib/firebase-admin';
+import { MARKETING_SENDER } from '@/lib/resend';
+// In production: import { resend } from '@/lib/resend';
+//
+// welcome/purchase are transactional — a reply to something the user just did —
+// so they carry no "פרסומת" marker and no unsubscribe link. If either one ever
+// grows a promo section, move it to sendMarketingEmail() in @/lib/resend.
+// Sender domain: cinemind.co.il everywhere (see MARKETING_SENDER; needs SPF+DKIM).
 
 export async function POST(req: Request) {
   try {
-    const { email, type, name } = await req.json();
+    // This route took the recipient address and the display name straight from the body, with no
+    // authentication — the moment the send below is enabled it becomes an open relay that puts
+    // attacker-written HTML in anyone's inbox, from our domain. The caller must now be a signed-in
+    // user, and we mail the address on their own account, never one they typed.
+    const authHeader = req.headers.get('authorization') || '';
+    const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!idToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let decoded;
+    try { decoded = await adminAuth.verifyIdToken(idToken); }
+    catch { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); }
+    const email = decoded.email;
+    if (!email) return NextResponse.json({ error: 'Account has no email address' }, { status: 400 });
+
+    const body = await req.json();
+    const type = body?.type;
+    // Escaped: the name was interpolated into the HTML as-is.
+    const name = String(body?.name || '').slice(0, 60)
+      .replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
     // הגדרת תוכן האימייל לפי סוג הפעולה
     let subject = '';
@@ -39,11 +62,11 @@ export async function POST(req: Request) {
     }
 
     // סימולציית שליחה (בפרודקשן מחליפים ל-resend.emails.send)
-    console.log(`[EMAIL SYSTEM] Sending '${type}' email to ${email}`);
-    
-    /* 
+    console.log(`[EMAIL SYSTEM] Sending '${type}' email from ${MARKETING_SENDER} to ${email}`);
+
+    /*
     await resend.emails.send({
-      from: 'CineMind <hello@cinemind.co.il>',
+      from: MARKETING_SENDER,
       to: email,
       subject: subject,
       html: htmlContent,

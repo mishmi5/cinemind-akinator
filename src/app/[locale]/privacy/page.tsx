@@ -1,39 +1,84 @@
 import React from 'react';
+import { getTranslations } from 'next-intl/server';
 
-export const metadata = {
-  title: 'מדיניות פרטיות',
-};
+const SUPPORT_EMAIL = 'hello@cinemind.co.il';
 
-export default function PrivacyPage() {
+export async function generateMetadata() {
+  const t = await getTranslations('Privacy');
+  return { title: t('meta_title') };
+}
+
+export default async function PrivacyPage() {
+  const t = await getTranslations('Privacy');
+
+  const tags = {
+    b: (chunks: React.ReactNode) => <strong className="text-white">{chunks}</strong>,
+    mail: () => (
+      <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 underline">
+        {SUPPORT_EMAIL}
+      </a>
+    ),
+  };
+
   return (
     <div className="min-h-screen bg-[#070709] text-zinc-300 py-20 px-4 md:px-8">
       <div className="max-w-3xl mx-auto bg-zinc-900/50 p-8 md:p-12 rounded-3xl border border-zinc-800">
-        <h1 className="text-4xl font-black text-white mb-8 text-center bg-gradient-to-l from-indigo-500 to-cyan-500 bg-clip-text text-transparent">מדיניות פרטיות</h1>
-        
+        <h1 className="text-4xl font-black text-white mb-8 text-center bg-gradient-to-l from-indigo-500 to-cyan-500 bg-clip-text text-transparent">{t('title')}</h1>
+
+        <p className="text-center text-zinc-400 text-sm mb-8">{t('updated')}</p>
+
         <div className="space-y-8 text-sm md:text-base leading-relaxed">
           <section>
-            <h2 className="text-xl font-bold text-white mb-3">1. שמירה על הפרטיות שלך</h2>
-            <p>ב-CineMind, פרטיות המשתמשים היא ערך עליון. אנו מחויבים להגן על המידע האישי שלך ולא למכור אותו או להעבירו לצדדים שלישיים ללא הסכמתך המפורשת.</p>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s1_h')}</h2>
+            <p>{t('s1_p')}</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-white mb-3">2. איסוף נתונים ושימוש</h2>
-            <p>אנו אוספים נתונים אודות העדפות הקולנוע שלך (היסטוריית צפייה, תשובות לשאלונים, ז'אנרים אהובים) אך ורק על מנת לשפר את אלגוריתם ה"מיקרו-ז'אנר" שלנו ולספק לך המלצות מדויקות ואישיות. הנתונים נשמרים בצורה מאובטחת תחת חוקי האבטחה המחמירים של Firebase.</p>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s2_h')}</h2>
+            <p>{t('s2_p')}</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-white mb-3">3. פרטי תשלום (Stripe)</h2>
-            <p>כל פעולות הסליקה מתבצעות על ידי צד שלישי המוסמך לכך (Stripe). אנו לא אוספים, לא רואים ולא שומרים את מספרי כרטיסי האשראי או פרטי חשבון הבנק שלך בשום שלב.</p>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s3_h')}</h2>
+            <ul className="list-disc ps-5 space-y-2">
+              <li>{t.rich('s3_li1', tags)}</li>
+              <li>{t.rich('s3_li2', tags)}</li>
+              <li>{t.rich('s3_li3', tags)}</li>
+              <li>{t.rich('s3_li4', tags)}</li>
+              <li>{t.rich('s3_li5', tags)}</li>
+            </ul>
+            <p className="mt-3">{t('s3_close')}</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-white mb-3">4. Cookies וטכנולוגיות מעקב</h2>
-            <p>האתר משתמש בקובצי עוגיות (Cookies) אך ורק לצורך ניהול התחברות (Authentication) ושמירת הסטטוס שלך באתר (כגון מניעת הצורך להתחבר מחדש בכל ביקור). איננו משתמשים בעוגיות לצורכי פרסום פולשני.</p>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s4_h')}</h2>
+            <p>{t.rich('s4_p', tags)}</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-white mb-3">5. זכויותיך</h2>
-            <p>מורה לך הזכות לעיין, לתקן או למחוק לחלוטין את המידע שצברנו אודותיך (ה-DNA הקולנועי שלך). ניתן לפנות לשירות הלקוחות שלנו לשם ביצוע מחיקה מוחלטת מהמערכת.</p>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s5_h')}</h2>
+            <p>{t.rich('s5_p', tags)}</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s6_h')}</h2>
+            <p>{t('s6_p')}</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s7_h')}</h2>
+            <p>{t.rich('s7_p', tags)}</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-white mb-3">{t('s8_h')}</h2>
+            {/* TODO(owner): real company name, ח.פ./ע.מ. and address before launch */}
+            <p>
+              {t('s8_owner_label')}<strong className="text-white">CineMind</strong>{' '}
+              <span className="text-amber-400">{t('s8_owner_todo')}</span>
+              {t('s8_contact')}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-400 underline">{SUPPORT_EMAIL}</a>.
+            </p>
           </section>
         </div>
       </div>

@@ -1,11 +1,23 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useLocale } from 'next-intl';
+import { Link } from '@/i18n/routing';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
+// The value stored on the profile stays stable in English; only what the user reads is translated.
+// A Hebrew visitor was picking their own title from a list written entirely in Latin script.
 const TITLES = ["Master of Horror", "Space Explorer", "Action Hero", "Comedy Genius", "Drama Queen", "Cinematic Architect"];
+const TITLE_HE: Record<string, string> = {
+  "Master of Horror": "אלוף האימה",
+  "Space Explorer": "חוקר החלל",
+  "Action Hero": "גיבור אקשן",
+  "Comedy Genius": "גאון הקומדיה",
+  "Drama Queen": "מלכת הדרמה",
+  "Cinematic Architect": "אדריכל קולנועי",
+};
 const COLORS = [
   { id: 'indigo', name: 'Cyber Blue', hex: '#6366f1', glow: 'rgba(99,102,241,0.4)', bg: 'bg-indigo-500' },
   { id: 'rose', name: 'Neon Red', hex: '#f43f5e', glow: 'rgba(244,63,94,0.4)', bg: 'bg-rose-500' },
@@ -18,24 +30,18 @@ export default function UserProfile() {
   const [title, setTitle] = useState(TITLES[0]);
   const [accent, setAccent] = useState(COLORS[0]);
   
-  // נתוני דמי של משתמש מחובר
-  const user = {
-    name: "עידן",
-    plan: "CineMind Elite",
-    tokens: 420,
-    topGenres: ["Dark Comedy", "Psychological Thriller", "Cyberpunk"],
-    avatars: [
-      `https://api.dicebear.com/7.x/avataaars/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`,
-      `https://api.dicebear.com/7.x/bottts/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`,
-      `https://api.dicebear.com/7.x/micah/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`,
-      `https://api.dicebear.com/7.x/adventurer/svg?seed=Idan&backgroundColor=${accent.hex.replace('#','')}`
-    ]
-  };
-
+  const locale = useLocale();
+  const dir = locale === 'he' ? 'rtl' : 'ltr';
   const { user: authUser, loading } = useAuth();
   const [xp, setXp] = useState(0);
-  const [referrals, setReferrals] = useState(0);
-  
+
+  // Avatar art only — it used to sit inside a fake "user" object that also carried an
+  // invented name, plan and token balance, shown identically to every visitor.
+  const avatarSeed = authUser?.uid || 'guest';
+  const avatars = ['avataaars', 'bottts', 'micah', 'adventurer'].map(
+    (style) => `https://api.dicebear.com/7.x/${style}/svg?seed=${avatarSeed}&backgroundColor=${accent.hex.replace('#','')}`
+  );
+
   useEffect(() => {
     const savedXp = localStorage.getItem('cinemind_xp');
     if (savedXp) setXp(parseInt(savedXp, 10));
@@ -50,6 +56,7 @@ export default function UserProfile() {
     loved: { term: string; score: number }[];
     rejected: { term: string; score: number }[];
     totalTerms?: number;
+    economy?: { xp?: number; streak?: number } | null;
   } | null>(null);
   useEffect(() => {
     if (!authUser) return;
@@ -58,30 +65,30 @@ export default function UserProfile() {
       try {
         const token = await authUser.getIdToken();
         const res = await fetch('/api/user/profile', { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok && !cancelled) setTaste(await res.json());
+        if (res.ok && !cancelled) {
+          const body = await res.json();
+          setTaste(body);
+          // The server is the one that awards XP, so it is the one that knows the total. This page
+          // used to read localStorage only, which meant a user the server had paid 100 XP was shown 0.
+          if (typeof body?.economy?.xp === 'number') setXp(body.economy.xp);
+        }
       } catch { /* leave the empty state — never block the page on this */ }
     })();
     return () => { cancelled = true; };
   }, [authUser]);
 
-  const copyReferralLink = () => {
-    const link = `https://cinemind.co/?ref=${authUser?.uid || 'guest'}`;
-    navigator.clipboard.writeText(link);
-    alert('הלינק הועתק! שלח לחברים כדי להרוויח עוד קרדיטים.');
-  };
-
-  const currentAvatar = user.avatars[avatarIndex];
+  const currentAvatar = avatars[avatarIndex];
 
   if (loading) {
     return (
-      <main dir="rtl" className="min-h-screen bg-[#070709] text-white flex items-center justify-center">
+      <div dir={dir} className="min-h-screen bg-[#070709] text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden pb-20">
+    <div dir={dir} className="min-h-screen bg-[#070709] text-white font-sans overflow-x-hidden pb-20">
       <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 mt-12">
@@ -90,36 +97,41 @@ export default function UserProfile() {
           <div className="absolute top-0 right-0 w-64 h-64 blur-[100px] pointer-events-none transition-colors duration-500" style={{ backgroundColor: accent.glow }}></div>
           
           <div className="w-32 h-32 rounded-full border-4 p-1 relative bg-zinc-900 transition-colors duration-500" style={{ borderColor: accent.hex, boxShadow: `0 0 30px ${accent.glow}` }}>
-            <img src={currentAvatar} alt="Avatar" className="w-full h-full rounded-full transition-all duration-500" />
-            <button 
-              onClick={() => setAvatarIndex((prev) => (prev + 1) % user.avatars.length)}
-              className="absolute bottom-0 right-0 w-8 h-8 bg-white text-black rounded-full flex items-center justify-center font-bold shadow-lg hover:scale-110 transition-transform"
+            {/* Decorative: the avatar art carries no information the name beside it does not. */}
+            <img src={currentAvatar} alt="" className="w-full h-full rounded-full transition-all duration-500" />
+            <button
+              onClick={() => setAvatarIndex((prev) => (prev + 1) % avatars.length)}
+              aria-label={locale === 'he' ? 'החלפת האווטאר' : 'Change avatar'}
+              className="absolute bottom-0 end-0 w-11 h-11 bg-white text-black rounded-full flex items-center justify-center font-bold shadow-lg hover:scale-110 transition-transform"
             >
-              ↻
+              <span aria-hidden="true">↻</span>
             </button>
           </div>
 
           <div className="flex-1 text-center md:text-right z-10">
             <h1 className="text-4xl font-black mb-1">{authUser?.displayName || authUser?.email?.split('@')[0] || (taste?.hasProfile ? 'הפרופיל שלך' : 'אורח')}</h1>
-            <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{title}</div>
+            <div className="text-xl font-bold mb-3 transition-colors duration-500" style={{ color: accent.hex }}>{locale === 'he' ? (TITLE_HE[title] || title) : title}</div>
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm font-bold mb-2">
-              👑 {taste?.isPremium ? 'CineMind Elite' : 'חשבון חינם'}
+              👑 {taste?.isPremium ? 'מקום מייסד' : 'חשבון חינם'}
             </div>
-            <div className="text-xs text-zinc-500 mb-4 font-mono">
+            <div className="text-xs text-zinc-400 mb-4 font-mono">
               {!isFirebaseConfigured ? "אורח זמני" : 
                 (authUser?.isAnonymous ? "אורח זמני" : authUser?.email)}
             </div>
             <p className="text-zinc-400 text-sm max-w-md">
-              כמשתמש Elite, יש לך גישה לניהול מתקדם של ה-DNA שלך, התאמת אווטאר אישית, וכניסה חופשית לזירת הטריוויה.
+              כאן יושב פרופיל הטעם שהחידון בנה לך, האווטאר שבחרת, וה-XP שצברת בזירה.
             </p>
           </div>
 
           <div className="bg-black/50 border border-white/10 rounded-2xl p-6 text-center min-w-[150px] z-10">
-            <div className="text-sm font-bold text-zinc-500 mb-1">XP נצבר</div>
+            <div className="text-sm font-bold text-zinc-400 mb-1">XP נצבר</div>
             <div className="text-4xl font-black drop-shadow-[0_0_10px_rgba(225,29,72,0.4)]" style={{ color: accent.hex }}>{xp}</div>
-            <button className="mt-4 text-xs font-bold text-white bg-white/10 hover:bg-white/20 w-full py-2 rounded-lg transition-colors">
+            <Link
+              href="/arena"
+              className="mt-4 block text-xs font-bold text-white bg-white/10 hover:bg-white/20 w-full py-2 rounded-lg transition-colors"
+            >
               שחק בזירה 👾
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -153,9 +165,15 @@ export default function UserProfile() {
                 </div>
               ))}
             </div>
-            <button className="mt-8 w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold text-sm text-zinc-300 transition-colors border border-white/5">
-              איפוס וכיול מחדש
-            </button>
+            {/* This said "reset and recalibrate" and did nothing at all — no handler, no endpoint.
+                Answering the quiz again IS the recalibration, so the button now says that and goes
+                there. A true delete-my-profile control belongs with the privacy request flow. */}
+            <Link
+              href="/scan"
+              className="mt-8 block text-center w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold text-sm text-zinc-300 transition-colors border border-white/5"
+            >
+              לענות על השאלון מחדש
+            </Link>
           </div>
 
           {/* היסטוריית סריקות (Top 3 Matches) */}
@@ -164,24 +182,15 @@ export default function UserProfile() {
               <span className="text-rose-500">🏆</span> הסריקות האחרונות
             </h2>
             <div className="space-y-4">
-              {[
-                { title: 'שבעה חטאים', match: 99, date: 'היום' },
-                { title: 'התחלה', match: 94, date: 'אתמול' },
-                { title: 'מטריקס', match: 91, date: 'לפני 3 ימים' }
-              ].map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center p-4 bg-black/40 rounded-xl border border-white/5">
-                  <div>
-                    <div className="font-bold text-white">{item.title}</div>
-                    <div className="text-xs text-zinc-500">{item.date}</div>
-                  </div>
-                  <div className="bg-rose-500/10 text-rose-500 px-3 py-1 rounded font-bold text-sm border border-rose-500/20">
-                    {item.match}% התאמה
-                  </div>
-                </div>
-              ))}
+              {/* The three films that used to sit here — שבעה חטאים 99%, התחלה 94%, מטריקס 91% —
+                  were hardcoded and identical for every visitor. Scan history is not stored
+                  anywhere yet, so there is nothing honest to list. */}
+              <p className="text-zinc-400 text-sm">
+                שמירת היסטוריית הסריקות עוד לא עלתה. הסרטים שקיבלת בחידון האחרון מופיעים במסך התוצאות עצמו.
+              </p>
               {!!taste?.rejected?.length && (
                 <div className="pt-4 mt-2 border-t border-white/5">
-                  <div className="text-xs text-zinc-500 font-bold mb-2">ומה שלא נמליץ לך לעולם:</div>
+                  <div className="text-xs text-zinc-400 font-bold mb-2">ומה שלא נמליץ לך לעולם:</div>
                   <div className="flex flex-wrap gap-2">
                     {taste.rejected.map(({ term }) => (
                       <span key={term} className="text-xs bg-white/5 border border-white/10 text-zinc-400 rounded-lg px-2 py-1">{term}</span>
@@ -196,7 +205,7 @@ export default function UserProfile() {
         {/* Profile Customization Section */}
         <div className="mt-8 bg-[#111113] border border-white/5 rounded-2xl p-8">
           <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-            <span style={{ color: accent.hex }}>✨</span> התאמה אישית (Elite)
+            <span style={{ color: accent.hex }}>✨</span> התאמה אישית
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -208,7 +217,7 @@ export default function UserProfile() {
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-white/30 transition-colors"
               >
-                {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                {TITLES.map(t => <option key={t} value={t}>{locale === 'he' ? (TITLE_HE[t] || t) : t}</option>)}
               </select>
             </div>
 
@@ -236,31 +245,17 @@ export default function UserProfile() {
           </div>
           
           <h2 className="text-2xl font-black mb-4 flex items-center gap-2">
-            <span>🎁</span> קבל המלצות בחינם
+            <span>🎁</span> חבר מביא חבר — בקרוב
           </h2>
-          <p className="text-zinc-400 mb-8 max-w-xl leading-relaxed">
-            שתף את הלינק הייחודי שלך עם חברים. על כל חבר שייכנס וישלים את החידון, אתה תקבל <strong className="text-white">חשיפת סרט אחת בחינם (בשווי ₪9)</strong>.
+          {/* This card used to hand out a referral link and promise a free ₪9 reveal per
+              friend. Nothing counted invitations and no credit was ever granted, so the
+              link and the counter are gone until the program actually exists. */}
+          <p className="text-zinc-400 max-w-xl leading-relaxed">
+            אנחנו בונים מסלול שבו הזמנת חברים מזכה אותך בהמלצות. הוא עוד לא פעיל, ולכן אין כאן לינק הפניה — כשנפעיל אותו זה יופיע בדיוק פה.
           </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 items-stretch mb-8">
-            <div className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-3 flex items-center font-mono text-sm text-zinc-500 overflow-hidden text-ellipsis whitespace-nowrap">
-              https://cinemind.co/?ref={authUser?.uid || 'guest'}
-            </div>
-            <button 
-              onClick={copyReferralLink}
-              className="px-8 py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(225,29,72,0.3)] whitespace-nowrap"
-            >
-              העתק לינק
-            </button>
-          </div>
-
-          <div className="flex items-center gap-4 text-sm font-bold bg-white/5 inline-flex px-4 py-2 rounded-lg border border-white/5">
-            <span className="text-zinc-400">חברים שהזמנת:</span>
-            <span className="text-rose-400 text-lg">{referrals}</span>
-          </div>
         </div>
 
       </div>
-    </main>
+    </div>
   );
 }
