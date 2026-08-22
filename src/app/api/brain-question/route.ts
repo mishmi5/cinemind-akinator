@@ -327,7 +327,7 @@ export async function POST(req: Request) {
     // enough that a shared address is not collateral damage. A flooder who rotates session ids to
     // dodge the session limit still meets the IP ceiling.
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-    if (!checkRateLimit('brain-ip:' + ip, 600, 60_000)) {
+    if (!(await checkRateLimit('brain-ip:' + ip, 600, 60_000))) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
@@ -351,7 +351,7 @@ export async function POST(req: Request) {
     // them off mid-quiz would be the worst possible reading of "abuse". Ninety still means a
     // machine, since a replay flood fires hundreds in the same window.
     const rlSessionId = typeof payload.sessionId === 'string' ? payload.sessionId.slice(0, 128) : '';
-    if (rlSessionId && !checkRateLimit('brain-session:' + rlSessionId, 90, 60_000)) {
+    if (rlSessionId && !(await checkRateLimit('brain-session:' + rlSessionId, 90, 60_000))) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
     // Absent and "he" are not the same thing, so the raw header is kept: a request that OMITS the
@@ -387,7 +387,7 @@ export async function POST(req: Request) {
     //    copy is only a fallback for continuity after a cold start or a redeploy, and a session
     //    restored that way is NOT eligible to be paid for.
     const sessionKey = typeof payload.sessionId === 'string' ? payload.sessionId : '';
-    const stored = payload.isInit ? startSession(sessionKey) : getSession(sessionKey);
+    const stored = payload.isInit ? await startSession(sessionKey) : await getSession(sessionKey);
     // The language belongs to the quiz, not to the request. Every title, synopsis and question in a
     // session was fetched in one language, so a request arriving WITHOUT an x-locale header used to
     // fall back to Hebrew and start mixing Hebrew films into an English quiz mid-run.
@@ -1521,7 +1521,7 @@ export async function POST(req: Request) {
           stored.servedTitles = [...stored.servedTitles, titleKey(movie.title)].slice(-200);
           stored.history = history; stored.probe = probe; stored.notSeen = notSeen;
           stored.skipYears = skipYears; stored.shown = shown;
-          saveSession(sessionKey, stored);
+          await saveSession(sessionKey, stored);
         }
         movie.trailerId = await getTrailer(movie.id);
         // The chosen film's own sub-genre, so the answer to it scores that sub-genre when it comes
@@ -2149,7 +2149,7 @@ export async function POST(req: Request) {
     }
 
     let proofToken: string | undefined;
-    if (isVerified(sessionKey)) {
+    if (await isVerified(sessionKey)) {
       try {
         proofToken = signSessionState({
           sessionId,

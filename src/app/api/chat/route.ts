@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     // made it an unauthenticated pipe straight into a paid model: any caller could send its own
     // `system` role (direct prompt injection) and as many tokens as it liked, on our bill.
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'anon';
-    if (!checkRateLimit('chat:' + ip, 20, 60_000)) {
+    if (!(await checkRateLimit('chat:' + ip, 20, 60_000))) {
       return new Response(JSON.stringify({ error: 'Too many requests' }), { status: 429 });
     }
     const body = await req.json();

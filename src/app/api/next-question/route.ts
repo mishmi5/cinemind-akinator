@@ -164,7 +164,7 @@ async function fetchMoviesFromTMDB(page: number, affinities: Record<string, numb
 export async function POST(req: Request) {
   try {
     const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-    if (!checkRateLimit(ip, 50, 60000)) { // Max 50 requests per minute
+    if (!(await checkRateLimit(ip, 50, 60000))) { // Max 50 requests per minute
       return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
     }
 
